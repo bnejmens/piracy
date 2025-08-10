@@ -4,86 +4,71 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { sanitize } from 'isomorphic-dompurify'   // ← remplace dompurify
+import { sanitize } from 'isomorphic-dompurify'
 import { supabase } from '../../lib/supabaseClient'
 
-/* ------------ Réglages “verre flou” (opacité + blur) ------------ */
+/* ------------ Réglages “verre flou” ------------ */
 const GLASS = {
-  left:   { bg: 'rgba(255,255,255,0.08)', blur: '2px'  }, // Sujets (léger)
-  editor: { bg: 'rgba(255,255,255,0.12)', blur: '10px' }, // Éditeur (moyen+)
-  right:  { bg: 'rgba(255,255,255,0.15)', blur: '14px'  }, // Posts (léger)
-  cardMine:  { bg: 'rgba(255,255,255,0.12)', blur: '14px' }, // Post du joueur (plus fort)
-  cardOther: { bg: 'rgba(255,255,255,0.10)', blur: '8px'  }, // Post des autres
+  left:   { bg: 'rgba(255,255,255,0.08)', blur: '2px'  },
+  editor: { bg: 'rgba(255,255,255,0.12)', blur: '10px' },
+  right:  { bg: 'rgba(255,255,255,0.15)', blur: '14px' },
+  cardMine:  { bg: 'rgba(255,255,255,0.12)', blur: '14px' },
+  cardOther: { bg: 'rgba(255,255,255,0.10)', blur: '8px'  },
 }
 const frost = v => ({ backgroundColor: v.bg, backdropFilter: `blur(${v.blur})`, WebkitBackdropFilter: `blur(${v.blur})` })
 
-/* -------------------- BBCode -> HTML étendu -------------------- */
+/* -------------------- BBCode -> HTML -------------------- */
 function bbcodeToHtml(src) {
   if (!src) return ''
   let s = src.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
-  // basiques
   s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>')
   s = s.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>')
   s = s.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>')
   s = s.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<s>$1</s>')
-
-  // titres / ligne
   s = s.replace(/\[h2\]([\s\S]*?)\[\/h2\]/gi, '<h2>$1</h2>')
   s = s.replace(/\[hr\]/gi, '<hr/>')
-
-  // quote / code
   s = s.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote>$1</blockquote>')
   s = s.replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<pre><code>$1</code></pre>')
-
-  // couleurs / tailles
   s = s.replace(/\[color=([#a-z0-9]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color:$1">$2</span>')
   s = s.replace(/\[size=(\d{1,2})\]([\s\S]*?)\[\/size\]/gi, (_, n, inner) => `<span style="font-size:${Math.max(10,Math.min(+n,48))}px">${inner}</span>`)
-
-  // alignements
   s = s.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div style="text-align:center">$1</div>')
   s = s.replace(/\[left\]([\s\S]*?)\[\/left\]/gi,   '<div style="text-align:left">$1</div>')
   s = s.replace(/\[right\]([\s\S]*?)\[\/right\]/gi, '<div style="text-align:right">$1</div>')
-
-  // listes
   s = s.replace(/\[ul\]([\s\S]*?)\[\/ul\]/gi, (_, body) => `<ul>${body.replace(/\[li\]([\s\S]*?)\[\/li\]/gi,'<li>$1</li>')}</ul>`)
   s = s.replace(/\[ol\]([\s\S]*?)\[\/ol\]/gi, (_, body) => `<ol>${body.replace(/\[li\]([\s\S]*?)\[\/li\]/gi,'<li>$1</li>')}</ol>`)
-
-  // liens / images
   s = s.replace(/\[url=(https?:\/\/[^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>')
   s = s.replace(/\[img\](https?:\/\/[^\]]+)\[\/img\]/gi, '<img src="$1" alt="" />')
-
-  // sauts de ligne
   s = s.replace(/\r?\n/g, '<br/>')
   return s
 }
 
-// Listes de whitelist compatibles DOMPurify
-const ALLOWED_TAGS = [
-  'a','b','strong','i','em','u','s','blockquote','pre','code','span','div','ul','ol','li','br','hr','img','h2','p'
-]
+const ALLOWED_TAGS = ['a','b','strong','i','em','u','s','blockquote','pre','code','span','div','ul','ol','li','br','hr','img','h2','p']
 const ALLOWED_ATTR = ['href','target','rel','style','src','alt','title','width','height']
 
 /* --------------------------- Page RP --------------------------- */
 export default function RPPage() {
   const router = useRouter()
 
-  // session + identités (profils partageant le même email)
+  // session + profil
   const [session, setSession] = useState(null)
   const [me, setMe] = useState(null)
+
+  // identités "comptes" partageant l'email (on garde si besoin plus tard)
   const [myIdentities, setMyIdentities] = useState([])
 
-  // sujets
+  // 🆕 personnages actifs du compte
+  const [myChars, setMyChars] = useState([])
+  const [postAsCharId, setPostAsCharId] = useState(null) // ← personnage sélectionné pour poster
+
+  // sujets & posts
   const [topics, setTopics] = useState([])
   const [topicsPage, setTopicsPage] = useState(1)
   const TOPICS_PER_PAGE = 10
 
-  // sujet actif & posts
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
 
   // éditeur
-  const [postAs, setPostAs] = useState(null)  // user_id utilisé comme auteur
   const [raw, setRaw] = useState('')
   const textareaRef = useRef(null)
   const [isPreviewOpen, setPreviewOpen] = useState(false)
@@ -91,7 +76,7 @@ export default function RPPage() {
   const endRef = useRef(null)
   const scrollToEnd = () => endRef.current?.scrollIntoView({ behavior: 'smooth' })
 
-  // PREVIEW (hook AVANT tout return conditionnel)
+  // PREVIEW
   const htmlPreview = useMemo(() => {
     const html = bbcodeToHtml(raw)
     return sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
@@ -104,18 +89,27 @@ export default function RPPage() {
       if (!session) { router.push('/auth'); return }
       setSession(session)
 
-      const { data: myProfile, error: e1 } = await supabase
+      const { data: myProfile } = await supabase
         .from('profiles').select('*').eq('user_id', session.user.id).maybeSingle()
-      if (e1) { console.error(e1); return }
-      setMe(myProfile)
+      setMe(myProfile || null)
 
-      const { data: ids, error: e2 } = await supabase
-        .from('profiles').select('user_id, pseudo, avatar_url, email')
-        .eq('email', myProfile.email)
+      const { data: ids } = await supabase
+        .from('profiles').select('user_id, pseudo, avatar_url, email, active_character_id')
+        .eq('email', myProfile?.email ?? null)
         .order('created_at', { ascending: true })
-      if (e2) { console.error(e2); return }
       setMyIdentities(ids || [])
-      setPostAs(myProfile.user_id)
+
+      // 🆕 charger mes personnages actifs
+      const { data: chars } = await supabase
+        .from('characters')
+        .select('id, name, avatar_url, is_active')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+      setMyChars(chars || [])
+
+      // Sélection par défaut : profil.active_character_id sinon 1er perso actif
+      setPostAsCharId(myProfile?.active_character_id || (chars?.[0]?.id ?? null))
 
       await loadTopics()
     }
@@ -131,15 +125,16 @@ export default function RPPage() {
     if (error) { console.error(error); return }
     setTopics(data || [])
     if (!activeTopic && (data?.length||0) > 0) {
-      setActiveTopic(data[0])
-      await loadPosts(data[0].id)
+      const first = data[0]
+      setActiveTopic(first)
+      await loadPosts(first.id)
     }
   }
 
   const loadPosts = async (topicId) => {
     const { data, error } = await supabase
       .from('rp_posts')
-      .select('id, topic_id, author_id, content_html, created_at')
+      .select('id, topic_id, author_id, author_character_id, content_html, created_at')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true })
       .limit(300)
@@ -162,30 +157,36 @@ export default function RPPage() {
     await loadPosts(data.id)
   }
 
-   const publishPost = async () => {
-  if (!raw.trim() || !activeTopic || !postAs || !session) return
-  const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
-  const { data, error } = await supabase
-    .from('rp_posts')
-    .insert({ 
-      topic_id: activeTopic.id, 
-      author_id: postAs, 
-      author_user_id: session.user.id, 
-      content_raw: raw, 
-      content_html: processedHtml  // ← Changement clé : utilise content_html au lieu de html
-    })
-    .select('id, topic_id, author_id, content_html, created_at')  // ← Sélectionne content_html
-    .single()
-  if (error) { 
-    console.error(error);  // Pour voir les détails en console
-    alert(error.message); 
-    return 
+  // 🔐 (optionnel) policy côté DB à prévoir :
+  // WITH CHECK: author_user_id = auth.uid() AND author_character_id IN (SELECT id FROM characters WHERE user_id = auth.uid())
+
+  const publishPost = async () => {
+    if (!raw.trim() || !activeTopic || !postAsCharId || !session) return
+
+    const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
+
+    const payload = {
+      topic_id: activeTopic.id,
+      author_id: session.user.id,             // profil propriétaire du post (ton compte)
+      author_user_id: session.user.id,        // auteur technique (audit)
+      author_character_id: postAsCharId,      // 🆕 personnage sélectionné
+      content_raw: raw,
+      content_html: processedHtml,
+    }
+
+    const { data, error } = await supabase
+      .from('rp_posts')
+      .insert(payload)
+      .select('id, topic_id, author_id, author_character_id, content_html, created_at')
+      .single()
+
+    if (error) { console.error(error); alert(error.message); return }
+
+    setPosts(p => [...p, data])
+    setRaw('')
+    setPreviewOpen(false)
+    setTimeout(scrollToEnd, 0)
   }
-  setPosts(p => [...p, data])
-  setRaw('')
-  setPreviewOpen(false)
-  setTimeout(scrollToEnd, 0)
-}
 
   // utils
   const pageCount = Math.max(1, Math.ceil(topics.length / TOPICS_PER_PAGE))
@@ -214,7 +215,7 @@ export default function RPPage() {
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/20 via-slate-900/15 to-slate-950/35" />
 
-      {/* ← Tableau de bord (au-dessus d’Ambiance) */}
+      {/* ← Tableau de bord */}
       <button
         onClick={() => router.push('/dashboard')}
         className="fixed left-10 bottom-[96px] z-50 rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20"
@@ -222,7 +223,7 @@ export default function RPPage() {
         ← Tableau de bord
       </button>
 
-      {/* GRID: 3 colonnes : Sujets / Éditeur / Posts */}
+      {/* GRID */}
       <div className="relative z-10 h-full grid gap-6 p-6
                       grid-cols-[420px_420px_minmax(0,1fr)]
                       xl:grid-cols-[380px_380px_minmax(0,1fr)]
@@ -276,19 +277,18 @@ export default function RPPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-white/80 text-sm">Poster en tant que</span>
               <select
-                value={postAs || ''}
-                onChange={e => setPostAs(e.target.value)}
+                value={postAsCharId || ''}
+                onChange={e => setPostAsCharId(e.target.value)}
                 className="rounded-lg bg-white/10 border border-white/15 px-3 py-1.5 text-white outline-none"
               >
-                {myIdentities.map(p => (
-                  <option key={p.user_id} value={p.user_id}>
-                    {p.pseudo || p.email?.split('@')[0] || 'Profil'}
+                {myChars.map(ch => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Barre d’édition (telle que tu l’avais) */}
             <EditorToolbar
               onBold={() => insertAroundSelection('[b]','[/b]')}
               onItalic={() => insertAroundSelection('[i]','[/i]')}
@@ -332,7 +332,7 @@ export default function RPPage() {
               </button>
               <button
                 onClick={publishPost}
-                disabled={!activeTopic || !raw.trim()}
+                disabled={!activeTopic || !raw.trim() || !postAsCharId}
                 className="rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2 hover:bg-amber-200 disabled:opacity-50"
               >
                 Publier
@@ -350,14 +350,16 @@ export default function RPPage() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-5">
             {activeTopic && posts.map(p => {
-              const mine = p.author_id === postAs
+              const mine = p.author_id === session?.user?.id
               return (
                 <article key={p.id}
                          className="rounded-2xl border px-4 py-3"
                          style={frost(mine ? GLASS.cardMine : GLASS.cardOther)}>
-                  {/* En-tête auteur : avatar + grand, nom + grand, date petite */}
-                  <PostHeader authorId={p.author_id} createdAt={p.created_at} />
-
+                  <PostHeader
+                    authorId={p.author_id}
+                    authorCharacterId={p.author_character_id}  // 🆕
+                    createdAt={p.created_at}
+                  />
                   <div
                     className="prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20 prose-a:text-amber-300"
                     dangerouslySetInnerHTML={{ __html: p.content_html }}
@@ -375,19 +377,19 @@ export default function RPPage() {
 
       {/* -------- MODALE PRÉVISUALISATION -------- */}
       {isPreviewOpen && (
-  <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4">
-    <div className="w-full max-w-3xl rounded-2xl border border-gray-300 p-4 bg-white/90 backdrop-blur-sm">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-gray-800 font-semibold">Prévisualisation</h3>
-        <button
-          onClick={() => setPreviewOpen(false)}
-          className="rounded-md bg-gray-100 border border-gray-300 px-3 py-1.5 text-gray-800 hover:bg-gray-200 transition-colors"
-        >
-          Fermer
-        </button>
+        <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-gray-300 p-4 bg-white/90 backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-gray-800 font-semibold">Prévisualisation</h3>
+              <button
+                onClick={() => setPreviewOpen(false)}
+                className="rounded-md bg-gray-100 border border-gray-300 px-3 py-1.5 text-gray-800 hover:bg-gray-200 transition-colors"
+              >
+                Fermer
+              </button>
             </div>
             <div
-              className="prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-hr:border-white/20 prose-a:text-amber-300"
+              className="prose max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-hr:border-gray-300 prose-a:text-blue-700"
               dangerouslySetInnerHTML={{ __html: htmlPreview }}
             />
           </div>
@@ -401,28 +403,118 @@ export default function RPPage() {
 
 function TopicParticipants({ topicId }) {
   const [list, setList] = useState([])
+  const DEBUG = false // passe à true 1 minute si besoin de logs
+
   useEffect(() => {
     let ok = true
     const run = async () => {
-      const { data } = await supabase
-        .from('rp_posts').select('author_id').eq('topic_id', topicId)
-      const uniq = [...new Set((data||[]).map(x=>x.author_id))].slice(0, 10)
-      if (!uniq.length) { setList([]); return }
-      const { data: profs } = await supabase
-        .from('profiles').select('user_id, avatar_url, pseudo').in('user_id', uniq)
-      if (ok) setList(profs || [])
+      try {
+        const { data: posts, error } = await supabase
+          .from('rp_posts')
+          .select('author_character_id, author_id')
+          .eq('topic_id', topicId)
+
+        if (error) throw error
+        if (DEBUG) console.log('[TP] posts=', posts)
+
+        if (!posts?.length) { if (ok) setList([]); return }
+
+        // Distinct ids
+        const charIds = Array.from(new Set(posts.map(p => p.author_character_id).filter(Boolean)))
+        const authorIdsAll = Array.from(new Set(posts.map(p => p.author_id).filter(Boolean)))
+
+        // 1) Characters (pour tous les author_character_id)
+        let charMap = new Map()
+        if (charIds.length) {
+          const { data: chars, error: eChars } = await supabase
+            .from('characters')
+            .select('id, name, avatar_url')
+            .in('id', charIds)
+          if (eChars) throw eChars
+          if (DEBUG) console.log('[TP] chars=', chars)
+          for (const c of (chars || [])) {
+            charMap.set(String(c.id), {
+              key: `char:${c.id}`,
+              label: c.name,
+              avatar: c.avatar_url || null,
+            })
+          }
+        }
+
+        // 2) Profils fallback
+        //    - auteurs sans personnage
+        //    - auteurs dont le personnage n’a pas été résolu (RLS, id manquant)
+        const authorsNeedingProfile = Array.from(new Set(
+          posts
+            .filter(p => !p.author_character_id || !charMap.has(String(p.author_character_id)))
+            .map(p => p.author_id)
+            .filter(Boolean)
+        ))
+
+        let profList = []
+        if (authorsNeedingProfile.length) {
+          const { data: profs, error: eProfs } = await supabase
+            .from('profiles')
+            .select('user_id, pseudo, email, avatar_url')
+            .in('user_id', authorsNeedingProfile)
+          if (eProfs) throw eProfs
+          if (DEBUG) console.log('[TP] profs=', profs)
+          profList = (profs || []).map(p => ({
+            key: `user:${p.user_id}`,
+            label: p.pseudo?.trim() || p.email?.split('@')[0] || 'Profil',
+            avatar: p.avatar_url || null,
+          }))
+        }
+
+        // 3) Fusion : on parcourt les posts dans l’ordre pour conserver une priorité naturelle
+        const merged = []
+        const seen = new Set()
+        for (const p of posts) {
+          const cid = p.author_character_id ? String(p.author_character_id) : null
+          if (cid && charMap.has(cid)) {
+            const item = charMap.get(cid)
+            if (!seen.has(item.key)) {
+              seen.add(item.key)
+              merged.push(item)
+              if (merged.length >= 10) break
+            }
+            continue
+          }
+          // Pas de perso résolu → on ajoute le profil correspondant si présent
+          const profileKey = `user:${p.author_id}`
+          const profItem = profList.find(x => x.key === profileKey)
+          if (profItem && !seen.has(profItem.key)) {
+            seen.add(profItem.key)
+            merged.push(profItem)
+            if (merged.length >= 10) break
+          }
+        }
+
+        if (DEBUG) console.log('[TP] merged=', merged)
+        if (ok) setList(merged)
+      } catch (e) {
+        console.warn('TopicParticipants error', e)
+        if (ok) setList([])
+      }
     }
     if (topicId) run()
     return () => { ok = false }
   }, [topicId])
+
+  if (!list.length) return null
+
   return (
     <div className="flex items-center gap-2">
       {list.map(p => (
-        <div key={p.user_id} className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-white/20 bg-white/10">
-          {p.avatar_url
-            ? <img src={p.avatar_url} alt="" className="w-full h-full object-cover" />
+        <div
+          key={p.key}
+          className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-white/20 bg-white/10"
+          title={p.label}
+        >
+          {p.avatar
+            ? <img src={p.avatar} alt="" className="w-full h-full object-cover" />
             : <div className="grid place-items-center w-full h-full text-white/70 text-xs">
-                {(p.pseudo?.[0] || '?').toUpperCase()}
+                {(p.label?.[0] || '?').toUpperCase()}
               </div>}
         </div>
       ))}
@@ -430,30 +522,47 @@ function TopicParticipants({ topicId }) {
   )
 }
 
-function PostHeader({ authorId, createdAt }) {
-  const [p, setP] = useState(null)
+function PostHeader({ authorId, authorCharacterId, createdAt }) {
+  const [display, setDisplay] = useState(null)
+
   useEffect(() => {
     let ok = true
     const run = async () => {
-      const { data } = await supabase
+      // 1) Essayer d’afficher le personnage si présent
+      if (authorCharacterId) {
+        const { data: ch } = await supabase
+          .from('characters')
+          .select('name, avatar_url')
+          .eq('id', authorCharacterId)
+          .maybeSingle()
+        if (ok && ch) {
+          setDisplay({ name: ch.name, avatar_url: ch.avatar_url })
+          return
+        }
+      }
+      // 2) Fallback sur le profil
+      const { data: p } = await supabase
         .from('profiles')
         .select('pseudo, avatar_url, email')
         .eq('user_id', authorId)
         .maybeSingle()
-      if (ok) setP(data || null)
+      if (ok) {
+        const name = p?.pseudo?.trim() || p?.email?.split('@')[0] || 'Auteur'
+        setDisplay({ name, avatar_url: p?.avatar_url || null })
+      }
     }
-    if (authorId) run()
+    run()
     return () => { ok = false }
-  }, [authorId])
+  }, [authorId, authorCharacterId])
 
-  const name = p?.pseudo?.trim() || p?.email?.split('@')[0] || 'Auteur'
+  const name = display?.name || 'Auteur'
   const initial = (name[0] || '?').toUpperCase()
 
   return (
     <div className="flex items-center gap-3 mb-3">
-      <div className="w-18 h-18 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_6px_24px_rgba(0,0,0,.25)]">
-        {p?.avatar_url
-          ? <img src={p.avatar_url} alt="" className="w-full h-full object-cover" />
+      <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_6px_24px_rgba(0,0,0,.25)]">
+        {display?.avatar_url
+          ? <img src={display.avatar_url} alt="" className="w-full h-full object-cover" />
           : <div className="grid place-items-center w-full h-full text-white/80 text-lg">{initial}</div>}
       </div>
       <div className="leading-tight">

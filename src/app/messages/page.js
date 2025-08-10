@@ -14,23 +14,31 @@ export default function MessagesPage() {
   const [myChars, setMyChars] = useState([])
 
   const [contacts, setContacts] = useState([])
-  const [convos, setConvos]   = useState([])
+  const [convos, setConvos] = useState([])
   const [activeConv, setActiveConv] = useState(null)
   const [messages, setMessages] = useState([])
 
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
+  const [error, setError] = useState(null)
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [creatingConvWith, setCreatingConvWith] = useState(null)
 
-  const endRef = useRef(null)
-  const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  const short = (s, n = 15) => (s?.length > n ? s.slice(0, n) + '…' : s || '')
+  // Perso “parlant”
+  const [currentSpeakerId, setCurrentSpeakerId] = useState(null)
 
   const [lastMsgByConv, setLastMsgByConv] = useState({})
+  const [participantsByConv, setParticipantsByConv] = useState({}) // groupes uniquement
 
+  // Cache local des persos référencés dans les direct_key (DM c:a_b)
+  const [charCache, setCharCache] = useState({}) // { id: {id,name,avatar_url,user_id} }
+
+  const endRef = useRef(null)
+  const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  const short = (s, n = 32) => (s?.length > n ? s.slice(0, n) + '…' : s || '')
+
+  // Boot
   useEffect(() => {
     const run = async () => {
       try {
@@ -55,7 +63,7 @@ export default function MessagesPage() {
 
         const { data: mineChars, error: eChars } = await supabase
           .from('characters')
-          .select('id, name, avatar_url')
+          .select('id, name, avatar_url, user_id')
           .eq('user_id', session.user.id)
           .eq('is_active', true)
           .order('created_at', { ascending: true })
@@ -72,12 +80,19 @@ export default function MessagesPage() {
     run()
   }, [router])
 
+  // Perso parlant par défaut
+  useEffect(() => {
+    if (!currentSpeakerId && myChars?.length) {
+      setCurrentSpeakerId(myChars[0].id)
+    }
+  }, [myChars, currentSpeakerId])
+
   const loadConversations = async () => {
     const { data: convs, error } = await supabase
       .from('conversations')
       .select('id, is_group, direct_key, title, created_by, last_message_at, created_at')
       .order('last_message_at', { ascending: false, nullsFirst: true })
-      .order('created_at',      { ascending: false, nullsFirst: true })
+      .order('created_at', { ascending: false, nullsFirst: true })
       .limit(50)
     if (error) throw error
     setConvos(convs || [])
@@ -85,9 +100,11 @@ export default function MessagesPage() {
     const ids = (convs || []).map(c => c.id)
     if (!ids.length) {
       setLastMsgByConv({})
+      setParticipantsByConv({})
       return
     }
 
+    // Dernier message par conv
     const { data: msgs, error: e2 } = await supabase
       .from('messages')
       .select('conversation_id, content, created_at')
@@ -101,13 +118,77 @@ export default function MessagesPage() {
       if (!map[m.conversation_id]) map[m.conversation_id] = { content: m.content, created_at: m.created_at }
     }
     setLastMsgByConv(map)
+
+    // Participants pour groupes (inutile pour DMs)
+    const { data: parts, error: e3 } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, user_id')
+      .in('conversation_id', ids)
+    if (e3) throw e3
+
+    const pByConv = {}
+    for (const row of parts || []) {
+      if (!pByConv[row.conversation_id]) pByConv[row.conversation_id] = []
+      pByConv[row.conversation_id].push({ user_id: row.user_id })
+    }
+    setParticipantsByConv(pByConv)
   }
+
+  // === Préchargement des personnages référencés dans les direct_key (DM perso↔perso) ===
+  useEffect(() => {
+    const preload = async () => {
+      try {
+        const allCharIds = new Set()
+        for (const c of convos) {
+          if (!c.is_group && c.direct_key?.startsWith('c:')) {
+            const [a, b] = c.direct_key.slice(2).split('_')
+            if (a) allCharIds.add(a)
+            if (b) allCharIds.add(b)
+          }
+        }
+        if (!allCharIds.size) return
+
+        // IDs déjà connus: v_contacts (persos) + mes persos + cache
+        const known = new Set()
+        for (const c of contacts) if (c.is_character) known.add(String(c.id))
+        for (const ch of myChars) known.add(String(ch.id))
+        for (const k of Object.keys(charCache)) known.add(String(k))
+
+        const missing = Array.from(allCharIds).filter(id => !known.has(String(id)))
+        if (!missing.length) return
+
+        const { data, error } = await supabase
+          .from('characters')
+          .select('id, name, avatar_url, user_id')
+          .in('id', missing)
+        if (error) throw error
+
+        if (data?.length) {
+          setCharCache(prev => {
+            const next = { ...prev }
+            for (const ch of data) {
+              next[String(ch.id)] = {
+                id: ch.id,
+                name: ch.name,
+                avatar_url: ch.avatar_url || null,
+                user_id: ch.user_id || null,
+              }
+            }
+            return next
+          })
+        }
+      } catch (e) {
+        console.warn('preload chars error', e)
+      }
+    }
+    preload()
+  }, [convos, contacts, myChars])
 
   const openConversation = async (conv) => {
     setActiveConv(conv)
     const { data, error } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, content, created_at')
+      .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
       .eq('conversation_id', conv.id)
       .order('created_at', { ascending: true })
       .limit(500)
@@ -117,6 +198,7 @@ export default function MessagesPage() {
     }
   }
 
+  // Index rapides
   const contactsByUser = useMemo(() => {
     const m = new Map()
     for (const c of contacts) {
@@ -126,157 +208,250 @@ export default function MessagesPage() {
     return m
   }, [contacts])
 
+  // Merge: v_contacts (persos) + mes persos + charCache
   const charsById = useMemo(() => {
     const m = new Map()
     for (const c of contacts) {
-      if (c.is_character) m.set(String(c.id), c) // normalisé en string
+      if (c.is_character) m.set(String(c.id), { id: c.id, name: c.name, avatar_url: c.avatar_url, user_id: c.user_id })
+    }
+    for (const ch of myChars) {
+      m.set(String(ch.id), { id: ch.id, name: ch.name, avatar_url: ch.avatar_url || null, user_id: ch.user_id })
+    }
+    for (const [k, v] of Object.entries(charCache)) {
+      if (!m.has(k)) m.set(String(k), v)
     }
     return m
-  }, [contacts])
+  }, [contacts, myChars, charCache])
 
-  const myCharIdSet = useMemo(() => {
-    return new Set(myChars.map(ch => String(ch.id))) // normalisé en string
-  }, [myChars])
+  const myCharIdSet = useMemo(() => new Set(myChars.map(ch => String(ch.id))), [myChars])
 
   const displayContacts = useMemo(() => {
     const usersWithChar = new Set(contacts.filter(c => c.is_character).map(c => c.user_id))
     return contacts.filter(c => c.is_character || !usersWithChar.has(c.user_id))
   }, [contacts])
 
- const infoForConv = (conv) => {
-  if (!conv || conv.is_group) {
-    return { label: conv?.title || 'Groupe', avatar: null }
-  }
+  // Info courte (entête colonne droite)
+  const infoForConv = (conv) => {
+    if (!conv || conv.is_group) return { label: conv?.title || 'Groupe', avatar: null }
 
-  const dk = conv.direct_key || ''
-
-  // --- Conversation entre personnages ---
-  if (dk.startsWith('c:')) {
-    const [a, b] = dk.slice(2).split('_').map(String) // IDs en string
-
-    let otherCharId
-    if (myCharIdSet.has(a) && !myCharIdSet.has(b)) {
-      // Je suis "a", l'autre est "b"
-      otherCharId = b
-    } else if (myCharIdSet.has(b) && !myCharIdSet.has(a)) {
-      // Je suis "b", l'autre est "a"
-      otherCharId = a
-    } else {
-      // Aucun des deux n'est moi → prendre le premier par défaut
-      otherCharId = a
+    const dk = conv.direct_key || ''
+    if (dk.startsWith('c:')) {
+      const [a, b] = dk.slice(2).split('_').map(String)
+      const other = myCharIdSet.has(a) && !myCharIdSet.has(b) ? b
+                 : myCharIdSet.has(b) && !myCharIdSet.has(a) ? a
+                 : a
+      const ch = charsById.get(other)
+      return { label: ch?.name || 'Personnage', avatar: ch?.avatar_url || null }
     }
 
-    const ch = charsById.get(otherCharId)
-    return { label: ch?.name || 'Personnage', avatar: ch?.avatar_url || null }
+    const [a, b] = dk.split('_')
+    const myUid = session?.user?.id
+    const otherUid = myUid === a ? b : a
+    const c = contactsByUser.get(otherUid)
+    const label = c?.name || (me && me.user_id === otherUid
+      ? (me.pseudo?.trim() || me.email?.split('@')[0] || 'Moi')
+      : 'Joueur')
+    return { label, avatar: c?.avatar_url || null }
   }
 
-  // --- Conversation entre comptes ---
-  const [a, b] = dk.split('_')
-  const myUid = session?.user?.id
-  const otherUid = myUid === a ? b : a
-  const c = contactsByUser.get(otherUid)
-  const label = c?.name || (me && me.user_id === otherUid
-    ? (me.pseudo?.trim() || me.email?.split('@')[0] || 'Moi')
-    : 'Joueur')
-  return { label, avatar: c?.avatar_url || null }
+  // === Liste complète des participants pour la colonne centrale ===
+  const participantsInfo = (conv) => {
+    const res = []
+    const dk = conv.direct_key || ''
+
+    // DMs: on lit uniquement direct_key
+    if (!conv.is_group && dk) {
+      if (dk.startsWith('c:')) {
+        const [a, b] = dk.slice(2).split('_').map(String)
+        const ids = [a, b].filter(Boolean)
+        for (const id of ids) {
+          const ch = charsById.get(id)
+          if (ch) res.push({ label: ch.name, avatar: ch.avatar_url || null })
+          else    res.push({ label: 'Personnage', avatar: null })
+        }
+        return res
+      } else {
+        const [ua, ub] = dk.split('_')
+        const ids = [ua, ub].filter(Boolean)
+        for (const uid of ids) {
+          const c = contactsByUser.get(uid)
+          const isMe = uid === session?.user?.id
+          const myLabel  = me?.pseudo?.trim() || me?.email?.split('@')[0] || 'Moi'
+          const myAvatar = contactsByUser.get(session?.user?.id)?.avatar_url || null
+          res.push({
+            label: c?.name || (isMe ? myLabel : 'Joueur'),
+            avatar: c?.avatar_url || (isMe ? myAvatar : null),
+          })
+        }
+        return res
+      }
+    }
+
+    // Groupes: via conversation_participants
+    const list = participantsByConv[conv.id] || []
+    for (const p of list) {
+      const c = contactsByUser.get(p.user_id)
+      const isMe = p.user_id === session?.user?.id
+      const myLabel  = me?.pseudo?.trim() || me?.email?.split('@')[0] || 'Moi'
+      const myAvatar = contactsByUser.get(session?.user?.id)?.avatar_url || null
+      res.push({
+        label: c?.name || (isMe ? myLabel : 'Joueur'),
+        avatar: c?.avatar_url || (isMe ? myAvatar : null),
+      })
+    }
+    return res
+  }
+
+  // Garantit que l'utilisateur courant est bien participant de la conv (RLS friendly)
+const ensureMyMembership = async (conversationId, myCharId = null) => {
+  if (!session?.user?.id || !conversationId) return
+
+  let role = 'member'
+  try {
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('created_by')
+      .eq('id', conversationId)
+      .maybeSingle()
+    if (conv && conv.created_by === session.user.id) role = 'owner'
+  } catch {}
+
+  const { error: upErr } = await supabase
+    .from('conversation_participants')
+    .upsert([{
+      conversation_id: conversationId,
+      user_id: session.user.id,
+      role,
+      character_id: myCharId || null
+    }], { onConflict: 'conversation_id,user_id' })
+
+  if (upErr) {
+    // non bloquant : juste log
+    console.warn('ensureMyMembership upsert error:', upErr)
+  }
 }
 
-
+  // Création/ensure d'une conversation directe
   const ensureDirectConversation = async (otherUserId, myCharId, otherCharId) => {
-    if (!session) return null
-    const myUid = session.user.id
-    setCreatingConvWith(otherUserId)
+  if (!session) return null
+  const myUid = session.user.id
+  setCreatingConvWith(otherUserId)
 
-    try {
-      const hasChars = myCharId && otherCharId
-      const key = hasChars
-        ? `c:${[myCharId, otherCharId].sort().join('_')}`
-        : [myUid, otherUserId].sort().join('_')
+  try {
+    const hasChars = !!(myCharId && otherCharId)
+    const key = hasChars
+      ? `c:${[myCharId, otherCharId].sort().join('_')}`
+      : [myUid, otherUserId].sort().join('_')
 
-      let { data: conv, error: eFind } = await supabase
+    let { data: conv, error: eFind } = await supabase
+      .from('conversations')
+      .select('id, is_group, direct_key, title, last_message_at, created_by')
+      .eq('is_group', false)
+      .eq('direct_key', key)
+      .maybeSingle()
+    if (eFind && eFind.code !== 'PGRST116') throw eFind
+
+    if (!conv) {
+      const { data: created, error: eIns } = await supabase
         .from('conversations')
+        .insert({ is_group: false, created_by: myUid, direct_key: key })
         .select('id, is_group, direct_key, title, last_message_at, created_by')
-        .eq('is_group', false)
-        .eq('direct_key', key)
-        .maybeSingle()
-      if (eFind && eFind.code !== 'PGRST116') throw eFind
-
-      if (!conv) {
-        const { data: created, error: eIns } = await supabase
-          .from('conversations')
-          .insert({ is_group: false, created_by: myUid, direct_key: key })
-          .select('id, is_group, direct_key, title, last_message_at, created_by')
-          .single()
-        if (eIns) {
-          if (eIns.code === '23505') {
-            const { data: again, error: eAgain } = await supabase
-              .from('conversations')
-              .select('id, is_group, direct_key, title, last_message_at, created_by')
-              .eq('is_group', false)
-              .eq('direct_key', key)
-              .maybeSingle()
-            if (eAgain) throw eAgain
-            conv = again
-          } else {
-            throw eIns
-          }
+        .single()
+      if (eIns) {
+        if (eIns.code === '23505') {
+          const { data: again, error: eAgain } = await supabase
+            .from('conversations')
+            .select('id, is_group, direct_key, title, last_message_at, created_by')
+            .eq('is_group', false)
+            .eq('direct_key', key)
+            .maybeSingle()
+          if (eAgain) throw eAgain
+          conv = again
         } else {
-          conv = created
+          throw eIns
         }
-
-        const uidSet = new Set([myUid, otherUserId])
-        const rows = Array.from(uidSet).map(uid => ({
-          conversation_id: conv.id,
-          user_id: uid,
-          role: uid === myUid ? 'owner' : 'member',
-        }))
-
-        const { error: ePart } = await supabase
-          .from('conversation_participants')
-          .insert(rows)
-        if (ePart && ePart.code !== '23505') throw ePart
+      } else {
+        conv = created
       }
-
-      return conv
-    } finally {
-      setCreatingConvWith(null)
     }
+
+    // 🔐 RLS: je m’assure que MOI je suis inscrit
+await ensureMyMembership(conv.id, hasChars ? myCharId : null)
+
+// Best-effort: inscrire aussi l’autre
+const rows = hasChars
+  ? [{ conversation_id: conv.id, user_id: otherUserId, role: 'member', character_id: otherCharId }]
+  : [{ conversation_id: conv.id, user_id: otherUserId, role: 'member', character_id: null }]
+
+const { error: upOtherErr } = await supabase
+  .from('conversation_participants')
+  .upsert(rows, { onConflict: 'conversation_id,user_id' })
+
+if (upOtherErr) {
+  // pas bloquant pour l’envoi de message
+  console.warn('upsert other participant error:', upOtherErr)
+}
+
+    return conv
+  } finally {
+    setCreatingConvWith(null)
   }
+}
 
   const sendMessage = async () => {
-    if (!input.trim() || !session || !activeConv) return
-    setSending(true)
-    try {
-      const payload = {
-        conversation_id: activeConv.id,
-        sender_id: session.user.id,
-        content: input.trim(),
-      }
-      const { data, error } = await supabase
-        .from('messages')
-        .insert(payload)
-        .select('id, conversation_id, sender_id, content, created_at')
-        .single()
-      if (error) throw error
-      setMessages(m => [...m, data])
-      setInput('')
+  if (!input.trim() || !session || !activeConv) return
+  setSending(true)
+  try {
+    // 🔐 s’assurer que je suis bien participant (sinon RLS peut bloquer)
+await ensureMyMembership(activeConv.id, currentSpeakerId ?? null)
 
-      await supabase
-        .from('conversations')
-        .update({ last_message_at: new Date().toISOString() })
-        .eq('id', activeConv.id)
+const payload = {
+  conversation_id: activeConv.id,
+  sender_id: session.user.id,
+  sender_character_id: currentSpeakerId ?? null,
+  content: input.trim(),
+}
 
-      await loadConversations()
-      setTimeout(scrollToBottom, 0)
-    } catch (e) {
-      console.error('sendMessage error', e)
-    } finally {
-      setSending(false)
-    }
+const { data, error } = await supabase
+  .from('messages')
+  .insert(payload)
+  .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
+  .single()
+
+if (error) {
+  console.error('sendMessage error →', error)
+  alert(`Envoi impossible: ${error.message || 'RLS/permission ?'}`)
+  setSending(false)
+  return
+}
+
+    setMessages(m => [...m, data])
+    setInput('')
+
+    await supabase
+      .from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', activeConv.id)
+
+    await loadConversations()
+    setTimeout(scrollToBottom, 0)
+  } catch (e) {
+    console.error('sendMessage fatal', e)
+    alert(`Erreur envoi: ${e?.message || e}`)
+  } finally {
+    setSending(false)
+  }
+}
+
+  const isMine = (m) => {
+    const msgChar = m.sender_character_id ? String(m.sender_character_id) : null
+    const curChar = currentSpeakerId ? String(currentSpeakerId) : null
+    if (msgChar && curChar) return msgChar === curChar
+    return m.sender_id === session?.user?.id
   }
 
   if (loading) return <p className="p-6">Chargement…</p>
-  if (error)   return <p className="p-6 text-red-500">Erreur : {error}</p>
+  if (error) return <p className="p-6 text-red-500">Erreur : {error}</p>
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -304,7 +479,7 @@ export default function MessagesPage() {
             {displayContacts.map(c => {
               const key  = c.is_character ? c.id : `fallback-${c.user_id}`
               const isMe = c.user_id === session?.user?.id
-              const myCharId = myChars?.[0]?.id || null
+              const myCharId = currentSpeakerId || myChars?.[0]?.id || null
               const otherCharId = c.is_character ? c.id : null
 
               return (
@@ -351,24 +526,49 @@ export default function MessagesPage() {
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium">Conversations</header>
           <div className="p-3 space-y-2 overflow-y-auto flex-1">
             {convos.map(c => {
-              const info = infoForConv(c)
+              const parts = participantsInfo(c)
               return (
                 <button
                   key={c.id}
                   onClick={() => openConversation(c)}
-                  className={`w-full text-left rounded-lg border px-3 py-2 hover:bg-white/10 transition ${activeConv?.id === c.id ? 'bg-white/10 border-white/30' : 'bg-white/5 border-white/10'}`}
+                  className={`w-full text-left rounded-lg border px-3 py-2 hover:bg-white/10 transition ${
+                    activeConv?.id === c.id ? 'bg-white/10 border-white/30' : 'bg-white/5 border-white/10'
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15">
-                      {info.avatar
-                        ? <img src={info.avatar} alt="" className="w-full h-full object-cover" />
-                        : <div className="grid place-items-center w-full h-full text-white/70">
-                            {(info.label?.[0] || '?').toUpperCase()}
-                          </div>
-                      }
+                    {/* Avatars empilés */}
+                    <div className="relative w-12 h-7">
+                      {parts.slice(0, 3).map((p, idx) => (
+                        <div
+                          key={idx}
+                          className="absolute top-0 w-7 h-7 rounded-full overflow-hidden ring-1 ring-white/20"
+                          style={{ left: `${idx * 14}px` }}
+                          title={p.label}
+                        >
+                          {p.avatar
+                            ? <img src={p.avatar} alt="" className="w-full h-full object-cover" />
+                            : <div className="grid place-items-center w-full h-full text-white/70 text-xs">
+                                {(p.label?.[0] || '?').toUpperCase()}
+                              </div>
+                          }
+                        </div>
+                      ))}
+                      {parts.length > 3 && (
+                        <div
+                          className="absolute top-0 left-[42px] w-7 h-7 rounded-full bg-white/20 text-[10px] grid place-items-center text-white ring-1 ring-white/20"
+                          title={`+${parts.length - 3} autres`}
+                        >
+                          +{parts.length - 3}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Noms concaténés */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-white/90 text-sm truncate">{info.label}</div>
+                      <div className="text-white/90 text-sm truncate">
+                        {c.is_group && c.title ? `${c.title} — ` : ''}
+                        {parts.map(p => p.label).join(', ')}
+                      </div>
                       <div className="text-white/50 text-xs truncate">
                         { lastMsgByConv[c.id]?.content
                             ? short(lastMsgByConv[c.id].content, 32)
@@ -385,24 +585,48 @@ export default function MessagesPage() {
 
         {/* COLONNE DROITE — MESSAGES */}
         <section className="rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-white/10">
+          <div className="px-4 py-3 border-b border-white/10 flex items-center gap-3">
             {activeConv
               ? <div className="text-white/90 font-medium">{infoForConv(activeConv).label}</div>
               : <div className="text-white/60">Sélectionnez une conversation</div>}
+
+            {/* Sélecteur du personnage parlant */}
+            {myChars.length > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-white/60 text-xs">Parler en tant que</span>
+                <select
+                  value={currentSpeakerId || ''}
+                  onChange={(e) => setCurrentSpeakerId(e.target.value || null)}
+                  className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
+                >
+                  {myChars.map(ch => (
+                    <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {activeConv && messages.map(m => {
-              const mine = m.sender_id === session.user.id
+              const mine = isMine(m)
+              const senderChar = m.sender_character_id ? charsById.get(String(m.sender_character_id)) : null
+              const myChar = currentSpeakerId ? charsById.get(String(currentSpeakerId)) : null
+              const fallbackContact = contactsByUser.get(m.sender_id)
+
+              const leftAvatarUrl  = senderChar?.avatar_url ?? fallbackContact?.avatar_url ?? null
+              const rightAvatarUrl = myChar?.avatar_url   ?? contactsByUser.get(session.user.id)?.avatar_url ?? null
+
+              const leftInitial  = (senderChar?.name?.[0] ?? fallbackContact?.name?.[0] ?? '?').toUpperCase()
+              const rightInitial = (myChar?.name?.[0]     ?? (me?.pseudo?.[0] || me?.email?.[0]) ?? '?').toUpperCase()
+
               return (
                 <div key={m.id} className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
                   {!mine && (
                     <div className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-white/15">
-                      {contactsByUser.get(m.sender_id)?.avatar_url
-                        ? <img src={contactsByUser.get(m.sender_id)?.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <div className="grid place-items-center w-full h-full text-white/70 text-xs">
-                            {(contactsByUser.get(m.sender_id)?.name?.[0] || '?').toUpperCase()}
-                          </div>
+                      {leftAvatarUrl
+                        ? <img src={leftAvatarUrl} alt="" className="w-full h-full object-cover" />
+                        : <div className="grid place-items-center w-full h-full text-white/70 text-xs">{leftInitial}</div>
                       }
                     </div>
                   )}
@@ -411,11 +635,9 @@ export default function MessagesPage() {
                   </div>
                   {mine && (
                     <div className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-white/15">
-                      {contactsByUser.get(m.sender_id)?.avatar_url
-                        ? <img src={contactsByUser.get(m.sender_id)?.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <div className="grid place-items-center w-full h-full text-white/70 text-xs">
-                            {(contactsByUser.get(m.sender_id)?.name?.[0] || '?').toUpperCase()}
-                          </div>
+                      {rightAvatarUrl
+                        ? <img src={rightAvatarUrl} alt="" className="w-full h-full object-cover" />
+                        : <div className="grid place-items-center w-full h-full text-white/70 text-xs">{rightInitial}</div>
                       }
                     </div>
                   )}
