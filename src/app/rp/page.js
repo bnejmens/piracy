@@ -9,9 +9,9 @@ import { supabase } from '../../lib/supabaseClient'
 
 /* ------------ Réglages “verre flou” ------------ */
 const GLASS = {
-  left:   { bg: 'rgba(255,255,255,0.08)', blur: '2px'  },
-  editor: { bg: 'rgba(255,255,255,0.12)', blur: '10px' },
-  right:  { bg: 'rgba(255,255,255,0.15)', blur: '14px' },
+  left:      { bg: 'rgba(0,0,0,0.4)', blur: '2px'  },
+  editor:    { bg: 'rgba(255,255,255,0.12)', blur: '10px' },
+  right:     { bg: 'rgba(255,255,255,0.15)', blur: '14px' },
   cardMine:  { bg: 'rgba(255,255,255,0.12)', blur: '14px' },
   cardOther: { bg: 'rgba(255,255,255,0.10)', blur: '8px'  },
 }
@@ -41,7 +41,6 @@ function bbcodeToHtml(src) {
   s = s.replace(/\r?\n/g, '<br/>')
   return s
 }
-
 const ALLOWED_TAGS = ['a','b','strong','i','em','u','s','blockquote','pre','code','span','div','ul','ol','li','br','hr','img','h2','p']
 const ALLOWED_ATTR = ['href','target','rel','style','src','alt','title','width','height']
 
@@ -53,14 +52,14 @@ export default function RPPage() {
   const [session, setSession] = useState(null)
   const [me, setMe] = useState(null)
 
-  // identités "comptes" partageant l'email (on garde si besoin plus tard)
+  // identités (multi-comptes via email — conservé si utile)
   const [myIdentities, setMyIdentities] = useState([])
 
-  // 🆕 personnages actifs du compte
+  // Persos du compte
   const [myChars, setMyChars] = useState([])
-  const [postAsCharId, setPostAsCharId] = useState(null) // ← personnage sélectionné pour poster
+  const [postAsCharId, setPostAsCharId] = useState(null)
 
-  // sujets & posts
+  // Sujets & posts
   const [topics, setTopics] = useState([])
   const [topicsPage, setTopicsPage] = useState(1)
   const TOPICS_PER_PAGE = 10
@@ -68,10 +67,14 @@ export default function RPPage() {
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
 
-  // éditeur
+  // Éditeur
   const [raw, setRaw] = useState('')
   const textareaRef = useRef(null)
   const [isPreviewOpen, setPreviewOpen] = useState(false)
+
+  // Edit/Delete post
+  const [editingPostId, setEditingPostId] = useState(null)
+  const [editingRaw, setEditingRaw] = useState('')
 
   const endRef = useRef(null)
   const scrollToEnd = () => endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -82,7 +85,7 @@ export default function RPPage() {
     return sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
   }, [raw])
 
-  // boot
+  // Boot
   useEffect(() => {
     const run = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -94,12 +97,13 @@ export default function RPPage() {
       setMe(myProfile || null)
 
       const { data: ids } = await supabase
-        .from('profiles').select('user_id, pseudo, avatar_url, email, active_character_id')
+        .from('profiles')
+        .select('user_id, pseudo, avatar_url, email, active_character_id')
         .eq('email', myProfile?.email ?? null)
         .order('created_at', { ascending: true })
       setMyIdentities(ids || [])
 
-      // 🆕 charger mes personnages actifs
+      // Mes personnages actifs
       const { data: chars } = await supabase
         .from('characters')
         .select('id, name, avatar_url, is_active')
@@ -107,8 +111,6 @@ export default function RPPage() {
         .eq('is_active', true)
         .order('created_at', { ascending: true })
       setMyChars(chars || [])
-
-      // Sélection par défaut : profil.active_character_id sinon 1er perso actif
       setPostAsCharId(myProfile?.active_character_id || (chars?.[0]?.id ?? null))
 
       await loadTopics()
@@ -116,10 +118,11 @@ export default function RPPage() {
     run()
   }, [router])
 
+  /* ---------- DATA ---------- */
   const loadTopics = async () => {
     const { data, error } = await supabase
       .from('rp_topics')
-      .select('id, title, created_at')
+      .select('id, title, created_at, author_id') // author_id optionnel si absent en DB
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) { console.error(error); return }
@@ -134,7 +137,7 @@ export default function RPPage() {
   const loadPosts = async (topicId) => {
     const { data, error } = await supabase
       .from('rp_posts')
-      .select('id, topic_id, author_id, author_character_id, content_html, created_at')
+      .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true })
       .limit(300)
@@ -146,10 +149,11 @@ export default function RPPage() {
   const createTopic = async () => {
     const title = prompt('Titre du nouveau sujet ?')
     if (!title) return
+    // on tente d’envoyer author_id (si la colonne existe, parfait; sinon RLS/DB rejetteront)
     const { data, error } = await supabase
       .from('rp_topics')
-      .insert({ title })
-      .select('id, title, created_at')
+      .insert({ title, author_id: session?.user?.id })
+      .select('id, title, created_at, author_id')
       .single()
     if (error) { alert(error.message); return }
     setTopics(t => [data, ...t])
@@ -157,38 +161,78 @@ export default function RPPage() {
     await loadPosts(data.id)
   }
 
-  // 🔐 (optionnel) policy côté DB à prévoir :
-  // WITH CHECK: author_user_id = auth.uid() AND author_character_id IN (SELECT id FROM characters WHERE user_id = auth.uid())
-
   const publishPost = async () => {
     if (!raw.trim() || !activeTopic || !postAsCharId || !session) return
-
     const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
-
     const payload = {
       topic_id: activeTopic.id,
-      author_id: session.user.id,             // profil propriétaire du post (ton compte)
-      author_user_id: session.user.id,        // auteur technique (audit)
-      author_character_id: postAsCharId,      // 🆕 personnage sélectionné
+      author_id: session.user.id,
+      author_user_id: session.user.id,       // si tu la gardes pour audit
+      author_character_id: postAsCharId,
       content_raw: raw,
       content_html: processedHtml,
     }
-
     const { data, error } = await supabase
       .from('rp_posts')
       .insert(payload)
-      .select('id, topic_id, author_id, author_character_id, content_html, created_at')
+      .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
       .single()
-
-    if (error) { console.error(error); alert(error.message); return }
-
+    if (error) { alert(error.message); return }
     setPosts(p => [...p, data])
     setRaw('')
     setPreviewOpen(false)
     setTimeout(scrollToEnd, 0)
   }
 
-  // utils
+  /* ---------- EDIT / DELETE POST ---------- */
+  const startEditPost = (p) => {
+    setEditingPostId(p.id)
+    setEditingRaw(p.content_raw || '')
+  }
+  const cancelEditPost = () => { setEditingPostId(null); setEditingRaw('') }
+  const saveEditPost = async () => {
+    if (!editingPostId || !editingRaw.trim()) return
+    const html = sanitize(bbcodeToHtml(editingRaw), { ALLOWED_TAGS, ALLOWED_ATTR })
+    const { data, error } = await supabase
+      .from('rp_posts')
+      .update({ content_raw: editingRaw, content_html: html })
+      .eq('id', editingPostId)
+      .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
+      .single()
+    if (error) { alert(error.message); return }
+    setPosts(ps => ps.map(p => p.id === editingPostId ? data : p))
+    cancelEditPost()
+  }
+  const deletePost = async (postId) => {
+    if (!confirm('Supprimer ce post ?')) return
+    const { error } = await supabase.from('rp_posts').delete().eq('id', postId)
+    if (error) { alert(error.message); return }
+    setPosts(ps => ps.filter(p => p.id !== postId))
+  }
+
+  /* ---------- EDIT / DELETE TOPIC ---------- */
+  const renameTopic = async (t) => {
+    const next = prompt('Nouveau titre ?', t.title)
+    if (!next || !next.trim()) return
+    const { data, error } = await supabase
+      .from('rp_topics')
+      .update({ title: next.trim() })
+      .eq('id', t.id)
+      .select('id, title, created_at, author_id')
+      .single()
+    if (error) { alert(error.message); return }
+    setTopics(ts => ts.map(x => x.id === t.id ? data : x))
+    if (activeTopic?.id === t.id) setActiveTopic(data)
+  }
+  const removeTopic = async (t) => {
+    if (!confirm('Supprimer ce sujet et tous ses posts ?')) return
+    const { error } = await supabase.from('rp_topics').delete().eq('id', t.id)
+    if (error) { alert(error.message); return }
+    setTopics(ts => ts.filter(x => x.id !== t.id))
+    if (activeTopic?.id === t.id) { setActiveTopic(null); setPosts([]) }
+  }
+
+  /* ---------- OUTILS ---------- */
   const pageCount = Math.max(1, Math.ceil(topics.length / TOPICS_PER_PAGE))
   const pageStart = (topicsPage - 1) * TOPICS_PER_PAGE
   const visibleTopics = topics.slice(pageStart, pageStart + TOPICS_PER_PAGE)
@@ -207,6 +251,7 @@ export default function RPPage() {
     requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(pos, pos) })
   }
 
+  /* ---------- RENDER ---------- */
   return (
     <main className="fixed inset-0 overflow-hidden">
       {/* BG */}
@@ -218,7 +263,7 @@ export default function RPPage() {
       {/* ← Tableau de bord */}
       <button
         onClick={() => router.push('/dashboard')}
-        className="fixed left-10 bottom-[96px] z-50 rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20"
+        className="fixed left-35 bottom-[96px] z-50 rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20"
       >
         ← Tableau de bord
       </button>
@@ -241,17 +286,42 @@ export default function RPPage() {
           </header>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {visibleTopics.map(t => (
-              <button
-                key={t.id}
-                onClick={async () => { setActiveTopic(t); await loadPosts(t.id) }}
-                className={`w-full text-left rounded-lg px-3 py-2 border transition
+            {visibleTopics.map(t => {
+              const isMineTopic = !!t.author_id && (t.author_id === session?.user?.id)
+              return (
+                <div key={t.id} className="relative">
+                  {/* carte sujet */}
+                  <button
+                    onClick={async () => { setActiveTopic(t); await loadPosts(t.id) }}
+                    className={`w-full text-left rounded-lg px-3 py-2 border transition
                            ${activeTopic?.id===t.id ? 'bg-white/12 border-white/30' : 'bg-white/6 border-white/12 hover:bg-white/10'}`}
-              >
-                <div className="text-white/90 text-sm truncate mb-2">{t.title}</div>
-                <TopicParticipants topicId={t.id} />
-              </button>
-            ))}
+                  >
+                    <div className="text-white/90 text-sm truncate mb-2">{t.title}</div>
+                    <TopicParticipants topicId={t.id} />
+                  </button>
+
+                  {/* actions owner sujet */}
+                  {isMineTopic && (
+                    <div className="absolute right-2 top-2 flex gap-2">
+                      <button
+                        onClick={() => renameTopic(t)}
+                        className="rounded-md border border-white/20 bg-white/10 text-white text-xs px-2 py-1 hover:bg-white/15"
+                        title="Éditer le sujet"
+                      >
+                        Éditer
+                      </button>
+                      <button
+                        onClick={() => removeTopic(t)}
+                        className="rounded-md bg-rose-500/20 border border-rose-300/40 text-rose-100 text-xs px-2 py-1 hover:bg-rose-500/30"
+                        title="Supprimer le sujet"
+                      >
+                        Suppr.
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
             {!visibleTopics.length && <div className="text-white/60 text-sm">Aucun sujet.</div>}
           </div>
 
@@ -278,17 +348,16 @@ export default function RPPage() {
               <span className="text-white/80 text-sm">Poster en tant que</span>
               <select
                 value={postAsCharId || ''}
-                onChange={e => setPostAsCharId(e.target.value)}
-                className="rounded-lg bg-white/10 border border-white/15 px-3 py-1.5 text-white outline-none"
+                onChange={e => setPostAsCharId(e.target.value ? Number(e.target.value) : null)}
+                className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
               >
                 {myChars.map(ch => (
-                  <option key={ch.id} value={ch.id}>
-                    {ch.name}
-                  </option>
+                  <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
                 ))}
               </select>
             </div>
 
+            {/* Toolbar */}
             <EditorToolbar
               onBold={() => insertAroundSelection('[b]','[/b]')}
               onItalic={() => insertAroundSelection('[i]','[/i]')}
@@ -296,36 +365,32 @@ export default function RPPage() {
               onStrike={() => insertAroundSelection('[s]','[/s]')}
               onQuote={() => insertAroundSelection('[quote]','[/quote]')}
               onCode={() => insertAroundSelection('[code]','[/code]')}
-              onUL={() => insertAroundSelection('[ul]\n[li]','[/li]\n[/ul]')}
-              onOL={() => insertAroundSelection('[ol]\n[li]','[/li]\n[/ol]')}
+              onUL={() => insertAroundSelection('[ul]','[/ul]','[li]…[/li]')}
+              onOL={() => insertAroundSelection('[ol]','[/ol]','[li]…[/li]')}
               onCenter={() => insertAroundSelection('[center]','[/center]')}
               onRight={() => insertAroundSelection('[right]','[/right]')}
               onH2={() => insertAroundSelection('[h2]','[/h2]')}
               onHR={() => insertAroundSelection('[hr]','')}
               onSize={() => insertAroundSelection('[size=18]','[/size]')}
-              onLink={() => {
-                const url = prompt('URL http(s) ?')
-                if (url && /^https?:\/\//i.test(url)) insertAroundSelection(`[url=${url}]`,`[/url]`,'lien')
-              }}
-              onImage={() => {
-                const url = prompt('URL de l’image http(s) ?')
-                if (url && /^https?:\/\//i.test(url)) insertAroundSelection('[img]','[/img]', url)
-              }}
-              onPickColor={(hex) => insertAroundSelection(`[color=${hex}]`,`[/color]`)}
+              onLink={() => insertAroundSelection('[url=https://]','[/url]','lien')}
+              onImage={() => insertAroundSelection('[img]https://…[/img]','')}
+              onPickColor={() => insertAroundSelection('[color=#f59e0b]','[/color]','texte')}
             />
 
             <textarea
               ref={textareaRef}
+              rows={8}
               value={raw}
-              onChange={(e) => setRaw(e.target.value)}
-              placeholder="Ton post (BBCode + HTML whitelisté)…"
-              className="w-full min-h-[180px] rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
+              onChange={e => setRaw(e.target.value)}
+              placeholder="Écris ton post en BBCode…"
+              className="w-full rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setPreviewOpen(true)}
-                disabled={!activeTopic || !raw.trim()}
+                disabled={!raw.trim()}
                 className="rounded-lg border border-white/20 bg-white/10 text-white px-3 py-2 hover:bg-white/15 disabled:opacity-50"
               >
                 Prévisualiser
@@ -353,17 +418,64 @@ export default function RPPage() {
               const mine = p.author_id === session?.user?.id
               return (
                 <article key={p.id}
-                         className="rounded-2xl border px-4 py-3"
+                         className="relative rounded-2xl border px-4 py-3"
                          style={frost(mine ? GLASS.cardMine : GLASS.cardOther)}>
+
+                  {/* actions owner (post) */}
+                  {mine && editingPostId !== p.id && (
+                    <div className="absolute right-3 top-3 flex gap-2">
+                      <button
+                        onClick={() => startEditPost(p)}
+                        className="rounded-md border border-white/20 bg-white/10 text-white text-xs px-2 py-1 hover:bg-white/15"
+                        title="Éditer le post"
+                      >
+                        Éditer
+                      </button>
+                      <button
+                        onClick={() => deletePost(p.id)}
+                        className="rounded-md bg-rose-500/20 border border-rose-300/40 text-rose-100 text-xs px-2 py-1 hover:bg-rose-500/30"
+                        title="Supprimer le post"
+                      >
+                        Suppr.
+                      </button>
+                    </div>
+                  )}
+
                   <PostHeader
                     authorId={p.author_id}
-                    authorCharacterId={p.author_character_id}  // 🆕
+                    authorCharacterId={p.author_character_id}
                     createdAt={p.created_at}
                   />
-                  <div
-                    className="prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20 prose-a:text-amber-300"
-                    dangerouslySetInnerHTML={{ __html: p.content_html }}
-                  />
+
+                  {editingPostId === p.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        className="w-full min-h-[140px] rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
+                        value={editingRaw}
+                        onChange={(e) => setEditingRaw(e.target.value)}
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={cancelEditPost}
+                          className="rounded-md border border-white/20 bg-white/10 text-white px-3 py-1.5 hover:bg-white/15"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={saveEditPost}
+                          disabled={!editingRaw.trim()}
+                          className="rounded-md bg-amber-300 text-slate-900 px-3 py-1.5 font-medium disabled:opacity-50"
+                        >
+                          Enregistrer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20 prose-a:text-amber-300"
+                      dangerouslySetInnerHTML={{ __html: p.content_html }}
+                    />
+                  )}
                 </article>
               )
             })}
@@ -403,8 +515,6 @@ export default function RPPage() {
 
 function TopicParticipants({ topicId }) {
   const [list, setList] = useState([])
-  const DEBUG = false // passe à true 1 minute si besoin de logs
-
   useEffect(() => {
     let ok = true
     const run = async () => {
@@ -413,52 +523,33 @@ function TopicParticipants({ topicId }) {
           .from('rp_posts')
           .select('author_character_id, author_id')
           .eq('topic_id', topicId)
-
         if (error) throw error
-        if (DEBUG) console.log('[TP] posts=', posts)
-
         if (!posts?.length) { if (ok) setList([]); return }
 
         // Distinct ids
         const charIds = Array.from(new Set(posts.map(p => p.author_character_id).filter(Boolean)))
-        const authorIdsAll = Array.from(new Set(posts.map(p => p.author_id).filter(Boolean)))
-
-        // 1) Characters (pour tous les author_character_id)
-        let charMap = new Map()
-        if (charIds.length) {
-          const { data: chars, error: eChars } = await supabase
-            .from('characters')
-            .select('id, name, avatar_url')
-            .in('id', charIds)
-          if (eChars) throw eChars
-          if (DEBUG) console.log('[TP] chars=', chars)
-          for (const c of (chars || [])) {
-            charMap.set(String(c.id), {
-              key: `char:${c.id}`,
-              label: c.name,
-              avatar: c.avatar_url || null,
-            })
-          }
-        }
-
-        // 2) Profils fallback
-        //    - auteurs sans personnage
-        //    - auteurs dont le personnage n’a pas été résolu (RLS, id manquant)
         const authorsNeedingProfile = Array.from(new Set(
           posts
-            .filter(p => !p.author_character_id || !charMap.has(String(p.author_character_id)))
+            .filter(p => !p.author_character_id)
             .map(p => p.author_id)
             .filter(Boolean)
         ))
 
+        // 1) Characters
+        const charMap = new Map()
+        if (charIds.length) {
+          const { data: chars } = await supabase
+            .from('characters').select('id, name, avatar_url').in('id', charIds)
+          for (const c of (chars || [])) {
+            charMap.set(String(c.id), { key: `char:${c.id}`, label: c.name, avatar: c.avatar_url || null })
+          }
+        }
+
+        // 2) Profils fallback
         let profList = []
         if (authorsNeedingProfile.length) {
-          const { data: profs, error: eProfs } = await supabase
-            .from('profiles')
-            .select('user_id, pseudo, email, avatar_url')
-            .in('user_id', authorsNeedingProfile)
-          if (eProfs) throw eProfs
-          if (DEBUG) console.log('[TP] profs=', profs)
+          const { data: profs } = await supabase
+            .from('profiles').select('user_id, pseudo, email, avatar_url').in('user_id', authorsNeedingProfile)
           profList = (profs || []).map(p => ({
             key: `user:${p.user_id}`,
             label: p.pseudo?.trim() || p.email?.split('@')[0] || 'Profil',
@@ -466,56 +557,41 @@ function TopicParticipants({ topicId }) {
           }))
         }
 
-        // 3) Fusion : on parcourt les posts dans l’ordre pour conserver une priorité naturelle
+        // 3) Fusion par ordre d’apparition
         const merged = []
         const seen = new Set()
         for (const p of posts) {
-          const cid = p.author_character_id ? String(p.author_character_id) : null
-          if (cid && charMap.has(cid)) {
-            const item = charMap.get(cid)
-            if (!seen.has(item.key)) {
-              seen.add(item.key)
-              merged.push(item)
-              if (merged.length >= 10) break
-            }
-            continue
-          }
-          // Pas de perso résolu → on ajoute le profil correspondant si présent
-          const profileKey = `user:${p.author_id}`
-          const profItem = profList.find(x => x.key === profileKey)
-          if (profItem && !seen.has(profItem.key)) {
-            seen.add(profItem.key)
-            merged.push(profItem)
-            if (merged.length >= 10) break
+          if (p.author_character_id && charMap.has(String(p.author_character_id))) {
+            const item = charMap.get(String(p.author_character_id))
+            if (!seen.has(item.key)) { merged.push(item); seen.add(item.key) }
+          } else {
+            const userKey = `user:${p.author_id}`
+            const prof = profList.find(x => x.key === userKey)
+            if (prof && !seen.has(prof.key)) { merged.push(prof); seen.add(prof.key) }
           }
         }
 
-        if (DEBUG) console.log('[TP] merged=', merged)
         if (ok) setList(merged)
       } catch (e) {
-        console.warn('TopicParticipants error', e)
         if (ok) setList([])
       }
     }
-    if (topicId) run()
+    run()
     return () => { ok = false }
   }, [topicId])
 
-  if (!list.length) return null
-
   return (
     <div className="flex items-center gap-2">
-      {list.map(p => (
-        <div
-          key={p.key}
-          className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-white/20 bg-white/10"
-          title={p.label}
-        >
-          {p.avatar
-            ? <img src={p.avatar} alt="" className="w-full h-full object-cover" />
-            : <div className="grid place-items-center w-full h-full text-white/70 text-xs">
-                {(p.label?.[0] || '?').toUpperCase()}
-              </div>}
+      {list.map(x => (
+        <div key={x.key} className="flex items-center gap-2 text-white/80 text-xs">
+          <div className="w-6 h-6 rounded-full overflow-hidden ring-1 ring-white/20 bg-white/10">
+            {x.avatar
+              ? <img src={x.avatar} alt="" className="w-full h-full object-cover" />
+              : <div className="grid place-items-center w-full h-full text-white/70 text-[10px]">
+                  {(x.label?.[0] || '?').toUpperCase()}
+                </div>}
+          </div>
+          <span className="truncate max-w-[120px]">{x.label}</span>
         </div>
       ))}
     </div>
@@ -524,35 +600,24 @@ function TopicParticipants({ topicId }) {
 
 function PostHeader({ authorId, authorCharacterId, createdAt }) {
   const [display, setDisplay] = useState(null)
-
   useEffect(() => {
     let ok = true
     const run = async () => {
-      // 1) Essayer d’afficher le personnage si présent
+      // 1) Essayer le personnage
       if (authorCharacterId) {
         const { data: ch } = await supabase
-          .from('characters')
-          .select('name, avatar_url')
-          .eq('id', authorCharacterId)
-          .maybeSingle()
-        if (ok && ch) {
-          setDisplay({ name: ch.name, avatar_url: ch.avatar_url })
-          return
-        }
+          .from('characters').select('name, avatar_url').eq('id', authorCharacterId).maybeSingle()
+        if (ok && ch) { setDisplay({ name: ch.name, avatar_url: ch.avatar_url }); return }
       }
-      // 2) Fallback sur le profil
+      // 2) Fallback profil
       const { data: p } = await supabase
-        .from('profiles')
-        .select('pseudo, avatar_url, email')
-        .eq('user_id', authorId)
-        .maybeSingle()
+        .from('profiles').select('pseudo, avatar_url, email').eq('user_id', authorId).maybeSingle()
       if (ok) {
         const name = p?.pseudo?.trim() || p?.email?.split('@')[0] || 'Auteur'
         setDisplay({ name, avatar_url: p?.avatar_url || null })
       }
     }
-    run()
-    return () => { ok = false }
+    run(); return () => { ok = false }
   }, [authorId, authorCharacterId])
 
   const name = display?.name || 'Auteur'
@@ -584,6 +649,7 @@ function EditorToolbar({
       {children}
     </button>
   )
+  const Sep = () => <span className="inline-block w-px h-4 bg-white/20 mx-1" />
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Btn onClick={onBold}>B</Btn>
@@ -597,25 +663,15 @@ function EditorToolbar({
       <Btn onClick={onUL}>UL</Btn>
       <Btn onClick={onOL}>OL</Btn>
       <Sep/>
-      <Btn onClick={onCenter}>C</Btn>
-      <Btn onClick={onRight}>R</Btn>
-      <Sep/>
+      <Btn onClick={onCenter}>Ctr</Btn>
+      <Btn onClick={onRight}>→</Btn>
       <Btn onClick={onH2}>H2</Btn>
       <Btn onClick={onHR}>HR</Btn>
-      <Btn onClick={onSize}>Size</Btn>
       <Sep/>
+      <Btn onClick={onSize}>Size</Btn>
       <Btn onClick={onLink}>Lien</Btn>
-      <Btn onClick={onImage}>Image</Btn>
-      <label className="ml-1 inline-flex items-center gap-2 rounded-md bg-white/10 border border-white/15 px-2 py-1 text-white">
-        Couleur
-        <input
-          type="color"
-          onChange={(e) => onPickColor(e.target.value)}
-          className="h-6 w-6 p-0 bg-transparent border-0 cursor-pointer"
-          title="Choisir une couleur"
-        />
-      </label>
+      <Btn onClick={onImage}>Img</Btn>
+      <Btn onClick={onPickColor}>Couleur</Btn>
     </div>
   )
 }
-const Sep = () => <span className="mx-1 h-6 w-px bg-white/15 inline-block" />
