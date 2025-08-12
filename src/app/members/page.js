@@ -161,76 +161,129 @@ export default function MembersPage() {
       </div>
 
       {/* MODAL détails personnage */}
-      {modalChar && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4"
-          onClick={() => setModalChar(null)}
-        >
-          <div
-            className="w-full max-w-3xl rounded-2xl border border-white/15 bg-white/10 backdrop-blur-x2 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.55)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header identité */}
-            <div className="flex items-center gap-4">
-              <div className="relative w-[96px] h-[96px] rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5">
-                {modalChar.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={modalChar.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-2xl">
-                    {modalChar.name?.[0]?.toUpperCase() || "?"}
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-semibold truncate">{modalChar.name}</h3>
-                <p className="text-xs text-white/60">
-                  {modalChar.genre || "Genre non renseigné"} • Joueur : {modalChar.ownerName}
-                </p>
-                <div className="mt-1 text-xs text-white/70 space-x-3">
-                  {modalChar.age ? <span>Âge : {modalChar.age}</span> : null}
-                  {modalChar.occupation ? <span>Occupation : {modalChar.occupation}</span> : null}
-                </div>
-              </div>
-            </div>
+{modalChar && (
+  <div
+    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4"
+    onClick={() => setModalChar(null)}
+  >
+    <div
+  className="w-[min(96vw,980px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-6 sm:p-8 text-white shadow-2xl max-h-[90vh] overflow-y-auto overscroll-contain"
+  onClick={(e) => e.stopPropagation()}
+>
+      {/* Header identité */}
+<div className="flex items-center gap-5 pb-5 border-b border-white/10">
+  <div className="relative w-[144px] h-[144px] rounded-2xl overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5">
+    {modalChar.avatar_url ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={modalChar.avatar_url}
+        alt=""
+        className="w-full h-full object-cover"
+        referrerPolicy="no-referrer"
+      />
+    ) : (
+      <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-3xl">
+        {modalChar.name?.[0]?.toUpperCase() || "?"}
+      </div>
+    )}
+  </div>
 
-            {/* Bio */}
-            <div className="mt-4 text-white/90 whitespace-pre-wrap">
-              {modalChar.bio || <span className="text-white/50">Aucune bio.</span>}
-            </div>
+  <div className="min-w-0">
+    <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{modalChar.name}</h3>
+    <p className="text-xs text-white/60">
+      {modalChar.genre || "Genre non renseigné"} • Joueur : {modalChar.ownerName}
+    </p>
+    <div className="mt-1 text-xs text-white/70 space-x-3">
+      {modalChar.age ? <span>Âge : {modalChar.age}</span> : null}
+      {modalChar.occupation ? <span>Occupation : {modalChar.occupation}</span> : null}
+    </div>
+  </div>
+</div>
 
-            {/* Traits + Relations en deux colonnes */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Traits */}
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Traits marquants</h4>
-                <TraitsSummary traits={modalChar.traits} />
-              </div>
-              {/* Relations */}
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Relations</h4>
-                <RelationsList relations={modalChar.character_relationships} />
-              </div>
-            </div>
+{/* Contenu : on ne garde PLUS la carte Avatar à gauche */}
+<div className="mt-6 grid gap-6 lg:grid-cols-[300px,1fr]">
+  {/* Colonne gauche : uniquement Compagnon */}
+<aside className="flex flex-col gap-4">
+  <div className="roproblème sur ce code, lorsque la descrunded-xl border border-white/10 bg-white/5 p-4">
+    
+    {/* Titre Compagnon */}
+    <div className="mb-3">
+      <div className="inline-flex items-center text-white text-sm font-bold bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-3 py-1">
+        {modalChar?.companion_name?.trim() || "Compagnon"}
+      </div>
+    </div>
 
-            {/* Actions */}
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setModalChar(null)}
-                className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15"
-              >
-                Fermer
-              </button>
-              <button
-                onClick={() => router.push(`/messages?to=${encodeURIComponent(modalChar.user_id)}`)}
-                className="rounded-lg bg-violet-300 text-slate-900 font-medium px-4 py-2 hover:bg-violet-200"
-              >
-                Écrire en MP
-              </button>
-            </div>
-          </div>
+    {/* Avatar + texte */}
+    <div className="flex items-center gap-3">
+      <div className="relative h-16 w-16 rounded-lg overflow-hidden ring-1 ring-white/15 bg-white/5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={modalChar?.companion_avatar_url || "/images/profile-icon.png"}
+          alt={modalChar?.companion_name || "Compagnon"}
+          className="h-full w-full object-cover"
+        />
+      </div>
+      <div className="text-sm text-white/70">
+        Companion that walks with{" "}
+        <span className="text-white/90 font-medium">{modalChar?.name}</span>
+      </div>
+    </div>
+
+  </div>
+</aside>
+        {/* Colonne droite : Description scrollable */}
+{/* Traits + Relations en deux colonnes */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h4 className="text-sm font-semibold mb-2">Traits marquants</h4>
+          <TraitsSummary traits={modalChar.traits} />
         </div>
-      )}
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h4 className="text-sm font-semibold mb-2">Relations</h4>
+          <RelationsList relations={modalChar.character_relationships} />
+        </div>
+      </div>
+
+         <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="mb-3 text-sm font-semibold text-white/80">Description</div>
+    <div className="custom-scroll pr-2 text-[0.97rem] leading-relaxed text-white/90">
+            {modalChar.bio ? (
+              <p className="whitespace-pre-wrap">{modalChar.bio}</p>
+            ) : (
+              <div className="text-white/50">Aucune bio.</div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      
+
+      {/* Actions */}
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          onClick={() => setModalChar(null)}
+          className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15"
+        >
+          Fermer
+        </button>
+        <button
+          onClick={() => router.push(`/messages?to=${encodeURIComponent(modalChar.user_id)}`)}
+          className="rounded-lg bg-violet-300 text-slate-900 font-medium px-4 py-2 hover:bg-violet-200"
+        >
+          Écrire en MP
+        </button>
+      </div>
+
+      {/* Scrollbar fine pour la description */}
+      <style jsx>{`
+        .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+      `}</style>
+    </div>
+  </div>
+)}
+
     </main>
   );
 }
