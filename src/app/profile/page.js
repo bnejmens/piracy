@@ -43,6 +43,18 @@ export default function ProfilePage() {
     { value: "inconnu", label: "Inconnu" },
   ]), []);
 
+// Helpers pour normaliser les valeurs
+const toNullIfEmpty = (v) => (v === '' || v === undefined ? null : v);
+const toIntOrNull = (v) => {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const toEnumOrNull = (v, allowed) => {
+  if (!v || v === '') return null;
+  return allowed.includes(v) ? v : null;
+};
+
   // Initial load session + characters
   useEffect(() => {
     (async () => {
@@ -115,17 +127,71 @@ export default function ProfilePage() {
   setSaving(true)
   setSavedMsg('')
 
-  const payload = {
-    name: form.name?.trim() || '',
-    gender: form.gender ?? null,
-    age: form.age ?? null,
-    occupation: form.occupation ?? null,
-    bio: form.bio ?? null,
-    traits: form.traits ?? {},
-    companion_name: form.companion_name ?? null,
-    companion_avatar_url: form.companion_avatar_url ?? null,
-    avatar_url: form.avatar_url ?? null,
-  }
+// Récupère l'état actuel du perso sélectionné pour comparer
+const current = (Array.isArray(myChars) ? myChars.find(c => c.id === charId) : null) || {};
+
+const payload = {};
+
+// name
+if ((form.name ?? '').trim() !== (current.name ?? '')) {
+  payload.name = (form.name ?? '').trim();
+}
+
+// gender (enum masculin/féminin, sinon null)
+if ((form.gender ?? null) !== (current.gender ?? null)) {
+  const allowed = ['masculin', 'féminin'];
+  payload.gender = form.gender && allowed.includes(form.gender) ? form.gender : null;
+}
+
+// age (int ou null)
+const formAgeStr = form.age === 0 ? '0' : (form.age ?? '').toString();
+const currAgeStr = current.age === 0 ? '0' : (current.age ?? '').toString();
+if (formAgeStr !== currAgeStr) {
+  payload.age = form.age === '' || form.age === undefined || form.age === null
+    ? null
+    : Number(form.age);
+}
+
+// occupation
+if ((form.occupation ?? '').trim() !== (current.occupation ?? '')) {
+  const v = (form.occupation ?? '').trim();
+  payload.occupation = v === '' ? null : v;
+}
+
+// bio / description
+if ((form.bio ?? '').trim() !== (current.bio ?? '')) {
+  const v = (form.bio ?? '').trim();
+  payload.bio = v === '' ? null : v;
+}
+
+// traits (jsonb)
+if (JSON.stringify(form.traits || {}) !== JSON.stringify(current.traits || {})) {
+  payload.traits = form.traits && typeof form.traits === 'object' ? form.traits : {};
+}
+
+// companion_name
+if ((form.companion_name ?? '').trim() !== (current.companion_name ?? '')) {
+  const v = (form.companion_name ?? '').trim();
+  payload.companion_name = v === '' ? null : v;
+}
+
+// companion_avatar_url
+if ((form.companion_avatar_url ?? null) !== (current.companion_avatar_url ?? null)) {
+  payload.companion_avatar_url = (form.companion_avatar_url ?? '') === '' ? null : form.companion_avatar_url;
+}
+
+// avatar_url
+if ((form.avatar_url ?? null) !== (current.avatar_url ?? null)) {
+  payload.avatar_url = (form.avatar_url ?? '') === '' ? null : form.avatar_url;
+}
+
+// Rien à sauver ?
+if (Object.keys(payload).length === 0) {
+  // option: petit feedback
+  // alert('Aucune modification détectée.');
+  setSaving(false);
+  return;
+}
 
   const { error } = await supabase
     .from('characters')
