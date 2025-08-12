@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
 
-// MagicFX rendu côté client uniquement
+// charge MagicFX uniquement côté client (évite l’hydratation)
 const MagicFX = dynamic(() => import('@/components/MagicFX'), { ssr: false })
 
 export default function FXGate() {
