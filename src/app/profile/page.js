@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -54,7 +54,7 @@ export default function ProfilePage() {
       // Mes personnages
       const { data: chars } = await supabase
         .from("characters")
-        .select("id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url")
+        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       setMyChars(chars || []);
@@ -79,11 +79,12 @@ export default function ProfilePage() {
     (async () => {
       const { data: c } = await supabase
         .from("characters")
-        .select("id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url")
+        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url")
         .eq("id", charId)
         .maybeSingle();
       if (c) {
         setForm({
+          user_id: c.user_id || "",
           name: c.name || "",
           gender: c.gender || "",
           bio: c.bio || "",
@@ -109,28 +110,43 @@ export default function ProfilePage() {
   const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const onTrait = (k, v) => setForm(f => ({ ...f, traits: { ...f.traits, [k]: v } }));
 
-  const onSave = async () => {
-    if (!charId) return;
-    setSaving(true); setSavedMsg("");
-    const payload = {
-      name: form.name?.trim() || null,
-      gender: form.gender || null,
-      bio: form.bio || null,
-      avatar_url: form.avatar_url || null,
-      age: form.age === "" ? null : Number(form.age),
-      occupation: form.occupation?.trim() || null,
-      traits: form.traits || {},
-      companion_name: form.companion_name?.trim() || null,
-      companion_avatar_url: form.companion_avatar_url || null,
-    };
-    const { error } = await supabase.from("characters").update(payload).eq("id", charId);
-    if (!error) {
-      setMyChars(list => list.map(c => c.id === charId ? { ...c, ...payload } : c));
-      setSavedMsg("Enregistré ✔");
-      setTimeout(() => setSavedMsg(""), 1500);
-    }
-    setSaving(false);
-  };
+ const onSave = async () => {
+  if (!charId) return
+  setSaving(true)
+  setSavedMsg('')
+
+  const payload = {
+    name: form.name?.trim() || '',
+    gender: form.gender ?? null,
+    age: form.age ?? null,
+    occupation: form.occupation ?? null,
+    bio: form.bio ?? null,
+    traits: form.traits ?? {},
+    companion_name: form.companion_name ?? null,
+    companion_avatar_url: form.companion_avatar_url ?? null,
+    avatar_url: form.avatar_url ?? null,
+  }
+
+  const { error } = await supabase
+    .from('characters')
+    .update(payload)
+    .eq('id', charId)
+    .eq('user_id', me.id) // ← important pour matcher la policy RLS
+
+  if (!error) {
+    // miroir local
+    setMyChars(list => list.map(c => (c.id === charId ? { ...c, ...payload } : c)))
+    setSavedMsg('Enregistré ✔')
+    setTimeout(() => setSavedMsg(''), 1500)
+  } else {
+    // feedback explicite si policy/erreur
+    setSavedMsg(error.message || 'Échec de l’enregistrement')
+    console.error('[characters.update] RLS/ERROR:', error)
+  }
+
+  setSaving(false)
+}
+;
 
   const onAddRelation = async (otherId, type) => {
     setRelMsg("");
@@ -161,6 +177,15 @@ export default function ProfilePage() {
     await supabase.from("character_relationships").delete().eq("id", id);
     setRelations(rs => rs.filter(r => r.id !== id));
   };
+
+  // L’utilisateur peut éditer s’il possède VRAIMENT le personnage sélectionné
+const ownsCurrentChar = useMemo(() => {
+  if (!me?.id || !charId) return false
+  const c = myChars.find(x => x.id === charId)
+  return !!c && c.user_id === me.id
+}, [me?.id, charId, myChars])
+
+const canEdit = !!me?.id && ownsCurrentChar
 
   if (loading) return <Loader label="Chargement…" />;
   if (!me) return <Centered label="Veuillez vous connecter." />;
@@ -198,10 +223,22 @@ export default function ProfilePage() {
                 onUploaded={async (url) => {
                   onChange("companion_avatar_url", url);
                   setImgBust(Date.now());
-                  await supabase.from("characters").update({ companion_avatar_url: url }).eq("id", charId);
+                  await supabase
+  .from('characters')
+  .update({ companion_avatar_url: url })
+  .eq('id', charId)
+  .eq('user_id', me.id)
+;
                 }}
               />
             </div>
+{/* Création de personnage si aucun n'existe */}
+  <CreateCharacterInline
+    userId={me?.id}
+    setMyChars={setMyChars}
+    setCharId={setCharId}
+  />
+
           </div>
         </aside>
 
@@ -243,9 +280,16 @@ export default function ProfilePage() {
           </Labeled>
 
           <div className="flex flex-wrap items-center justify-between gap-3 mt-2">
-            <button onClick={onSave} disabled={saving || !charId} className="rounded-lg bg-white/10 border border-white/20 px-4 py-2 text-white hover:bg-white/15 disabled:opacity-50">
-              {saving ? "Enregistrement…" : "Enregistrer"}
-            </button>
+            
+
+<button
+  onClick={onSave}
+  disabled={saving || !charId}
+  className="rounded-lg bg-white/10 border border-white/20 px-4 py-2 text-white hover:bg-white/15 disabled:opacity-50"
+>
+  {saving ? "Enregistrement…" : "Enregistrer"}
+</button>
+
             {savedMsg && <span className="text-green-300 text-sm">{savedMsg}</span>}
             <div className="flex gap-2 items-center">
               <AvatarUploader
@@ -255,7 +299,12 @@ export default function ProfilePage() {
                   onChange("avatar_url", url);
                   setImgBust(Date.now());
                   // autosave avatar
-                  await supabase.from("characters").update({ avatar_url: url }).eq("id", charId);
+                  await supabase
+  .from('characters')
+  .update({ avatar_url: url })
+  .eq('id', charId)
+  .eq('user_id', me.id)
+;
                 }}
               />
               <input value={form.avatar_url} onChange={(e)=>onChange("avatar_url", e.target.value)} placeholder="URL avatar" className="w-64 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none" />
@@ -338,6 +387,7 @@ function baseTraits() {
 
 function baseForm() {
   return {
+    user_id: "",
     name: "",
     gender: "",
     bio: "",
@@ -412,6 +462,63 @@ function MiniAvatar({ src, size = 40 }) {
       ) : (
         <div className="w-full h-full grid place-items-center text-white/40">—</div>
       )}
+    </div>
+  );
+}
+
+function CreateCharacterInline({ userId, setMyChars, setCharId }) {
+  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const canCreate = !!userId && name.trim().length > 1;
+
+  const onCreate = async () => {
+    if (!canCreate) return;
+    setCreating(true);
+    const payload = {
+      user_id: userId,
+      name: name.trim(),
+      is_active: true, // optionnel si ta colonne existe
+    };
+
+    const { data, error } = await supabase
+      .from('characters')
+      .insert(payload)
+      .select('id, user_id, name, avatar_url, is_active')
+      .single();
+
+    if (error) {
+      console.error('[characters.insert]', error);
+      alert(error.message || 'Création impossible (RLS ?)');
+    } else {
+      setMyChars(prev => ([...(prev || []), data]));
+      setCharId(data.id);     // bascule tout de suite sur ce perso
+      setName('');
+    }
+    setCreating(false);
+  };
+
+  return (
+    <div className="mt-4 p-3 rounded border border-white/15 bg-white/5">
+      <p className="text-sm mb-2">Créer un nouveau personnage</p>
+      <div className="flex flex-col gap-2 w-full">
+  <input
+    type="text"
+    value={name}
+    placeholder="Nom du personnage"
+    onChange={(e) => setName(e.target.value)}
+    className="w-full border p-2 rounded bg-black/20"
+  />
+
+  <button
+    onClick={onCreate}
+    disabled={!canCreate || creating}
+    className={`w-full px-3 py-2 rounded text-white text-center ${
+      !canCreate || creating ? 'bg-gray-500' : 'bg-emerald-600 hover:bg-emerald-700'
+    }`}
+  >
+    {creating ? 'Création…' : 'Créer'}
+  </button>
+</div>
     </div>
   );
 }
