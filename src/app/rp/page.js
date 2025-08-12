@@ -348,7 +348,7 @@ export default function RPPage() {
               <span className="text-white/80 text-sm">Poster en tant que</span>
               <select
                 value={postAsCharId || ''}
-                onChange={e => setPostAsCharId(e.target.value ? Number(e.target.value) : null)}
+                onChange={e => setPostAsCharId(e.target.value || null)}
                 className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
               >
                 {myChars.map(ch => (
@@ -625,7 +625,7 @@ function PostHeader({ authorId, authorCharacterId, createdAt }) {
 
   return (
     <div className="flex items-center gap-3 mb-3">
-      <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_6px_24px_rgba(0,0,0,.25)]">
+      <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_8px_24px_rgba(0,0,0,.25)]">
         {display?.avatar_url
           ? <img src={display.avatar_url} alt="" className="w-full h-full object-cover" />
           : <div className="grid place-items-center w-full h-full text-white/80 text-lg">{initial}</div>}
