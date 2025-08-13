@@ -1,117 +1,129 @@
 // src/app/auth/page.js
-'use client'
+'use client';
 
-import { useState } from 'react'
-import Image from 'next/image'
-import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
-// import MagicFX from '../../components/MagicFX' // optionnel
+import { useState } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function AuthPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   // Bascule d'affichage
-  const [isSignup, setIsSignup] = useState(false)
+  const [isSignup, setIsSignup] = useState(false);
 
   // Connexion
-  const [identifier, setIdentifier] = useState('') // pseudo OU email
-  const [loginPassword, setLoginPassword] = useState('')
+  const [identifier, setIdentifier] = useState(''); // pseudo OU email
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Inscription
-  const [pseudo, setPseudo] = useState('')
-  const [email, setEmail] = useState('')
-  const [signupPassword, setSignupPassword] = useState('')
-
-
+  const [pseudo, setPseudo] = useState('');
+  const [email, setEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
 
   // UI
-  const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  // -------- helpers --------
+  const resolveEmailFromIdentifier = async (input) => {
+    let emailLike = input?.trim().toLowerCase();
+    if (!emailLike) throw new Error('Identifiant requis');
+    if (emailLike.includes('@')) return emailLike;
+
+    // 1) Essai RPC (si créée côté DB)
+    const { data: foundEmail, error: rpcErr } = await supabase
+      .rpc('email_for_pseudo', { p_pseudo: emailLike });
+    if (!rpcErr && foundEmail) return String(foundEmail).toLowerCase();
+
+    // 2) Fallback SELECT si RPC absente
+    const { data: prof, error: selErr } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('pseudo', emailLike)
+      .maybeSingle();
+    if (selErr || !prof?.email) throw new Error('Identifiants invalides');
+    return String(prof.email).toLowerCase();
+  };
+
+  const upsertMyProfile = async (user, p) => {
+    if (!user) return;
+    const { error: profileErr } = await supabase
+      .from('profiles')
+      .upsert(
+        { user_id: user.id, email: user.email ?? '', ...(p ? { pseudo: p } : {}) },
+        { onConflict: 'user_id' }
+      );
+    if (profileErr) throw profileErr;
+  };
+
+  // -------- actions --------
   const handleLogin = async () => {
     try {
-      setErrorMsg('')
-      setLoading(true)
+      setErrorMsg('');
+      setLoading(true);
 
-      let emailToUse = identifier?.trim()
-      if (!emailToUse) throw new Error('Identifiant requis')
+      if (!identifier?.trim()) throw new Error('Identifiant requis');
+      if (!loginPassword) throw new Error('Mot de passe requis');
 
-      // Si l’identifiant n’est PAS un email, on va chercher l’email par pseudo
-      if (!emailToUse.includes('@')) {
-        const { data: foundEmail, error: rpcErr } = await supabase
-          .rpc('email_for_pseudo', { p_pseudo: emailToUse })
-        if (rpcErr) throw rpcErr
-        if (!foundEmail) throw new Error('Identifiants invalides')
-        emailToUse = foundEmail
-      }
+      const emailToUse = await resolveEmailFromIdentifier(identifier);
 
       const { error } = await supabase.auth.signInWithPassword({
         email: emailToUse,
-        password: loginPassword
-      })
-      if (error) throw error
+        password: loginPassword,
+      });
+      if (error) throw error;
 
-      // Upsert de sécurité (si le profil n’existait pas)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('profiles').upsert(
-          { user_id: user.id, email: user.email ?? '' },
-          { onConflict: 'user_id' }
-        )
-      }
+      // Filet : crée/maj profil si manquant
+      const { data: { user } } = await supabase.auth.getUser();
+      await upsertMyProfile(user);
 
-      router.push('/dashboard')
+      router.push('/dashboard');
     } catch (e) {
-      setErrorMsg(e.message || 'Connexion impossible')
+      console.error('Login error:', e);
+      setErrorMsg(e.message || 'Connexion impossible');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleSignup = async () => {
     try {
-      setErrorMsg('')
-      setLoading(true)
+      setErrorMsg('');
+      setLoading(true);
 
-      const p = pseudo.trim()
-      const em = email.trim()
+      // Validation côté client
+      const p = (pseudo || '').trim();
+      const em = (email || '').trim().toLowerCase();
 
-      if (p.length < 3) throw new Error('Pseudo trop court (min 3 caractères)')
-      if (!em.includes('@')) throw new Error('Email invalide')
-      if (signupPassword.length < 8) throw new Error('Mot de passe trop court (min 8)')
+      if (p.length < 3) throw new Error('Pseudo trop court (min 3 caractères)');
+      if (!em.includes('@')) throw new Error('Email invalide');
+      if (signupPassword.length < 8) throw new Error('Mot de passe trop court (min 8)');
 
-      // Vérifier disponibilité du pseudo
-      const { data: ok, error: rpcErr } = await supabase
-        .rpc('is_pseudo_available', { p_pseudo: p })
-      if (rpcErr) throw rpcErr
-      if (!ok) throw new Error('Pseudo déjà pris')
-
-      // Inscription Supabase
+      // Inscription Auth (le trigger DB lira "pseudo")
       const { error: signErr } = await supabase.auth.signUp({
         email: em,
         password: signupPassword,
         options: {
-          data: { pseudo: p, username: p } // stocké dans user_metadata (optionnel)
-        }
-      })
-      if (signErr) throw signErr
+          data: { pseudo: p, username: p }, // compat + trigger
+          // emailRedirectTo: 'https://ton-domaine.xyz/auth/callback'
+        },
+      });
+      if (signErr) throw signErr;
 
-      // Récupérer l’utilisateur et créer/mettre à jour le profil
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('profiles').upsert(
-          { user_id: user.id, email: user.email ?? '', pseudo: p },
-          { onConflict: 'user_id' }
-        )
-      }
+      // Upsert profil de sûreté (si le trigger est désactivé/différé)
+      const { data: { user } } = await supabase.auth.getUser();
+      await upsertMyProfile(user, p);
 
-      router.push('/dashboard')
+      // Redirection après succès (ou direct /dashboard si tu ne valides pas l’email)
+      router.push('/verification-email');
     } catch (e) {
-      setErrorMsg(e.message || 'Inscription impossible')
+      console.error('Signup error:', e);
+      setErrorMsg(e.message || 'Inscription impossible');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -126,7 +138,6 @@ export default function AuthPage() {
         />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
-      {/* <div className="absolute inset-0 -z-[5]"><MagicFX strength="fx-soft" /></div> */}
 
       {/* Carte */}
       <div className="absolute inset-0 grid place-items-center p-4">
@@ -226,5 +237,5 @@ export default function AuthPage() {
         </div>
       </div>
     </main>
-  )
+  );
 }

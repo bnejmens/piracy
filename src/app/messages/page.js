@@ -145,7 +145,7 @@ export default function MessagesPage() {
     // On récupère les derniers MSG_BATCH messages, triés desc, puis on inverse pour affichage
     const { data, error } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url')
+      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url )')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .limit(MSG_BATCH)
@@ -168,7 +168,7 @@ export default function MessagesPage() {
     if (!activeConv || !oldestLoadedAt) return
     const { data, error } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url')
+      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url )')
       .eq('conversation_id', activeConv.id)
       .lt('created_at', oldestLoadedAt)
       .order('created_at', { ascending: false })
@@ -203,7 +203,7 @@ export default function MessagesPage() {
       const { data, error } = await supabase
         .from('messages')
         .insert(payload)
-        .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
+        .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url )')
         .single()
       if (error) throw error
 
@@ -471,13 +471,16 @@ export default function MessagesPage() {
           </div>
         )}
 
-        {activeConv && messages.map(m => (
-          <Bubble
-            key={m.id}
-            mine={m.sender_id === session?.user?.id}
-            message={m}
-          />
-        ))}
+        {activeConv && messages.map(m => {
+   const mine = String(m.sender_character_id) === String(currentSpeakerId);
+   return (
+     <Bubble
+       key={m.id}
+       mine={mine}
+       message={m}
+     />
+   );
+ })}
 
         <div ref={endRef} />
       </div>
@@ -592,28 +595,58 @@ export default function MessagesPage() {
 /* ===== Composants UI ===== */
 
 function Bubble({ mine, message }) {
-  const isImage = /^\!\[.*\]\((https?:\/\/.+)\)$/.test(message.content?.trim() || '')
-  let imgUrl = null
-  if (isImage) {
-    const m = /\((https?:\/\/.+)\)/.exec(message.content.trim())
-    imgUrl = m?.[1] || null
-  }
+  // Couleur perso (stable via HSL) pour les autres
+  const othersColor = colorForCharacter(message.sender_character_id);
+  const bubbleClass = mine ? 'bg-amber-300/90 text-slate-900 border border-amber-300/60'
+                           : `${othersColor} text-white border border-white/20`;
+
+  const name = message?.sender?.name || 'Anonyme';
+  const avatar = message?.sender?.avatar_url || '/images/profile-icon.png';
+
+  // Image markdown simple: ![alt](url)
+  const isImage = /^\!\[.*\]\((https?:\/\/.+)\)$/.test(message.content?.trim() || '');
+  const imgUrl = isImage ? (/\((https?:\/\/.+)\)/.exec(message.content.trim())?.[1] || null) : null;
+
   return (
-    <div className={`flex gap-2 items-end ${mine ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[75%] rounded-2xl px-3 py-2 text-base leading-snug shadow ${
-          mine ? 'bg-amber-300/90 text-slate-900 border border-amber-300/60' : 'bg-white/15 text-white border border-white/20'
-        }`}
-      >
-        {isImage && imgUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imgUrl} alt="" className="max-h-[320px] rounded-lg object-contain" />
-        ) : (
-          message.content
-        )}
+    <div className={`mb-3 flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      {/* Avatar à gauche si "autres" */}
+      {!mine && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`${avatar}?v=${message.sender?.id || ''}`}
+          alt={name}
+          className="size-8 rounded-full border border-white/10 object-cover"
+        />
+      )}
+
+      <div className="max-w-[75%]">
+        {/* Nom du personnage */}
+        <div className={`mb-1 text-xs ${mine ? 'text-white/60 text-right' : 'text-white/60'}`}>
+          {name}
+        </div>
+
+        {/* Bulle */}
+        <div className={`rounded-2xl px-3 py-2 leading-snug shadow ${mine ? 'rounded-br-sm' : 'rounded-bl-sm'} ${bubbleClass}`}>
+          {isImage && imgUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imgUrl} alt="" className="max-h-[320px] rounded-lg object-contain" />
+          ) : (
+            <span className="break-words">{message.content}</span>
+          )}
+        </div>
       </div>
+
+      {/* Avatar à droite si "moi" */}
+      {mine && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`${avatar}?v=${message.sender?.id || ''}`}
+          alt={name}
+          className="size-8 rounded-full border border-white/10 object-cover"
+        />
+      )}
     </div>
-  )
+  );
 }
 
 function FakeAzertyKeyboard() {
