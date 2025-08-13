@@ -89,7 +89,7 @@ export default function AuthPage() {
         email: em,
         password: signupPassword,
         options: {
-          data: { username: p } // stocké dans user_metadata (optionnel)
+          data: { pseudo:, username: p } // stocké dans user_metadata (optionnel)
         }
       })
       if (signErr) throw signErr

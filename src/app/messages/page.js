@@ -9,6 +9,23 @@ import { supabase } from '../../lib/supabaseClient'
 const PAGE_SIZE = 12
 const MSG_BATCH = 50
 
+// Couleur stable par personnage (UUID → HSL)
+function colorForCharacter(id) {
+  if (!id) return 'bg-white/10';
+  // hash simple
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  // teinte, saturation/ligthness fixes pour lisibilité
+  return `bg-[hsl(${h}deg_70%_45%)]`;
+}
+
+// Texte adapté selon la bulle colorée
+function textOn(colorClass) {
+  // si c'est une couleur custom HSL → texte blanc
+  if (colorClass.startsWith('bg-[')) return 'text-white';
+  return 'text-white';
+}
+
 export default function MessagesPage() {
   const router = useRouter()
 
@@ -128,7 +145,7 @@ export default function MessagesPage() {
     // On récupère les derniers MSG_BATCH messages, triés desc, puis on inverse pour affichage
     const { data, error } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
+      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .limit(MSG_BATCH)
@@ -151,7 +168,7 @@ export default function MessagesPage() {
     if (!activeConv || !oldestLoadedAt) return
     const { data, error } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
+      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, sender:sender_character_id ( id, name, avatar_url')
       .eq('conversation_id', activeConv.id)
       .lt('created_at', oldestLoadedAt)
       .order('created_at', { ascending: false })
