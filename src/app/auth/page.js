@@ -22,6 +22,8 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
 
+
+
   // UI
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(false)
@@ -89,7 +91,7 @@ export default function AuthPage() {
         email: em,
         password: signupPassword,
         options: {
-          data: { pseudo:, username: p } // stocké dans user_metadata (optionnel)
+          data: { pseudo: p, username: p } // stocké dans user_metadata (optionnel)
         }
       })
       if (signErr) throw signErr
