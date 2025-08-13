@@ -19,150 +19,45 @@
   }
 }
 
+/* Styles de base */
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* --- Effets décoratifs Apasonia --- */
-@layer utilities {
-  /* Faisceau du phare */
-  .phare-beam {
-    position: absolute;
-    inset: auto auto 10% 60%;
-    width: 40vw; height: 40vw;
-    transform-origin: left bottom;
-    background: conic-gradient(from -15deg at 0% 100%,
-      rgba(255,255,200,.28),
-      rgba(255,255,200,0) 25%);
-    filter: blur(2px);
-    animation: sweep 6s ease-in-out infinite alternate;
-    pointer-events: none;
-  }
-  @keyframes sweep {
-    from { transform: rotate(-8deg); }
-    to   { transform: rotate(12deg); }
-  }
-
-  /* Brume douce qui dérive */
-  .fog {
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(60% 40% at 30% 30%, rgba(255,255,255,.06), transparent 60%),
-      radial-gradient(50% 35% at 70% 60%, rgba(255,255,255,.05), transparent 60%);
-    filter: blur(18px);
-    animation: fogMove 40s linear infinite alternate;
-    pointer-events: none;
-  }
-  @keyframes fogMove {
-    from { transform: translateX(-4%); }
-    to   { transform: translateX(4%); }
-  }
-
-  /* Étoiles qui scintillent légèrement */
-  .twinkle {
-    position: absolute;
-    inset: 0;
-    background-image:
-      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.7), transparent),
-      radial-gradient(1.5px 1.5px at 55% 15%, rgba(255,255,255,.9), transparent),
-      radial-gradient(1px 1px at 80% 40%, rgba(255,255,255,.7), transparent),
-      radial-gradient(1px 1px at 35% 70%, rgba(255,255,255,.6), transparent),
-      radial-gradient(1px 1px at 75% 80%, rgba(255,255,255,.65), transparent);
-    animation: twinkle 5s ease-in-out infinite alternate;
-    pointer-events: none;
-  }
-  @keyframes twinkle {
-    from { opacity: .45; }
-    to   { opacity: 1; }
-  }
-
-  /* Lueur douce autour de la carte + hover boutons */
-  .card-glow {
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,.12) inset,
-      0 10px 40px rgba(0,0,0,.45),
-      0 0 30px rgba(102,243,255,.15);
-  }
-  .btn-glow:hover {
-    box-shadow:
-      0 0 0 2px rgba(255,255,255,.15) inset,
-      0 0 20px rgba(102,243,255,.35);
-  }
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-/* --- Effets magiques réutilisables --- */
-@layer utilities {
-  /* Calque de base */
-  .fx-layer { position:absolute; inset:0; pointer-events:none; }
-
-  /* Volutes bleues (douces) */
-  .magic-wisps-blue {
-    background:
-      radial-gradient(60% 40% at 20% 30%, rgba(120,200,255,.10), transparent 60%),
-      radial-gradient(55% 45% at 80% 70%, rgba(90,170,255,.08), transparent 60%);
-    filter: blur(22px);
-    animation: wispDrift1 28s ease-in-out infinite alternate;
-    mix-blend-mode: screen;
-  }
-  @keyframes wispDrift1 {
-    from { transform: translate3d(-2%, -1%, 0) scale(1.02); }
-    to   { transform: translate3d( 3%,  2%, 0) scale(1.06); }
-  }
-
-  /* Volutes dorées (très légères) */
-  .magic-wisps-gold {
-    background:
-      radial-gradient(50% 38% at 70% 20%, rgba(255,210,150,.08), transparent 60%),
-      radial-gradient(45% 35% at 25% 75%, rgba(255,190,120,.06), transparent 60%);
-    filter: blur(24px);
-    animation: wispDrift2 34s ease-in-out infinite alternate;
-    mix-blend-mode: screen;
-  }
-  @keyframes wispDrift2 {
-    from { transform: translate3d( 2%,  2%, 0) scale(1.00); }
-    to   { transform: translate3d(-3%, -2%, 0) scale(1.05); }
-  }
-
-  /* Petites étincelles bleues */
-  .magic-sparks-blue {
-    background-image:
-      radial-gradient(1px 1px at 15% 25%, rgba(170,230,255,.9), transparent),
-      radial-gradient(1.5px 1.5px at 55% 15%, rgba(140,210,255,1), transparent),
-      radial-gradient(1px 1px at 83% 40%, rgba(160,225,255,.85), transparent),
-      radial-gradient(1px 1px at 35% 70%, rgba(150,215,255,.8), transparent);
-    opacity: .55;
-    animation: sparksTwinkleB 6s ease-in-out infinite alternate;
-    mix-blend-mode: screen;
-  }
-  @keyframes sparksTwinkleB {
-    from { opacity: .35; transform: translateY(-0.5%); }
-    to   { opacity: .75; transform: translateY( 0.5%); }
-  }
-
-  /* Petites étincelles dorées */
-  .magic-sparks-gold {
-    background-image:
-      radial-gradient(1px 1px at 25% 45%, rgba(255,220,160,.9), transparent),
-      radial-gradient(1.5px 1.5px at 70% 65%, rgba(255,215,140,.95), transparent),
-      radial-gradient(1px 1px at 48% 18%, rgba(255,230,180,.85), transparent);
-    opacity: .45;
-    animation: sparksTwinkleG 7s ease-in-out infinite alternate;
-    mix-blend-mode: screen;
-  }
-  @keyframes sparksTwinkleG {
-    from { opacity: .30; transform: translateX(-0.4%); }
-    to   { opacity: .65; transform: translateX( 0.4%); }
-  }
-
-  /* Intensité pratique (tu peux jouer avec) */
-  .fx-soft  { opacity: .6; }
-  .fx-mid   { opacity: .8; }
-  .fx-strong{ opacity: 1; }
+body {
+  @apply bg-background text-foreground font-sans;
 }
 
+/* Sélection du texte */
+::selection {
+  background: rgba(16, 185, 129, 0.3); /* teal-500/30 */
+}
+
+/* Scrollbar stylisée */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Animation fade-in */
+.fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

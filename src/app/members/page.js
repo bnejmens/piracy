@@ -32,6 +32,7 @@ export default function MembersPage() {
   .select(`
     id, user_id, name, genre, avatar_url, bio, created_at,
     age, occupation, traits,
+    companion_name, companion_avatar_url,
     character_relationships:character_relationships!character_id (
       id, type, other_character_id,
       other:other_character_id ( id, name, avatar_url )
@@ -204,7 +205,7 @@ export default function MembersPage() {
 <div className="mt-6 grid gap-6 lg:grid-cols-[300px,1fr]">
   {/* Colonne gauche : uniquement Compagnon */}
 <aside className="flex flex-col gap-4">
-  <div className="roproblème sur ce code, lorsque la descrunded-xl border border-white/10 bg-white/5 p-4">
+  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
     
     {/* Titre Compagnon */}
     <div className="mb-3">

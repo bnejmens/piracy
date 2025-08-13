@@ -5,6 +5,8 @@ import { useEffect, useState, useMemo } from 'react'
 import Image from 'next/image'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import useCharacterSubscriptions from '@/hooks/useCharacterSubscriptions'
+import { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
@@ -14,14 +16,24 @@ export default function DashboardPage() {
   // state
   const [profile, setProfile] = useState(null)
   const [character, setCharacter] = useState(null)
+  const [myChars, setMyChars] = useState([])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [hasNewMessage, setHasNewMessage] = useState(false)
+  const [hasNewRP, setHasNewRP] = useState(false)
 
   // responsive geometry
   const [radius, setRadius] = useState(220)
-  const [iconSize, setIconSize] = useState(120)
+  const [iconSize, setIconSize] = useState(110)
+  const [centerSize, setCenterSize] = useState(320)
 
-  // hooks MUST come before any conditional returns
+  // hook de souscriptions temps réel
+  useCharacterSubscriptions(character?.id, {
+    onNewMessage: () => setHasNewMessage(true),
+    onNewRP: () => setHasNewRP(true)
+  })
+
   const actions = useMemo(() => ([
     { key:'messages', label:'Messages', href:'/messages', icon:'/images/msg-icon.png',    ring:'ring-amber-300/80',  glow:'bg-amber-300/25'  },
     { key:'rp',       label:'RP',       href:'/rp',       icon:'/images/rp-icon.png',     ring:'ring-cyan-300/80',   glow:'bg-cyan-300/25'   },
@@ -33,44 +45,98 @@ export default function DashboardPage() {
   const positioned = useMemo(() => {
     const N = actions.length
     return actions.map((a, i) => {
-      const angle = (2 * Math.PI * i) / N - Math.PI / 2 // start at top, clockwise
+      const angle = (2 * Math.PI * i) / N - Math.PI / 2
       return { ...a, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
     })
   }, [actions, radius])
 
-  // effects
+  // responsive resize
   useEffect(() => {
     const onResize = () => {
       const w = window.innerWidth
       const h = window.innerHeight
-      const min = Math.min(w, h)
-      setRadius(Math.round(clamp(min * 1.6, 150, 320)))
-      setIconSize(Math.round(clamp(min * 0.14, 100, 180)))
+      const base = Math.min(w, h)
+      setCenterSize(Math.round(clamp(base * 0.34, 220, 320)))
+      setRadius(Math.round(clamp(base * 0.33, 140, 260)))
+      setIconSize(Math.round(clamp(base * 0.12, 80, 140)))
     }
     onResize()
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  // changement du personnage actif
+  const setActiveCharacter = async (charId) => {
+    if (!profile?.user_id || !charId) return
+
+    // reset tous les persos à inactif
+    await supabase
+      .from('characters')
+      .update({ is_active: false })
+      .eq('user_id', profile.user_id)
+
+    // active le perso choisi
+    const { error } = await supabase
+      .from('characters')
+      .update({ is_active: true })
+      .eq('id', charId)
+
+    if (error) { alert(error.message); return }
+
+    // recharge le perso actif
+    const { data: ch } = await supabase
+      .from('characters').select('*').eq('id', charId).maybeSingle()
+
+    setCharacter(ch || null)
+setCharacter(ch || null)
+
+// 🔹 recharge la liste pour mettre à jour les ticks
+const { data: chars } = await supabase
+  .from('characters')
+  .select('id, name, avatar_url, is_active')
+  .eq('user_id', profile.user_id)
+  .order('created_at', { ascending: true })
+setMyChars(chars || [])
+
+setPickerOpen(false)
+
+    setPickerOpen(false)
+  }
+
+  // chargement initial
   useEffect(() => {
     const run = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/auth'); return }
+
       const { data: prof, error: e1 } = await supabase
         .from('profiles').select('*').eq('user_id', session.user.id).maybeSingle()
       if (e1) { setError(e1.message); setLoading(false); return }
       setProfile(prof)
-      if (prof?.active_character_id) {
-        const { data: ch } = await supabase
-          .from('characters').select('*').eq('id', prof.active_character_id).maybeSingle()
-        setCharacter(ch || null)
-      }
+
+      const { data: chars } = await supabase
+        .from('characters')
+        .select('id, name, avatar_url, is_active')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: true })
+      setMyChars(chars || [])
+
+      // récupère le perso actif
+      const { data: activeChar } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (activeChar) setCharacter(activeChar)
+
       setLoading(false)
     }
     run()
   }, [router])
 
-  // display data (safe defaults so hooks order never changes)
+  // affichage
   const displayName =
     character?.name?.trim()
     || profile?.pseudo?.trim()
@@ -89,15 +155,21 @@ export default function DashboardPage() {
   return (
     <main className="fixed inset-0 overflow-hidden">
 
-{/* Nom en haut à gauche */}
-<div className="absolute top-6 left-8 z-40">
-  <span
-    className={`text-xl md:text-2xl font-semibold tracking-wide drop-shadow ${nameClass}`}
-    style={{ textShadow: '0 1px 10px rgba(0,0,0,.5)' }}
-  >
-    {displayName}
-  </span>
-</div>
+      {/* Nom + bouton changement perso */}
+      <div className="absolute top-6 left-8 z-40">
+        <span className={`text-xl md:text-2xl font-semibold tracking-wide drop-shadow ${nameClass}`} style={{ textShadow: '0 1px 10px rgba(0,0,0,.5)' }}>
+          {displayName}
+        </span>
+        {!!myChars.length && (
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="ml-3 align-middle rounded-full border border-white/30 bg-white/15 backdrop-blur-md px-2 py-1 text-[12px] text-white/90 hover:bg-white/20"
+            title="Changer de personnage"
+          >
+            Changer
+          </button>
+        )}
+      </div>
 
       {/* BG */}
       <div className="absolute inset-0 -z-20">
@@ -108,15 +180,12 @@ export default function DashboardPage() {
       {/* Logout */}
       <button
         onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
-        className="absolute top-6 right-8 z-40
-           rounded-full border border-white/25 bg-white/25 backdrop-blur-md
-           px-3 py-1.5 text-white/90 text-sm
-           hover:bg-white/20 focus:outline-none"
+        className="absolute top-6 right-8 z-40 rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 focus:outline-none"
       >
         Se déconnecter
       </button>
 
-      {/* Content states */}
+      {/* Content */}
       {loading ? (
         <div className="absolute inset-0 grid place-items-center text-white/80">Chargement…</div>
       ) : error ? (
@@ -126,7 +195,7 @@ export default function DashboardPage() {
       ) : (
         <div className="absolute inset-0 grid place-items-center">
           <div className="relative">
-            {/* Avatar */}
+            {/* Avatar central */}
             <div className="group relative w-[min(64vw,360px)] h-[min(64vw,360px)] rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto">
               {displayAvatar
                 ? <img src={displayAvatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -138,26 +207,69 @@ export default function DashboardPage() {
               <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-amber-300/45" />
             </div>
 
-               {/* Circular action ring */}
-            <div className="pointer-events-none absolute inset-0">
-              {positioned.map(a => (
-                <button
-                  key={a.key}
-                  onClick={() => router.push(a.href)}
-                  className="pointer-events-auto group absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
-                  style={{ left:`calc(50% + ${a.x}px)`, top:`calc(45% + ${a.y}px)`, width:iconSize, height:iconSize }}
-                  aria-label={a.label}
-                >
-                  <div className="relative w-full h-full rounded-full border border-white/45 bg-white/6 backdrop-blur-sm p-2 transition">
-                    <span className={`pointer-events-none absolute inset-0 rounded-full ring-2 ring-transparent group-hover:${a.ring} transition`} />
-                    <span className={`pointer-events-none absolute -inset-2 rounded-full opacity-0 group-hover:opacity-100 blur-xl ${a.glow} transition`} />
-                    <Image src={a.icon} alt="" fill sizes="140px" className="object-contain drop-shadow" />
+            {/* Choix personnage */}
+            {pickerOpen && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4">
+                <div className="w-[min(94vw,720px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-5 text-white shadow-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Choisir le personnage actif</h3>
+                    <button onClick={()=>setPickerOpen(false)} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">Fermer</button>
                   </div>
-                  <span className="absolute left-1/2 top-[calc(100%+6px)] -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[11px] opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
-                    {a.label}
-                  </span>
-                </button>
-              ))}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {myChars.map(ch => (
+                      <button key={ch.id} onClick={()=>setActiveCharacter(ch.id)}
+                        className={`group relative rounded-xl p-3 border transition text-left
+                          ${ch.is_active ? 'bg-white/15 border-white/35' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
+                        title={ch.name}
+                      >
+                        <div className="w-20 h-20 mx-auto rounded-full overflow-hidden ring-2 ring-white/20 bg-white/5">
+                          {ch.avatar_url
+                            ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
+                            : <div className="grid place-items-center w-full h-full text-white/70 text-xl">
+                                {(ch.name?.[0]||'?').toUpperCase()}
+                              </div>}
+                        </div>
+                        <div className="mt-2 text-center text-sm truncate">{ch.name}</div>
+                        {ch.is_active && (
+                          <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/20 border border-emerald-300/40 text-emerald-100">Actif ✓</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Anneau d’actions avec notifications */}
+            <div className="pointer-events-none absolute inset-0">
+              {positioned.map(a => {
+                const showNotif = (a.key === 'messages' && hasNewMessage) || (a.key === 'rp' && hasNewRP)
+                return (
+                  <button
+                    key={a.key}
+                    onClick={() => {
+                      router.push(a.href)
+                      if (a.key === 'messages') setHasNewMessage(false)
+                      if (a.key === 'rp') setHasNewRP(false)
+                    }}
+                    className="pointer-events-auto group absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
+                    style={{ left:`calc(50% + ${a.x}px)`, top:`calc(45% + ${a.y}px)`, width:iconSize, height:iconSize }}
+                    aria-label={a.label}
+                  >
+                    <div className="relative w-full h-full rounded-full border border-white/45 bg-white/6 backdrop-blur-sm p-2 transition">
+                      <span className={`pointer-events-none absolute inset-0 rounded-full ring-2 ring-transparent group-hover:${a.ring} transition`} />
+                      <span className={`pointer-events-none absolute -inset-2 rounded-full opacity-0 group-hover:opacity-100 blur-xl ${a.glow} transition`} />
+                      <Image src={a.icon} alt="" fill sizes="140px" className="object-contain drop-shadow" />
+                      {showNotif && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>
+                      )}
+                    </div>
+                    <span className="absolute left-1/2 top-[calc(100%+6px)] -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[11px] opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
+                      {a.label}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

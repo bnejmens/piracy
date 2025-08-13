@@ -85,6 +85,32 @@ export default function RPPage() {
     return sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
   }, [raw])
 
+// Source de vérité = me.active_character_id ; fallback = premier perso actif
+useEffect(() => {
+  if (!myChars.length) { setPostAsCharId(null); return }
+
+  // si me.active_character_id est défini ET présent dans myChars → on prend
+  const fromProfile = me?.active_character_id
+    ? myChars.find(c => String(c.id) === String(me.active_character_id))
+    : null
+
+  setPostAsCharId(fromProfile?.id || myChars[0].id)
+}, [myChars, me?.active_character_id])
+
+
+// garde toujours un perso valide sélectionné, sans jamais écraser un choix utilisateur actif
+useEffect(() => {
+  // si la liste change et que le perso courant n'est plus dans la liste, on force un choix
+  if (myChars.length === 0) { setPostAsCharId(null); return; }
+  if (!postAsCharId || !myChars.find(c => String(c.id) === String(postAsCharId))) {
+    // si le profil a un active_character_id qui existe, on le prend, sinon le 1er
+    const preferred = me?.active_character_id && myChars.find(c => String(c.id) === String(me.active_character_id));
+    setPostAsCharId(preferred?.id || myChars[0].id);
+  }
+  // ne change rien si l'utilisateur a déjà choisi un perso valide
+}, [myChars, me?.active_character_id]); 
+
+
   // Boot
   useEffect(() => {
     const run = async () => {
@@ -162,27 +188,40 @@ export default function RPPage() {
   }
 
   const publishPost = async () => {
-    if (!raw.trim() || !activeTopic || !postAsCharId || !session) return
-    const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
-    const payload = {
-      topic_id: activeTopic.id,
-      author_id: session.user.id,
-      author_user_id: session.user.id,       // si tu la gardes pour audit
-      author_character_id: postAsCharId,
-      content_raw: raw,
-      content_html: processedHtml,
-    }
-    const { data, error } = await supabase
-      .from('rp_posts')
-      .insert(payload)
-      .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
-      .single()
-    if (error) { alert(error.message); return }
-    setPosts(p => [...p, data])
-    setRaw('')
-    setPreviewOpen(false)
-    setTimeout(scrollToEnd, 0)
+  const chosenCharId = postAsCharId // capture synchrone
+  if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
+    alert("Choisis un personnage et un sujet, puis écris un message."); 
+    return
   }
+
+  const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
+  const payload = {
+    topic_id: activeTopic.id,
+    author_id: session.user.id,
+    author_user_id: session.user.id,
+    author_character_id: chosenCharId, // <- verrouillé
+    content_raw: raw,
+    content_html: processedHtml,
+  }
+
+  const { data, error } = await supabase
+    .from('rp_posts')
+    .insert(payload)
+    .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
+    .single()
+  if (error) { alert(error.message); return }
+
+  // on s’assure visuellement que le post a bien l’ID voulu
+  if (String(data.author_character_id) !== String(chosenCharId)) {
+    console.warn('Mismatch author_character_id after insert', { chosenCharId, data })
+  }
+
+  setPosts(p => [...p, data])
+  setRaw('')
+  setPreviewOpen(false)
+  setTimeout(scrollToEnd, 0)
+}
+
 
   /* ---------- EDIT / DELETE POST ---------- */
   const startEditPost = (p) => {
@@ -345,17 +384,22 @@ export default function RPPage() {
 
           <div className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-white/80 text-sm">Poster en tant que</span>
-              <select
-                value={postAsCharId || ''}
-                onChange={e => setPostAsCharId(e.target.value || null)}
-                className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
-              >
-                {myChars.map(ch => (
-                  <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
-                ))}
-              </select>
-            </div>
+  <span className="text-white/80 text-sm">Poster en tant que</span>
+  <select
+    value={postAsCharId || ''}
+    onChange={e => setPostAsCharId(e.target.value || null)}
+    className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
+  >
+    {myChars.map(ch => (
+      <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
+    ))}
+  </select>
+
+  {/* feedback clair du choix */}
+  {postAsCharId && (
+    <PostAsBadge characterId={postAsCharId} />
+  )}
+</div>
 
             {/* Toolbar */}
             <EditorToolbar
@@ -637,6 +681,36 @@ function PostHeader({ authorId, authorCharacterId, createdAt }) {
     </div>
   )
 }
+
+function PostAsBadge({ characterId }) {
+  const [ch, setCh] = useState(null)
+  useEffect(() => {
+    let ok = true
+    const run = async () => {
+      const { data } = await supabase
+        .from('characters')
+        .select('name, avatar_url')
+        .eq('id', characterId)
+        .maybeSingle()
+      if (ok) setCh(data || null)
+    }
+    if (characterId) run()
+    return () => { ok = false }
+  }, [characterId])
+
+  if (!ch) return null
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-2 py-1">
+      <span className="inline-block w-6 h-6 rounded-full overflow-hidden ring-1 ring-white/15">
+        {ch.avatar_url
+          ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
+          : <span className="grid place-items-center w-full h-full text-[10px] text-white/70">{(ch.name?.[0]||'?').toUpperCase()}</span>}
+      </span>
+      <span className="text-white/80 text-xs">{ch.name}</span>
+    </span>
+  )
+}
+
 
 function EditorToolbar({
   onBold, onItalic, onUnderline, onStrike,
