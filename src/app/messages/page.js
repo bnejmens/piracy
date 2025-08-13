@@ -283,7 +283,7 @@ export default function MessagesPage() {
         {/* COLONNE GAUCHE */}
         <aside className="rounded-2xl bg-black/45 backdrop-blur-md border border-white/15 overflow-hidden flex flex-col">
           {/* En-tête */}
-          <div className="px-4 py-3 border-b border-white/10 text-white/90 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-white/10 text-white/80 flex items-center justify-between">
             <div className="font-medium">
               téléphone de <span className="text-amber-300">{activeCharName}</span>
             </div>
@@ -292,7 +292,7 @@ export default function MessagesPage() {
               <select
                 value={currentSpeakerId || ''}
                 onChange={e => setCurrentSpeakerId(e.target.value || null)}
-                className="rounded-md bg-white/10 border border-white/20 text-white/90 text-sm px-2 py-1"
+                className="rounded-md bg-white/20 border border-white/30 text-black/70 text-sm px-2 py-1"
                 title="Parler en tant que…"
               >
                 {myChars.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
