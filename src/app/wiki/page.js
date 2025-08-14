@@ -10,7 +10,7 @@ export const CATS = [
   { key: 'univers', label: 'Univers', color: '#60a5fa',
     subs: [{key:'faune',label:'Faune'},{key:'flore',label:'Flore'},{key:'historique',label:'Historique'}] },
   { key: 'personnages', label: 'Personnages', color: '#f59e0b',
-    subs: [{key:'pnj',label:'PNJ'},{key:'creatures',label:'Créatures'},{key:'groupes',label:'Groupes'}] },
+    subs: [{key:'pnj',label:'PNJ'},{key:'creatures',label:'Créatures'},{ key:'galerie', label:'Galerie de Joueurs' },{key:'groupes',label:'Groupes'}] },
   { key: 'magie', label: 'Magie', color: '#a78bfa',
     subs: [{key:'sorts',label:'Sorts'},{key:'potions',label:'Potions'},{key:'objets',label:'Objets magiques'}] },
   { key: 'contes', label: 'Contes & Légendes', color: '#34d399',
