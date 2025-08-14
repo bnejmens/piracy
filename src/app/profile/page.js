@@ -36,11 +36,16 @@ export default function ProfilePage() {
 
   const REL_TYPES = useMemo(() => ([
     { value: "love_interest", label: "Love interest" },
-    { value: "ami", label: "Ami" },
+    { value: "ami(e)", label: "Ami(e)" },
+    { value: "amour", label: "Amour" },
+    { value: "amant(e)", label: "Amant(e)" },
     { value: "ennemi", label: "Ennemi" },
     { value: "indifferent", label: "Indifférent" },
-    { value: "nemesis", label: "Némésis" },
     { value: "inconnu", label: "Inconnu" },
+    { value: "Père/Mère", label: "Père/Mère" },
+    { value: "Frère/soeur", label: "Frère/soeur" },
+    { value: "fils/fille", label: "fils/fille" },
+    { value: "Cousin(e)", label: "Cousin(e)" },
   ]), []);
 
 // Helpers pour normaliser les valeurs
@@ -75,11 +80,11 @@ const toEnumOrNull = (v, allowed) => {
 
       // Tous les persos actifs (pour carnet relations)
       const { data: all } = await supabase
-        .from("characters")
-        .select("id, name, avatar_url")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-      setAllChars(all || []);
+  .from("characters")
+  .select("id, name, avatar_url, is_listed, is_active")
+  .or("is_listed.is.true,is_active.is.true")
+  .order("name", { ascending: true });
+setAllChars(all || []);
 
       setLoading(false);
     })();
