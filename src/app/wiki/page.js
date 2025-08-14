@@ -1,3 +1,4 @@
+// src/app/wiki/page.js
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -5,17 +6,91 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
 
-/* -------------------- Catégories / sous-catégories -------------------- */
-export const CATS = [
-  { key: 'univers', label: 'Univers', color: '#60a5fa',
-    subs: [{key:'faune',label:'Faune'},{key:'flore',label:'Flore'},{key:'historique',label:'Historique'}] },
-  { key: 'personnages', label: 'Personnages', color: '#f59e0b',
-    subs: [{key:'pnj',label:'PNJ'},{key:'creatures',label:'Créatures'},{ key:'galerie', label:'Galerie de Joueurs' },{key:'groupes',label:'Groupes'}] },
-  { key: 'magie', label: 'Magie', color: '#a78bfa',
-    subs: [{key:'sorts',label:'Sorts'},{key:'potions',label:'Potions'},{key:'objets',label:'Objets magiques'}] },
-  { key: 'contes', label: 'Contes & Légendes', color: '#34d399',
-    subs: [{key:'rumeurs',label:'Rumeurs'},{key:'histoires',label:'Histoires'}] },
-]
+/* -------------------- Helpers catégories dynamiques -------------------- */
+function buildTree(list) {
+  const byId = new Map(list.map(n => [n.id, { ...n, children: [] }]))
+  const roots = []
+  for (const n of byId.values()) {
+    if (n.parent_id && byId.has(n.parent_id)) byId.get(n.parent_id).children.push(n)
+    else roots.push(n)
+  }
+  const sortRec = (arr) => { arr.sort((a,b)=>(a.order_index??0)-(b.order_index??0)); arr.forEach(x=>sortRec(x.children)) }
+  sortRec(roots)
+  return roots
+}
+function staticToTree() {
+  // fallback si DB vide/erreur — ALIGNE avec /wiki/create
+  const STATIC = [
+    {
+      key: 'univers', label: 'Univers', color: '#0ea5e9',
+      subs: [
+        { key:'faune', label:'Faune' },
+        { key:'flore', label:'Flore' },
+        { key:'historique', label:'Historique' },
+      ]
+    },
+    {
+      key: 'personnages', label: 'Personnages', color: '#f59e0b',
+      subs: [
+        { key:'pnj',       label:'PNJ' },
+        { key:'creatures', label:'Créatures' },
+        { key:'groupes',   label:'Groupes' },
+        { key:'galerie',   label:'Galerie de Joueurs', subs: [
+          { key:'Joan',  label:'Joan' },
+          { key:'Sunny', label:'Sunny' },
+          { key:'Lou',   label:'Lou' },
+        ]},
+      ]
+    },
+    {
+      key: 'magie', label: 'Magie', color: '#a78bfa',
+      subs: [
+        { key:'sorts',   label:'Sorts' },
+        { key:'potions', label:'Potions' },
+        { key:'objets',  label:'Objets magiques' },
+      ]
+    },
+  ];
+  const gen = (prefix, items) => items.map((x,i) => ({
+    id: `${prefix}-${x.key}-${i}`,
+    parent_id: null,
+    label: x.label,
+    slug: x.key,
+    color: x.color,
+    order_index: i,
+    is_active: true,
+    children: x.subs?.map((s,j) => ({
+      id: `${prefix}-${x.key}-${s.key}-${j}`,
+      parent_id: `${prefix}-${x.key}-${i}`,
+      label: s.label,
+      slug: s.key,
+      color: x.color,
+      order_index: j,
+      is_active: true,
+      children: s.subs?.map((s3,k) => ({
+        id: `${prefix}-${x.key}-${s.key}-${s3.key}-${k}`,
+        parent_id: `${prefix}-${x.key}-${s.key}-${j}`,
+        label: s3.label,
+        slug: s3.key,
+        color: x.color,
+        order_index: k,
+        is_active: true,
+        children: []
+      })) || []
+    })) || []
+  }))
+  return gen('static', STATIC)
+}
+
+function findById(tree, id) {
+  const stack = [...tree]
+  while (stack.length) {
+    const n = stack.pop()
+    if (n.id === id) return n
+    if (n.children?.length) stack.push(...n.children)
+  }
+  return null
+}
 
 /* -------------------- Raretés (styles) -------------------- */
 const RARITY = {
@@ -32,7 +107,6 @@ function srcForDisplay(url) {
   try {
     const u = new URL(url)
     const isSupabase = u.hostname.endsWith('.supabase.co')
-    // Supabase direct (optimisé par Next/Image), sinon proxy local
     return isSupabase ? url : `/api/img?u=${encodeURIComponent(url)}`
   } catch {
     return `/api/img?u=${encodeURIComponent(url)}`
@@ -44,11 +118,26 @@ export default function WikiPage() {
   const [me, setMe] = useState(null)
   const isAdmin = !!me?.is_admin
 
-  // Filtres
-  const [cat, setCat] = useState(CATS[0].key)
-  const [sub, setSub] = useState(CATS[0].subs[0].key)
+  // --------- Catégories dynamiques ----------
+  const [tree, setTree] = useState([])
+  const [catsLoading, setCatsLoading] = useState(true)
+
+  // Sélections (ids)
+  const roots = tree
+  const firstRootId = roots?.[0]?.id || null
+  const [l1, setL1] = useState(null) // niveau 1 (id)
+  const l1Node = useMemo(() => findById(tree, l1), [tree, l1])
+  const l2List = l1Node?.children || []
+  const firstL2Id = l2List?.[0]?.id || null
+  const [l2, setL2] = useState(null) // niveau 2 (id)
+  const l2Node = useMemo(() => findById(tree, l2), [tree, l2])
+  const l3List = l2Node?.children || []
+  const [l3, setL3] = useState('')
+
+
+  // Filtres/tri/recherche
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState('newest') // newest|title|rarity_desc|rarity_asc
+  const [sortKey, setSortKey] = useState('newest')
   const [dimUncollected, setDimUncollected] = useState(true)
 
   // Données
@@ -63,10 +152,11 @@ export default function WikiPage() {
   const PAGE_SIZE = 16
   const [page, setPage] = useState(1)
 
-  // Confetti sobre
+  // Confetti
   const [confetti, setConfetti] = useState([])
   const confettiTimer = useRef(null)
 
+  // Boot: session + profil + catégories + cartes + collection
   useEffect(() => {
     const boot = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -78,6 +168,21 @@ export default function WikiPage() {
         .eq('user_id', session.user.id)
         .maybeSingle()
       setMe(myProfile || null)
+
+      // catégories
+      setCatsLoading(true)
+      const { data: rawCats, error: catsErr } = await supabase
+        .from('wiki_categories')
+        .select('id,parent_id,label,slug,color,order_index,is_active')
+        .order('order_index', { ascending: true })
+      if (catsErr) {
+        setTree(staticToTree())
+      } else {
+        const onlyActive = (rawCats || []).filter(x => x.is_active !== false)
+        setTree(onlyActive.length ? buildTree(onlyActive) : staticToTree())
+      }
+      setCatsLoading(false)
+
       await Promise.all([loadCards(), loadCollection(session.user.id)])
       setLoading(false)
     }
@@ -85,10 +190,22 @@ export default function WikiPage() {
     return () => { if (confettiTimer.current) clearInterval(confettiTimer.current) }
   }, [])
 
+  // init sélection cat/sub quand l’arbre est dispo
+  useEffect(() => {
+    if (catsLoading) return
+    setL1(prev => prev || firstRootId)
+  }, [catsLoading, firstRootId])
+  useEffect(() => {                                                   // init L2 quand L1 change
+    setL2(l1Node?.children?.[0]?.id || null)
+    setL3('') // reset systématique du niveau 3
+  }, [l1])
+
+  useEffect(() => { setL3('') }, [l2])
+
   const loadCards = async () => {
     const { data, error } = await supabase
       .from('cards')
-      .select('id, owner_id, title, description, category, subcategory, rarity, image_url, created_at')
+      .select('id, owner_id, title, description, category, subcategory, sub_subcategory, category_id, subcategory_id, sub_subcategory_id, rarity, image_url, created_at')
       .order('created_at', { ascending: false })
       .limit(1000)
     if (!error) setCards(data || [])
@@ -102,27 +219,89 @@ export default function WikiPage() {
     setCollectedSet(new Set((data || []).map(x => x.card_id)))
   }
 
-  const currentCatColor = useMemo(
-    () => CATS.find(c => c.key === cat)?.color || '#60a5fa',
-    [cat]
-  )
+  const currentCatColor = useMemo(() => l1Node?.color || '#60a5fa', [l1Node])
 
-  const filteredAll = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    let list = cards.filter(c => c.category === cat && c.subcategory === sub)
-    if (q) list = list.filter(c => (c.title||'').toLowerCase().includes(q))
-    const rw = { commun:1, rare:2, epique:3, legendaire:4 }
-    if (sortKey === 'title') list.sort((a,b)=>(a.title||'').localeCompare(b.title||''))
-    else if (sortKey === 'rarity_desc') list.sort((a,b)=>(rw[b.rarity]||0)-(rw[a.rarity]||0))
-    else if (sortKey === 'rarity_asc') list.sort((a,b)=>(rw[a.rarity]||0)-(rw[b.rarity]||0))
-    else list.sort((a,b)=> new Date(b.created_at)-new Date(a.created_at))
-    return list
-  }, [cards, cat, sub, search, sortKey])
+const filteredAll = useMemo(() => {
+  const norm = (s) =>
+    (s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+  // helper: match champ carte vs node (slug OU label)
+  const matchNode = (cardValue, node) => {
+    if (!node) return true; // rien à filtrer
+    const v = norm(cardValue);
+    const bySlug  = norm(node.slug);
+    const byLabel = norm(node.label);
+    return v === bySlug || v === byLabel;
+  };
+
+  // Sélections (nodes + ids)
+  const selL1Id = l1 || null;
+  const selL2Id = l2 || null;
+  const selL3Id = l3 || null;
+
+  const l1NodeSel = l1Node || null;
+  const l2NodeSel = l2 ? (l1Node?.children || []).find(x => x.id === l2) : null;
+  const l3NodeSel = l3 ? (l2Node?.children || []).find(x => x.id === l3) : null;
+
+  const q = norm(search);
+
+  let list = cards.filter((c) => {
+    // 1) Catégorie L1
+    if (selL1Id) {
+      if (c.category_id) {
+        if (c.category_id !== selL1Id) return false;
+      } else {
+        if (!matchNode(c.category, l1NodeSel)) return false;
+      }
+    }
+    // 2) Sous-catégorie L2
+    if (selL2Id) {
+      if (c.subcategory_id) {
+        if (c.subcategory_id !== selL2Id) return false;
+      } else {
+        if (!matchNode(c.subcategory, l2NodeSel)) return false;
+      }
+    }
+    // 3) Sous-sous-catégorie L3
+    if (selL3Id) {
+      if (c.sub_subcategory_id) {
+        if (c.sub_subcategory_id !== selL3Id) return false;
+      } else {
+        if (!matchNode(c.sub_subcategory, l3NodeSel)) return false;
+      }
+    }
+    return true;
+  });
+
+  // Recherche plein-texte simple
+  if (q) {
+    list = list.filter((c) =>
+      norm(c.title).includes(q) ||
+      norm(c.description).includes(q)
+    );
+  }
+
+  // Tri
+  const rw = { commun:1, rare:2, epique:3, legendaire:4 };
+  if (sortKey === 'title') list.sort((a,b)=>(cTitle(a)).localeCompare(cTitle(b)));
+  else if (sortKey === 'rarity_desc') list.sort((a,b)=>(rw[b.rarity]||0)-(rw[a.rarity]||0));
+  else if (sortKey === 'rarity_asc') list.sort((a,b)=>(rw[a.rarity]||0)-(rw[b.rarity]||0));
+  else list.sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
+
+  return list;
+}, [cards, l1, l1Node, l2, l2Node, l3, search, sortKey]);
+
+
+function cTitle(c){ return (c.title||'').toString() }
 
   const pageCount = Math.max(1, Math.ceil(filteredAll.length / PAGE_SIZE))
   const pageStart = (page - 1) * PAGE_SIZE
   const filtered = filteredAll.slice(pageStart, pageStart + PAGE_SIZE)
-  useEffect(() => { setPage(1) }, [cat, sub, search, sortKey])
+  useEffect(() => { setPage(1) }, [l1, l2, l3, search, sortKey])
 
   const isCollected = (id) => collectedSet.has(id)
 
@@ -166,13 +345,13 @@ export default function WikiPage() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-{/* Bouton retour */}
-<button
-  onClick={() => window.location.href = '/dashboard'}
-  className="fixed left-60 bottom-[20px] z-50 rounded-full border border-white/25 bg-white/20 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/60"
->
-  ← Tableau de bord
-</button>
+      {/* Bouton retour */}
+      <button
+        onClick={() => window.location.href = '/dashboard'}
+        className="fixed left-60 bottom-[20px] z-50 rounded-full border border-white/25 bg-white/20 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/60"
+      >
+        ← Tableau de bord
+      </button>
 
       {/* BG */}
       <div className="absolute inset-0 -z-20">
@@ -232,31 +411,53 @@ export default function WikiPage() {
               </select>
             </div>
 
-            {/* Catégories */}
-            {CATS.map(group=>(
-              <div key={group.key} className="space-y-2">
+            {/* Catégories (dynamiques) */}
+            {roots.map(group=>(
+              <div key={group.id} className="space-y-2">
                 <button
-                  onClick={() => { setCat(group.key); setSub(group.subs[0]?.key) }}
-                  className={`w-full text-left rounded-lg px-3 py-2 border transition ${cat===group.key ? 'bg-white/15 border-white/30' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
-                  style={{ boxShadow:`inset 0 0 0 1px ${cat===group.key?group.color:'transparent'}` }}
+                  onClick={() => { setL1(group.id); setL2(group.children?.[0]?.id || null) }}
+                  className={`w-full text-left rounded-lg px-3 py-2 border transition ${l1===group.id ? 'bg-white/15 border-white/30' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
+                  style={{ boxShadow:`inset 0 0 0 1px ${l1===group.id?(group.color||'#ffffff66'):'transparent'}` }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: group.color }} />
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: group.color || '#999' }} />
                     <span className="text-white/90">{group.label}</span>
                   </div>
                 </button>
-                {cat===group.key && (
+                {l1===group.id && (
                   <div className="pl-5 space-y-1">
-                    {group.subs.map(s=>(
-                      <button key={s.key} onClick={()=>setSub(s.key)}
-                        className={`w-full text-left rounded-md px-2 py-1 border text-sm transition ${sub===s.key ? 'bg-white/15 border-white/30' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}>
+                    {(group.children||[]).map(s=>(
+                      <button key={s.id} onClick={() => { setL1(group.id); setL2(s.id) }}
+                        className={`w-full text-left rounded-md px-2 py-1 border text-sm transition ${l2===s.id ? 'bg-white/15 border-white/30' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}>
                         <span className="text-white/80">{s.label}</span>
                       </button>
                     ))}
                   </div>
                 )}
+                {/* Rangée L3 optionnelle (affichée à la suite de la sous-catégorie du groupe courant) */}
+                {l1===group.id && l2 && (findById(tree, l2)?.children?.length > 0) && (
+                  <div className="pl-8 mt-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setL3('')}
+                      className={`px-2.5 py-1.5 rounded-full border text-xs transition ${l3==='' ? 'bg-white/15 border-white/30' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
+                    >
+                      Aucune
+                    </button>
+                    {(findById(tree, l2)?.children || []).map(s3 => (
+                      <button
+                        key={s3.id}
+                        onClick={() => setL3(s3.id)}
+                        className={`px-2.5 py-1.5 rounded-full border text-xs transition ${l3===s3.id ? 'bg-white/15 border-white/30' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
+                      >
+                        {s3.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
               </div>
             ))}
+
 
             {/* Griser */}
             <div className="mt-2 p-3 rounded-lg border border-white/15 bg-white/5">
@@ -272,7 +473,7 @@ export default function WikiPage() {
         <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md overflow-hidden flex flex-col">
           <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <div className="text-white/90 font-medium">
-              {CATS.find(c=>c.key===cat)?.label} — {CATS.find(c=>c.key===cat)?.subs.find(s=>s.key===sub)?.label}
+              {l1Node?.label || 'Catégorie'} — {l2List.find(x=>x.id===l2)?.label || 'Sous-catégorie'}
             </div>
             <div className="text-white/60 text-sm">
               {filteredAll.length} carte(s){filteredAll.length>PAGE_SIZE ? ` • page ${page}/${pageCount}`:''}
