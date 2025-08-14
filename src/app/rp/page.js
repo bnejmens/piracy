@@ -85,31 +85,25 @@ export default function RPPage() {
     return sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
   }, [raw])
 
-// Source de vérité = me.active_character_id ; fallback = premier perso actif
-useEffect(() => {
-  if (!myChars.length) { setPostAsCharId(null); return }
+  // Source de vérité = me.active_character_id ; fallback = premier perso actif
+  useEffect(() => {
+    if (!myChars.length) { setPostAsCharId(null); return }
 
-  // si me.active_character_id est défini ET présent dans myChars → on prend
-  const fromProfile = me?.active_character_id
-    ? myChars.find(c => String(c.id) === String(me.active_character_id))
-    : null
+    const fromProfile = me?.active_character_id
+      ? myChars.find(c => String(c.id) === String(me.active_character_id))
+      : null
 
-  setPostAsCharId(fromProfile?.id || myChars[0].id)
-}, [myChars, me?.active_character_id])
+    setPostAsCharId(fromProfile?.id || myChars[0].id)
+  }, [myChars, me?.active_character_id])
 
-
-// garde toujours un perso valide sélectionné, sans jamais écraser un choix utilisateur actif
-useEffect(() => {
-  // si la liste change et que le perso courant n'est plus dans la liste, on force un choix
-  if (myChars.length === 0) { setPostAsCharId(null); return; }
-  if (!postAsCharId || !myChars.find(c => String(c.id) === String(postAsCharId))) {
-    // si le profil a un active_character_id qui existe, on le prend, sinon le 1er
-    const preferred = me?.active_character_id && myChars.find(c => String(c.id) === String(me.active_character_id));
-    setPostAsCharId(preferred?.id || myChars[0].id);
-  }
-  // ne change rien si l'utilisateur a déjà choisi un perso valide
-}, [myChars, me?.active_character_id]); 
-
+  // garde toujours un perso valide sélectionné, sans écraser un choix utilisateur actif
+  useEffect(() => {
+    if (myChars.length === 0) { setPostAsCharId(null); return; }
+    if (!postAsCharId || !myChars.find(c => String(c.id) === String(postAsCharId))) {
+      const preferred = me?.active_character_id && myChars.find(c => String(c.id) === String(me.active_character_id));
+      setPostAsCharId(preferred?.id || myChars[0].id);
+    }
+  }, [myChars, me?.active_character_id])
 
   // Boot
   useEffect(() => {
@@ -148,7 +142,7 @@ useEffect(() => {
   const loadTopics = async () => {
     const { data, error } = await supabase
       .from('rp_topics')
-      .select('id, title, created_at, author_id') // author_id optionnel si absent en DB
+      .select('id, title, created_at, author_id')
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) { console.error(error); return }
@@ -175,7 +169,6 @@ useEffect(() => {
   const createTopic = async () => {
     const title = prompt('Titre du nouveau sujet ?')
     if (!title) return
-    // on tente d’envoyer author_id (si la colonne existe, parfait; sinon RLS/DB rejetteront)
     const { data, error } = await supabase
       .from('rp_topics')
       .insert({ title, author_id: session?.user?.id })
@@ -188,40 +181,38 @@ useEffect(() => {
   }
 
   const publishPost = async () => {
-  const chosenCharId = postAsCharId // capture synchrone
-  if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
-    alert("Choisis un personnage et un sujet, puis écris un message."); 
-    return
+    const chosenCharId = postAsCharId
+    if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
+      alert("Choisis un personnage et un sujet, puis écris un message."); 
+      return
+    }
+
+    const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
+    const payload = {
+      topic_id: activeTopic.id,
+      author_id: session.user.id,
+      author_user_id: session.user.id,
+      author_character_id: chosenCharId,
+      content_raw: raw,
+      content_html: processedHtml,
+    }
+
+    const { data, error } = await supabase
+      .from('rp_posts')
+      .insert(payload)
+      .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
+      .single()
+    if (error) { alert(error.message); return }
+
+    if (String(data.author_character_id) !== String(chosenCharId)) {
+      console.warn('Mismatch author_character_id after insert', { chosenCharId, data })
+    }
+
+    setPosts(p => [...p, data])
+    setRaw('')
+    setPreviewOpen(false)
+    setTimeout(scrollToEnd, 0)
   }
-
-  const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
-  const payload = {
-    topic_id: activeTopic.id,
-    author_id: session.user.id,
-    author_user_id: session.user.id,
-    author_character_id: chosenCharId, // <- verrouillé
-    content_raw: raw,
-    content_html: processedHtml,
-  }
-
-  const { data, error } = await supabase
-    .from('rp_posts')
-    .insert(payload)
-    .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
-    .single()
-  if (error) { alert(error.message); return }
-
-  // on s’assure visuellement que le post a bien l’ID voulu
-  if (String(data.author_character_id) !== String(chosenCharId)) {
-    console.warn('Mismatch author_character_id after insert', { chosenCharId, data })
-  }
-
-  setPosts(p => [...p, data])
-  setRaw('')
-  setPreviewOpen(false)
-  setTimeout(scrollToEnd, 0)
-}
-
 
   /* ---------- EDIT / DELETE POST ---------- */
   const startEditPost = (p) => {
@@ -307,15 +298,32 @@ useEffect(() => {
         ← Tableau de bord
       </button>
 
-      {/* GRID */}
-      <div className="relative z-10 h-full grid gap-6 p-6
-                      grid-cols-[420px_420px_minmax(0,1fr)]
-                      xl:grid-cols-[380px_380px_minmax(0,1fr)]
-                      lg:grid-cols-1">
+      {/* GRID — responsive split pane */}
+      <div
+        className="
+          relative z-10 h-full min-h-0
+          grid gap-6 p-6
+
+          /* Mobile par défaut : pile en 1 colonne */
+          grid-cols-1
+
+          /* iPad horizontal : split 2 colonnes (Sujets | Posts+Éditeur) */
+          lg:grid-cols-[320px_minmax(0,1fr)]
+          lg:[grid-auto-rows:minmax(0,1fr)]
+
+          /* Desktop : 3 colonnes (comme avant) */
+          xl:grid-cols-[380px_380px_minmax(0,1fr)]
+          2xl:grid-cols-[420px_420px_minmax(0,1fr)]
+        "
+      >
 
         {/* -------- SUJETS -------- */}
-        <section className="rounded-2xl border border-white/15 overflow-hidden flex flex-col"
-                 style={frost(GLASS.left)}>
+        <section
+          className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0
+                     order-1 lg:col-start-1 lg:row-start-1
+                     xl:col-start-1 xl:row-start-1 xl:order-1"
+          style={frost(GLASS.left)}
+        >
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between">
             <span>Sujets en cours</span>
             <button onClick={createTopic}
@@ -376,32 +384,32 @@ useEffect(() => {
         </section>
 
         {/* -------- ÉDITEUR -------- */}
-        <section className="rounded-2xl border border-white/15 overflow-hidden flex flex-col"
-                 style={frost(GLASS.editor)}>
+        <section
+          className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0
+                     order-3 lg:col-start-2 lg:row-start-2 lg:min-h-[28vh] lg:order-3
+                     xl:col-start-2 xl:row-start-1 xl:order-2"
+          style={frost(GLASS.editor)}
+        >
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium">
             {activeTopic ? activeTopic.title : 'Sélectionne un sujet pour écrire'}
           </header>
 
           <div className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-  <span className="text-white/80 text-sm">Poster en tant que</span>
-  <select
-    value={postAsCharId || ''}
-    onChange={e => setPostAsCharId(e.target.value || null)}
-    className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
-  >
-    {myChars.map(ch => (
-      <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
-    ))}
-  </select>
+              <span className="text-white/80 text-sm">Poster en tant que</span>
+              <select
+                value={postAsCharId || ''}
+                onChange={e => setPostAsCharId(e.target.value || null)}
+                className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
+              >
+                {myChars.map(ch => (
+                  <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
+                ))}
+              </select>
 
-  {/* feedback clair du choix */}
-  {postAsCharId && (
-    <PostAsBadge characterId={postAsCharId} />
-  )}
-</div>
+              {postAsCharId && <PostAsBadge characterId={postAsCharId} />}
+            </div>
 
-            {/* Toolbar */}
             <EditorToolbar
               onBold={() => insertAroundSelection('[b]','[/b]')}
               onItalic={() => insertAroundSelection('[i]','[/i]')}
@@ -427,7 +435,7 @@ useEffect(() => {
               value={raw}
               onChange={e => setRaw(e.target.value)}
               placeholder="Écris ton post en BBCode…"
-              className="w-full rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
+              className="w-full lg:min-h-[120px] rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
             />
 
             <div className="flex items-center gap-2">
@@ -451,8 +459,12 @@ useEffect(() => {
         </section>
 
         {/* -------- POSTS -------- */}
-        <section className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0"
-                 style={frost(GLASS.right)}>
+        <section
+          className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0 min-h-0
+                     order-2 lg:col-start-2 lg:row-start-1 lg:min-h-[60vh] lg:order-2
+                     xl:col-start-3 xl:row-start-1 xl:order-3"
+          style={frost(GLASS.right)}
+        >
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium">
             {activeTopic ? activeTopic.title : 'Posts'}
           </header>
@@ -465,7 +477,6 @@ useEffect(() => {
                          className="relative rounded-2xl border px-4 py-3"
                          style={frost(mine ? GLASS.cardMine : GLASS.cardOther)}>
 
-                  {/* actions owner (post) */}
                   {mine && editingPostId !== p.id && (
                     <div className="absolute right-3 top-3 flex gap-2">
                       <button
@@ -570,16 +581,11 @@ function TopicParticipants({ topicId }) {
         if (error) throw error
         if (!posts?.length) { if (ok) setList([]); return }
 
-        // Distinct ids
         const charIds = Array.from(new Set(posts.map(p => p.author_character_id).filter(Boolean)))
         const authorsNeedingProfile = Array.from(new Set(
-          posts
-            .filter(p => !p.author_character_id)
-            .map(p => p.author_id)
-            .filter(Boolean)
+          posts.filter(p => !p.author_character_id).map(p => p.author_id).filter(Boolean)
         ))
 
-        // 1) Characters
         const charMap = new Map()
         if (charIds.length) {
           const { data: chars } = await supabase
@@ -589,7 +595,6 @@ function TopicParticipants({ topicId }) {
           }
         }
 
-        // 2) Profils fallback
         let profList = []
         if (authorsNeedingProfile.length) {
           const { data: profs } = await supabase
@@ -601,7 +606,6 @@ function TopicParticipants({ topicId }) {
           }))
         }
 
-        // 3) Fusion par ordre d’apparition
         const merged = []
         const seen = new Set()
         for (const p of posts) {
@@ -616,7 +620,7 @@ function TopicParticipants({ topicId }) {
         }
 
         if (ok) setList(merged)
-      } catch (e) {
+      } catch {
         if (ok) setList([])
       }
     }
@@ -647,13 +651,11 @@ function PostHeader({ authorId, authorCharacterId, createdAt }) {
   useEffect(() => {
     let ok = true
     const run = async () => {
-      // 1) Essayer le personnage
       if (authorCharacterId) {
         const { data: ch } = await supabase
           .from('characters').select('name, avatar_url').eq('id', authorCharacterId).maybeSingle()
         if (ok && ch) { setDisplay({ name: ch.name, avatar_url: ch.avatar_url }); return }
       }
-      // 2) Fallback profil
       const { data: p } = await supabase
         .from('profiles').select('pseudo, avatar_url, email').eq('user_id', authorId).maybeSingle()
       if (ok) {
@@ -710,7 +712,6 @@ function PostAsBadge({ characterId }) {
     </span>
   )
 }
-
 
 function EditorToolbar({
   onBold, onItalic, onUnderline, onStrike,
