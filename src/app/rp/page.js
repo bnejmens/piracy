@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ColorPalette from '@/components/ColorPalette'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { sanitize } from 'isomorphic-dompurify'
@@ -9,7 +10,7 @@ import { supabase } from '../../lib/supabaseClient'
 
 /* ------------ Réglages “verre flou” ------------ */
 const GLASS = {
-  left:      { bg: 'rgba(0,0,0,0.4)', blur: '2px'  },
+  left:      { bg: 'rgba(0,0,0,0.4)',  blur: '2px'  },
   editor:    { bg: 'rgba(255,255,255,0.12)', blur: '10px' },
   right:     { bg: 'rgba(255,255,255,0.15)', blur: '14px' },
   cardMine:  { bg: 'rgba(255,255,255,0.12)', blur: '14px' },
@@ -52,7 +53,7 @@ export default function RPPage() {
   const [session, setSession] = useState(null)
   const [me, setMe] = useState(null)
 
-  // identités (multi-comptes via email — conservé si utile)
+  // identités
   const [myIdentities, setMyIdentities] = useState([])
 
   // Persos du compte
@@ -61,11 +62,13 @@ export default function RPPage() {
 
   // Sujets & posts
   const [topics, setTopics] = useState([])
-  const [topicsPage, setTopicsPage] = useState(1)
   const TOPICS_PER_PAGE = 10
-
+  const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+
+  // Nuancier
+  const [showPalette, setShowPalette] = useState(false)
 
   // Éditeur
   const [raw, setRaw] = useState('')
@@ -88,15 +91,13 @@ export default function RPPage() {
   // Source de vérité = me.active_character_id ; fallback = premier perso actif
   useEffect(() => {
     if (!myChars.length) { setPostAsCharId(null); return }
-
     const fromProfile = me?.active_character_id
       ? myChars.find(c => String(c.id) === String(me.active_character_id))
       : null
-
     setPostAsCharId(fromProfile?.id || myChars[0].id)
   }, [myChars, me?.active_character_id])
 
-  // garde toujours un perso valide sélectionné, sans écraser un choix utilisateur actif
+  // garde un perso valide sélectionné
   useEffect(() => {
     if (myChars.length === 0) { setPostAsCharId(null); return; }
     if (!postAsCharId || !myChars.find(c => String(c.id) === String(postAsCharId))) {
@@ -183,7 +184,7 @@ export default function RPPage() {
   const publishPost = async () => {
     const chosenCharId = postAsCharId
     if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
-      alert("Choisis un personnage et un sujet, puis écris un message."); 
+      alert("Choisis un personnage et un sujet, puis écris un message.")
       return
     }
 
@@ -293,38 +294,29 @@ export default function RPPage() {
       {/* ← Tableau de bord */}
       <button
         onClick={() => router.push('/dashboard')}
-        className="fixed left-35 bottom-[96px] z-50 rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20"
+        className="rp-button fixed left-35 bottom-[96px] z-50 rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 lg:left-6 lg:bottom-6"
       >
         ← Tableau de bord
       </button>
 
       {/* GRID — responsive split pane */}
       <div
-        className="
-          relative z-10 h-full min-h-0
-          grid gap-6 p-6
-
-          /* Mobile par défaut : pile en 1 colonne */
+        className={`
+          rp-grid relative z-10 h-full min-h-0
+          grid gap-4 xl:gap-6
+          p-4 xl:p-6
           grid-cols-1
-
-          /* iPad horizontal : split 2 colonnes (Sujets | Posts+Éditeur) */
-          lg:grid-cols-[320px_minmax(0,1fr)]
+          lg:grid-cols-[360px_minmax(0,1fr)]
           lg:[grid-auto-rows:minmax(0,1fr)]
-
-          /* Desktop : 3 colonnes (comme avant) */
           xl:grid-cols-[380px_380px_minmax(0,1fr)]
           2xl:grid-cols-[420px_420px_minmax(0,1fr)]
-        "
+        `}
       >
-
         {/* -------- SUJETS -------- */}
         <section
-          className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0
-                     order-1 lg:col-start-1 lg:row-start-1
-                     xl:col-start-1 xl:row-start-1 xl:order-1"
-          style={frost(GLASS.left)}
-        >
-          <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between">
+          className={`rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-1 lg:col-start-1 lg:row-start-1 xl:col-start-1 xl:row-start-1 xl:order-1`}
+          style={frost(GLASS.left)} >
+          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between bg-black/20 backdrop-blur-sm">
             <span>Sujets en cours</span>
             <button onClick={createTopic}
                     className="rounded-lg bg-amber-300 text-slate-900 text-xs font-medium px-2.5 py-1 hover:bg-amber-200">
@@ -332,7 +324,7 @@ export default function RPPage() {
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
             {visibleTopics.map(t => {
               const isMineTopic = !!t.author_id && (t.author_id === session?.user?.id)
               return (
@@ -385,16 +377,14 @@ export default function RPPage() {
 
         {/* -------- ÉDITEUR -------- */}
         <section
-          className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0
-                     order-3 lg:col-start-2 lg:row-start-2 lg:min-h-[28vh] lg:order-3
-                     xl:col-start-2 xl:row-start-1 xl:order-2"
+          className={`rp-editor rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-3 lg:col-start-2 lg:row-start-2 lg:min-h-[32vh] lg:order-3 xl:col-start-2 xl:row-start-1 xl:order-2`}
           style={frost(GLASS.editor)}
         >
-          <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium">
+          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Sélectionne un sujet pour écrire'}
           </header>
 
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-3 overflow-y-auto min-h-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-white/80 text-sm">Poster en tant que</span>
               <select
@@ -426,8 +416,21 @@ export default function RPPage() {
               onSize={() => insertAroundSelection('[size=18]','[/size]')}
               onLink={() => insertAroundSelection('[url=https://]','[/url]','lien')}
               onImage={() => insertAroundSelection('[img]https://…[/img]','')}
-              onPickColor={() => insertAroundSelection('[color=#f59e0b]','[/color]','texte')}
+              onPickColor={() => setShowPalette(v => !v)}
             />
+
+            {showPalette && (
+              <div className="mt-2">
+                <ColorPalette
+                  columns={10}
+                  size={22}
+                  onPick={(hex) => {
+                    insertAroundSelection(`[color=${hex}]`, `[/color]`, 'texte')
+                    setShowPalette(false)
+                  }}
+                />
+              </div>
+            )}
 
             <textarea
               ref={textareaRef}
@@ -460,16 +463,14 @@ export default function RPPage() {
 
         {/* -------- POSTS -------- */}
         <section
-          className="rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0 min-h-0
-                     order-2 lg:col-start-2 lg:row-start-1 lg:min-h-[60vh] lg:order-2
-                     xl:col-start-3 xl:row-start-1 xl:order-3"
+          className={`rp-posts rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0 min-h-0 order-2 lg:col-start-2 lg:row-start-1 lg:min-h-[62vh] lg:order-2 xl:col-start-3 xl:row-start-1 xl:order-3`}
           style={frost(GLASS.right)}
         >
-          <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium">
+          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Posts'}
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0">
             {activeTopic && posts.map(p => {
               const mine = p.author_id === session?.user?.id
               return (
@@ -527,7 +528,7 @@ export default function RPPage() {
                     </div>
                   ) : (
                     <div
-                      className="prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20 prose-a:text-amber-300"
+                      className="rp-body prose max-w-none prose-slate prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
                       dangerouslySetInnerHTML={{ __html: p.content_html }}
                     />
                   )}
@@ -545,7 +546,7 @@ export default function RPPage() {
       {/* -------- MODALE PRÉVISUALISATION -------- */}
       {isPreviewOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-gray-300 p-4 bg-white/90 backdrop-blur-sm">
+          <div className="w-full max-w-3xl rounded-2xl border border-gray-300 p-4 bg-white/90 backdrop-blur-sm flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-gray-800 font-semibold">Prévisualisation</h3>
               <button
@@ -555,13 +556,42 @@ export default function RPPage() {
                 Fermer
               </button>
             </div>
-            <div
-              className="prose max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-hr:border-gray-300 prose-a:text-blue-700"
-              dangerouslySetInnerHTML={{ __html: htmlPreview }}
-            />
+            <div className="overflow-y-auto flex-1">
+              <div
+                className="prose max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-hr:border-gray-300 prose-a:text-blue-700"
+                dangerouslySetInnerHTML={{ __html: htmlPreview }}
+              />
+            </div>
           </div>
         </div>
       )}
+
+      {/* 🔧 Ajustements ciblés tablette paysage (1024–1279px) */}
+      <style jsx global>{`
+        @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
+          .rp-grid {
+            padding: 16px !important;
+            gap: 16px !important;
+            grid-template-columns: 360px minmax(0, 1fr) !important;
+            grid-auto-rows: minmax(0, 1fr) !important;
+          }
+          /* posts au-dessus (≈62vh), éditeur dessous (≈32vh) */
+          .rp-posts { min-height: 62vh !important; }
+          .rp-editor { min-height: 32vh !important; }
+          .rp-button { left: 16px !important; bottom: 16px !important; }
+          .rp-posts .prose { font-size: 0.95rem; }
+
+          /* Sécurité lisibilité (neutralise le blanc inline) */
+          .rp-posts .rp-body,
+          .rp-posts .rp-body * { color: #0f172a !important; }
+          .rp-posts .rp-body a { color: #a16207 !important; }
+          .rp-posts .rp-body blockquote { color: #0f172a !important; }
+          .rp-posts .rp-body code,
+          .rp-posts .rp-body pre { color: #0f172a !important; }
+          .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
+          .rp-posts .rp-body img { background: transparent !important; }
+        }
+      `}</style>
     </main>
   )
 }

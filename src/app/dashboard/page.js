@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import useCharacterSubscriptions from '@/hooks/useCharacterSubscriptions'
 import { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
+import NotificationsWidget from '@/components/NotificationsWidget'
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
@@ -177,13 +178,18 @@ setPickerOpen(false)
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
-      {/* Logout */}
-      <button
-        onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
-        className="absolute top-6 right-8 z-40 rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 focus:outline-none"
-      >
-        Se déconnecter
-      </button>
+    {/* Logout + Notifications (empilés en haut à droite) */}
+<div className="absolute top-6 right-8 z-40 flex flex-col items-end gap-2">
+  <button
+    onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
+    className="rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 focus:outline-none"
+  >
+    Se déconnecter
+  </button>
+
+  {/* Bouton Notifications – s'affiche juste en dessous */}
+  <NotificationsWidget />
+</div>
 
       {/* Content */}
       {loading ? (
