@@ -291,13 +291,25 @@ export default function RPPage() {
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/20 via-slate-900/15 to-slate-950/35" />
 
-      {/* ← Tableau de bord */}
-      <button
-        onClick={() => router.push('/dashboard')}
-        className="rp-button fixed left-35 bottom-[96px] z-50 rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 lg:left-6 lg:bottom-6"
-      >
-        ← Tableau de bord
-      </button>
+      {/* ← Tableau de bord (aligné à côté d’Ambiance en bas-gauche) */}
+<button
+  onClick={() => router.push('/dashboard')}
+  className={`
+    fixed z-50
+    bottom-6
+    left-[95px]   /* ~24px (left-7) + ~56px (diamètre Ambiance) + ~8px gap */
+    sm:left-[98px]
+    md:left-[116px]
+    lg:left-[122px]
+    xl:left-[136px]
+    2xl:left-[150px]
+    rounded-full border border-white/25 bg-white/15 backdrop-blur-md
+    px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 focus:outline-none
+  `}
+  title="Retour au dashboard"
+>
+  ← Tableau de bord
+</button>
 
       {/* GRID — responsive split pane */}
       <div
@@ -314,7 +326,7 @@ export default function RPPage() {
       >
         {/* -------- SUJETS -------- */}
         <section
-          className={`rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-1 lg:col-start-1 lg:row-start-1 xl:col-start-1 xl:row-start-1 xl:order-1`}
+          className={`isolate relative rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-1 lg:col-start-1 lg:row-start-1 xl:col-start-1 xl:row-start-1 xl:order-1`}
           style={frost(GLASS.left)} >
           <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between bg-black/20 backdrop-blur-sm">
             <span>Sujets en cours</span>
@@ -377,7 +389,7 @@ export default function RPPage() {
 
         {/* -------- ÉDITEUR -------- */}
         <section
-          className={`rp-editor rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-3 lg:col-start-2 lg:row-start-2 lg:min-h-[32vh] lg:order-3 xl:col-start-2 xl:row-start-1 xl:order-2`}
+          className={`rp-editor isolate relative rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-3 lg:col-start-2 lg:row-start-2 lg:min-h-[32vh] lg:order-3 xl:col-start-2 xl:row-start-1 xl:order-2`}
           style={frost(GLASS.editor)}
         >
           <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 backdrop-blur-sm">
@@ -400,37 +412,41 @@ export default function RPPage() {
               {postAsCharId && <PostAsBadge characterId={postAsCharId} />}
             </div>
 
-            <EditorToolbar
-              onBold={() => insertAroundSelection('[b]','[/b]')}
-              onItalic={() => insertAroundSelection('[i]','[/i]')}
-              onUnderline={() => insertAroundSelection('[u]','[/u]')}
-              onStrike={() => insertAroundSelection('[s]','[/s]')}
-              onQuote={() => insertAroundSelection('[quote]','[/quote]')}
-              onCode={() => insertAroundSelection('[code]','[/code]')}
-              onUL={() => insertAroundSelection('[ul]','[/ul]','[li]…[/li]')}
-              onOL={() => insertAroundSelection('[ol]','[/ol]','[li]…[/li]')}
-              onCenter={() => insertAroundSelection('[center]','[/center]')}
-              onRight={() => insertAroundSelection('[right]','[/right]')}
-              onH2={() => insertAroundSelection('[h2]','[/h2]')}
-              onHR={() => insertAroundSelection('[hr]','')}
-              onSize={() => insertAroundSelection('[size=18]','[/size]')}
-              onLink={() => insertAroundSelection('[url=https://]','[/url]','lien')}
-              onImage={() => insertAroundSelection('[img]https://…[/img]','')}
-              onPickColor={() => setShowPalette(v => !v)}
-            />
+            <div className="relative z-20 rounded-lg border border-white/10 bg-white/10 backdrop-blur-md">
+  <div className="p-2">
+    <EditorToolbar
+      onBold={() => insertAroundSelection('[b]','[/b]')}
+      onItalic={() => insertAroundSelection('[i]','[/i]')}
+      onUnderline={() => insertAroundSelection('[u]','[/u]')}
+      onStrike={() => insertAroundSelection('[s]','[/s]')}
+      onQuote={() => insertAroundSelection('[quote]','[/quote]')}
+      onCode={() => insertAroundSelection('[code]','[/code]')}
+      onUL={() => insertAroundSelection('[ul]','[/ul]','[li]…[/li]')}
+      onOL={() => insertAroundSelection('[ol]','[/ol]','[li]…[/li]')}
+      onCenter={() => insertAroundSelection('[center]','[/center]')}
+      onRight={() => insertAroundSelection('[right]','[/right]')}
+      onH2={() => insertAroundSelection('[h2]','[/h2]')}
+      onHR={() => insertAroundSelection('[hr]','')}
+      onSize={() => insertAroundSelection('[size=18]','[/size]')}
+      onLink={() => insertAroundSelection('[url=https://]','[/url]','lien')}
+      onImage={() => insertAroundSelection('[img]https://…[/img]','')}
+      onPickColor={() => setShowPalette(v => !v)}
+    />
+  </div>
 
-            {showPalette && (
-              <div className="mt-2">
-                <ColorPalette
-                  columns={10}
-                  size={22}
-                  onPick={(hex) => {
-                    insertAroundSelection(`[color=${hex}]`, `[/color]`, 'texte')
-                    setShowPalette(false)
-                  }}
-                />
-              </div>
-            )}
+  {showPalette && (
+    <div className="px-2 pb-2">
+      <ColorPalette
+        columns={10}
+        size={22}
+        onPick={(hex) => {
+          insertAroundSelection(`[color=${hex}]`, `[/color]`, 'texte')
+          setShowPalette(false)
+        }}
+      />
+    </div>
+  )}
+</div>
 
             <textarea
               ref={textareaRef}
@@ -463,7 +479,7 @@ export default function RPPage() {
 
         {/* -------- POSTS -------- */}
         <section
-          className={`rp-posts rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0 min-h-0 order-2 lg:col-start-2 lg:row-start-1 lg:min-h-[62vh] lg:order-2 xl:col-start-3 xl:row-start-1 xl:order-3`}
+          className={`rp-posts isolate relative rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0 min-h-0 order-2 lg:col-start-2 lg:row-start-1 lg:min-h-[62vh] lg:order-2 xl:col-start-3 xl:row-start-1 xl:order-3`}
           style={frost(GLASS.right)}
         >
           <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 backdrop-blur-sm">
@@ -569,28 +585,29 @@ export default function RPPage() {
       {/* 🔧 Ajustements ciblés tablette paysage (1024–1279px) */}
       <style jsx global>{`
         @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
-          .rp-grid {
-            padding: 16px !important;
-            gap: 16px !important;
-            grid-template-columns: 360px minmax(0, 1fr) !important;
-            grid-auto-rows: minmax(0, 1fr) !important;
-          }
-          /* posts au-dessus (≈62vh), éditeur dessous (≈32vh) */
-          .rp-posts { min-height: 62vh !important; }
-          .rp-editor { min-height: 32vh !important; }
-          .rp-button { left: 16px !important; bottom: 16px !important; }
-          .rp-posts .prose { font-size: 0.95rem; }
+  .rp-grid {
+    padding: 16px !important;
+    gap: 12px !important; /* un poil moins de gap pour gagner de la place */
+    grid-template-columns: 360px minmax(0, 1fr) !important;
+    grid-auto-rows: minmax(0, 1fr) !important;
+  }
 
-          /* Sécurité lisibilité (neutralise le blanc inline) */
-          .rp-posts .rp-body,
-          .rp-posts .rp-body * { color: #0f172a !important; }
-          .rp-posts .rp-body a { color: #a16207 !important; }
-          .rp-posts .rp-body blockquote { color: #0f172a !important; }
-          .rp-posts .rp-body code,
-          .rp-posts .rp-body pre { color: #0f172a !important; }
-          .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
-          .rp-posts .rp-body img { background: transparent !important; }
-        }
+  /* Assure l'ordre et évite tout chevauchement visuel */
+  .rp-posts { min-height: 60vh !important; z-index: 10; }
+  .rp-editor { min-height: 36vh !important; z-index: 20; } /* éditeur au-dessus au cas où */
+  .rp-button { left: 16px !important; bottom: 16px !important; }
+  .rp-posts .prose { font-size: 0.95rem; }
+
+  /* Lisibilité : neutralise texte blanc inline */
+  .rp-posts .rp-body,
+  .rp-posts .rp-body * { color: #0f172a !important; }
+  .rp-posts .rp-body a { color: #a16207 !important; }
+  .rp-posts .rp-body blockquote { color: #0f172a !important; }
+  .rp-posts .rp-body code,
+  .rp-posts .rp-body pre { color: #0f172a !important; }
+  .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
+  .rp-posts .rp-body img { background: transparent !important; }
+}
       `}</style>
     </main>
   )

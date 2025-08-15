@@ -37,6 +37,8 @@ export default function ProfilePage() {
   const REL_TYPES = useMemo(() => ([
     { value: "love_interest", label: "Love interest" },
     { value: "ami(e)", label: "Ami(e)" },
+    { value: "Affaires", label: "Affaires" },
+    { value: "C'est compliqué", label: "C'est compliqué" },
     { value: "amour", label: "Amour" },
     { value: "amant(e)", label: "Amant(e)" },
     { value: "ennemi", label: "Ennemi" },
