@@ -235,10 +235,23 @@ export default function MembersPage() {
         {/* Colonne droite : Description scrollable */}
 {/* Traits + Relations en deux colonnes */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <h4 className="text-sm font-semibold mb-2">Traits marquants</h4>
-          <TraitsSummary traits={modalChar.traits} />
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="space-y-4">
+    <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={modalChar.traits?.intro_extro} />
+    <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={modalChar.traits?.egoiste_altruiste} />
+    <Bipolar leftLabel="Prudent" rightLabel="Téméraire" value={modalChar.traits?.prudent_temer} />
+    <Bipolar leftLabel="Réfléchi" rightLabel="Impulsif" value={modalChar.traits?.reflechi_impulsif} />
+    <Bipolar leftLabel="Obéissant" rightLabel="Rebelle" value={modalChar.traits?.obeissant_rebelle} />
+  </div>
+  <div className="space-y-4">
+    <Bipolar leftLabel="Méthodique" rightLabel="Chaotique" value={modalChar.traits?.methodique_chaotique} />
+    <Bipolar leftLabel="Idéaliste" rightLabel="Cynique" value={modalChar.traits?.idealiste_cynique} />
+    <Bipolar leftLabel="Résilient" rightLabel="Vulnérable" value={modalChar.traits?.resil_vulnerable} />
+    <Bipolar leftLabel="Loyal" rightLabel="Opportuniste" value={modalChar.traits?.loyal_opportuniste} />
+    <Bipolar leftLabel="Créatif" rightLabel="Pragmatique" value={modalChar.traits?.creatif_pragmatique} />
+  </div>
+</div>
+
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <h4 className="text-sm font-semibold mb-2">Relations</h4>
           <RelationsList relations={modalChar.character_relationships} />
@@ -360,6 +373,41 @@ function TraitsSummary({ traits }) {
     </ul>
   );
 }
+
+// --- À ajouter tout en bas de MembersPage (avant export default si tu as une exportation nommée, sinon juste à la fin du fichier) ---
+function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#6ea8ff", rightColor="#f6d24a" }) {
+  const pct = (value / 10) * 100; // 0..100 → droite
+  const gradient = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${pct}%, ${rightColor} ${pct}%, ${rightColor} 100%)`;
+  return (
+    <div className="space-y-2 select-none">
+      <div className="flex justify-between text-white/70 text-sm">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
+        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
+        <div
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: `calc(${pct}% - 6px)` }}
+        >
+          <div className="w-3 h-3 rounded-full bg-white shadow" />
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={10}
+          step={1}
+          value={value}
+          onChange={(e) => onChange?.(Number(e.target.value))}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          aria-label={`${leftLabel} ↔ ${rightLabel}`}
+          disabled
+        />
+      </div>
+    </div>
+  );
+}
+
 
 function relationLabel(type) {
   const map = {
