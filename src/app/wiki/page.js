@@ -331,46 +331,93 @@ useEffect(() => {
   useEffect(() => { setL3('') }, [l2])
 
   /* --------- Filtres/tri --------- */
-  const currentCatColor = useMemo(() => l1Node?.color || '#60a5fa', [l1Node])
+const currentCatColor = useMemo(() => l1Node?.color || '#60a5fa', [l1Node])
 
-  const filteredAll = useMemo(() => {
-    const n = norm
-    const matchNode = (cardValue, node) => {
-      if (!node) return true
-      const v = slugify(cardValue)
-      return v === node.slug
+const filteredAll = useMemo(() => {
+  const n = norm
+  const matchNode = (cardValue, node) => {
+    if (!node) return true
+    const v = slugify(cardValue)
+    return v === node.slug
+  }
+
+  // ---- 1. Filtrer selon la navigation ----
+  let list = (cards || []).filter((c) => {
+    if (l1 && !matchNode(c.category, l1Node)) return false
+    if (l2) {
+      const node = l2Node || (l1Node?.children || []).find(x => x.id === l2)
+      if (!matchNode(c.subcategory, node)) return false
     }
+    if (l3) {
+      const node = (l2Node?.children || []).find(x => x.id === l3)
+      if (!matchNode(c.sub_subcategory, node)) return false
+    }
+    return true
+  })
 
-    let list = (cards||[]).filter((c) => {
-      if (l1 && !matchNode(c.category, l1Node)) return false
-      if (l2) {
-        const node = l2Node || (l1Node?.children||[]).find(x=>x.id===l2)
-        if (!matchNode(c.subcategory, node)) return false
-      }
-      if (l3) {
-        const node = (l2Node?.children||[]).find(x=>x.id===l3)
-        if (!matchNode(c.sub_subcategory, node)) return false
-      }
-      return true
-    })
+  // ---- 2. Helpers pour détecter les "fausses cartes" (dossiers/placeholder) ----
+  const isBackImage = (url) => {
+    if (!url) return true
+    return /card[-_ ]?back|\/backs?\/|placeholder|default/i.test(url)
+  }
 
-    const q = n(search)
-    if (q) list = list.filter(c => n(c.title).includes(q) || n(c.description).includes(q))
+  const plainText = (html) => (html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 
-    if (sortKey === 'title') list.sort((a,b)=> (''+(a.title||'')).localeCompare(''+(b.title||'')))
-    else if (sortKey === 'rarity_desc') list.sort((a,b)=>(rarityWeight[b.rarity]||0)-(rarityWeight[a.rarity]||0))
-    else if (sortKey === 'rarity_asc') list.sort((a,b)=>(rarityWeight[a.rarity]||0)-(rarityWeight[b.rarity]||0))
-    else list.sort((a,b)=> new Date(b.created_at)-new Date(a.created_at))
+  const breadcrumbOf = (c) => {
+    const parts = [c.category, c.subcategory, c.sub_subcategory]
+      .map(x => (typeof x === 'string' ? x : x?.title || x?.name || ''))
+      .filter(Boolean)
+    return parts.join(' / ').trim()
+  }
 
-    return list
-  }, [cards, l1, l1Node, l2, l2Node, l3, search, sortKey])
+  const isPseudoFolderCard = (c) => {
+    const title = (c.title || '').trim().toLowerCase()
+    const breadcrumb = breadcrumbOf(c).toLowerCase()
+    const noRealImage = isBackImage(c.image_url)
+    const noContent = !(c.content_raw?.trim()) && !plainText(c.content_html)
+    const titleIsPath = breadcrumb && title === breadcrumb
+    return noRealImage && (noContent || titleIsPath)
+  }
 
-  const pageCount = Math.max(1, Math.ceil(filteredAll.length / PAGE_SIZE))
-  const pageStart = (page - 1) * PAGE_SIZE
-  const filtered = filteredAll.slice(pageStart, pageStart + PAGE_SIZE)
-  useEffect(() => { setPage(1) }, [l1, l2, l3, search, sortKey])
+  // ---- 3. Exclure les fausses cartes ----
+  list = list.filter(c => !isPseudoFolderCard(c))
 
-  const isCollected = (id) => collectedSet.has(id)
+  // ---- 4. Recherche texte ----
+  const q = n(search)
+  if (q) list = list.filter(c =>
+    n(c.title).includes(q) ||
+    n(c.description).includes(q)
+  )
+
+  // ---- 5. Tri ----
+  if (sortKey === 'title') {
+    list.sort((a, b) => ('' + (a.title || '')).localeCompare('' + (b.title || '')))
+  } else if (sortKey === 'rarity_desc') {
+    list.sort((a, b) => (rarityWeight[b.rarity] || 0) - (rarityWeight[a.rarity] || 0))
+  } else if (sortKey === 'rarity_asc') {
+    list.sort((a, b) => (rarityWeight[a.rarity] || 0) - (rarityWeight[b.rarity] || 0))
+  } else {
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  }
+
+  return list
+}, [cards, l1, l1Node, l2, l2Node, l3, search, sortKey])
+
+const pageCount = Math.max(1, Math.ceil(filteredAll.length / PAGE_SIZE))
+const pageStart = (page - 1) * PAGE_SIZE
+const filtered = filteredAll.slice(pageStart, pageStart + PAGE_SIZE)
+
+useEffect(() => { setPage(1) }, [l1, l2, l3, search, sortKey])
+
+const isCollected = (id) => collectedSet.has(id)
+
+
+
 
   /* --------- Collect & confetti --------- */
   const doConfetti = () => {
