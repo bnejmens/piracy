@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [error, setError] = useState(null)
   const [hasNewMessage, setHasNewMessage] = useState(false)
   const [hasNewRP, setHasNewRP] = useState(false)
+  const [hasNewNotif, setHasNewNotif] = useState(false)
 
   // responsive geometry
   const [radius, setRadius] = useState(220)
@@ -41,6 +42,7 @@ export default function DashboardPage() {
     { key:'lore',     label:'Lore',     href:'/wiki',     icon:'/images/lore-icon.png',   ring:'ring-violet-300/80', glow:'bg-violet-300/25' },
     { key:'members',  label:'Membres',  href:'/members',  icon:'/images/member-icon.png', ring:'ring-fuchsia-300/80',glow:'bg-fuchsia-300/25'},
     { key:'profile',  label:'Profil',   href:'/profile',  icon:'/images/profile-icon.png',ring:'ring-sky-300/80',    glow:'bg-sky-300/25'    },
+{ key:'randomvava', label:'Random Vava', href:'/randomvava', icon:'/images/vava-icon.png', ring:'ring-emerald-300/80', glow:'bg-emerald-300/25' },
   ]), [])
 
   const positioned = useMemo(() => {
