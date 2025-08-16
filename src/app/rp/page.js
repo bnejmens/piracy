@@ -609,6 +609,21 @@ export default function RPPage() {
   .rp-posts .rp-body img { background: transparent !important; }
 }
       `}</style>
+
+<style jsx global>{`
+  /* Posts : texte toujours noir, tous appareils */
+  .rp-posts .rp-body,
+  .rp-posts .rp-body * { color: #0f172a !important; }
+
+  /* Liens / code / hr : variantes compatibles fond clair */
+  .rp-posts .rp-body a { color: #0f172a !important; text-decoration: underline; }
+  .rp-posts .rp-body blockquote { color: #0f172a !important; }
+  .rp-posts .rp-body code,
+  .rp-posts .rp-body pre { color: #0f172a !important; }
+  .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
+  .rp-posts .rp-body img { background: transparent !important; }
+`}</style>
+
     </main>
   )
 }
