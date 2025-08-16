@@ -611,15 +611,19 @@ export default function RPPage() {
       `}</style>
 
 <style jsx global>{`
-  /* Posts : texte toujours noir, tous appareils */
-  .rp-posts .rp-body,
-  .rp-posts .rp-body * { color: #0f172a !important; }
+  /* Base : texte noir par défaut */
+  .rp-posts .rp-body { color: #0f172a; }
 
-  /* Liens / code / hr : variantes compatibles fond clair */
-  .rp-posts .rp-body a { color: #0f172a !important; text-decoration: underline; }
-  .rp-posts .rp-body blockquote { color: #0f172a !important; }
-  .rp-posts .rp-body code,
-  .rp-posts .rp-body pre { color: #0f172a !important; }
+  /* Forcer le noir UNIQUEMENT si l’élément n’a PAS de couleur inline (préserve [color=#...]) */
+  .rp-posts .rp-body :not([style*="color"]) { color: #0f172a !important; }
+
+  /* Variantes usuelles, mais toujours sans écraser les couleurs inline des joueurs */
+  .rp-posts .rp-body a:not([style*="color"]) { color: #0f172a !important; text-decoration: underline; }
+  .rp-posts .rp-body blockquote:not([style*="color"]) { color: #0f172a !important; }
+  .rp-posts .rp-body code:not([style*="color"]),
+  .rp-posts .rp-body pre:not([style*="color"]) { color: #0f172a !important; }
+
+  /* Séparateurs / images */
   .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
   .rp-posts .rp-body img { background: transparent !important; }
 `}</style>
