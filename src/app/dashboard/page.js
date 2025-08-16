@@ -43,6 +43,8 @@ export default function DashboardPage() {
     { key:'members',  label:'Membres',  href:'/members',  icon:'/images/member-icon.png', ring:'ring-fuchsia-300/80',glow:'bg-fuchsia-300/25'},
     { key:'profile',  label:'Profil',   href:'/profile',  icon:'/images/profile-icon.png',ring:'ring-sky-300/80',    glow:'bg-sky-300/25'    },
 { key:'randomvava', label:'Random Vava', href:'/randomvava', icon:'/images/vava-icon.png', ring:'ring-emerald-300/80', glow:'bg-emerald-300/25' },
+{ key:'offrecords', label:'OffRecords', href:'/offrecords', icon:'/images/radio-icon.png', ring:'ring-rose-300/80', glow:'bg-rose-300/25' },
+
   ]), [])
 
   const positioned = useMemo(() => {

@@ -1,0 +1,399 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabaseClient'
+
+/**
+ * ✅ Ce composant :
+ * - permet de créer des playlists perso
+ * - d’y ajouter des titres (coller URL YouTube ou iframe → ID vidéo auto)
+ * - de lire la playlist via YouTube IFrame Player API (player visible, conforme)
+ * - commandes : Play / Pause / Précédent / Suivant + sélection d’un titre
+ *
+ * Assets attendus :
+ * - /public/images/radio-bg.webp (fond)
+ * - /public/images/radio-icon.png (icône dashboard)
+ */
+
+// ---------- Helpers
+const normSlug = (s='') =>
+  s.toLowerCase()
+   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+   .replace(/[^a-z0-9]+/g, '-')
+   .replace(/^-+|-+$/g, '')
+
+/** Extrait un ID vidéo YouTube depuis :
+ * - URL standard (watch?v=…)
+ * - youtu.be/…
+ * - embed/…
+ * - iframe collé en entier
+ * Retourne null si rien trouvé.
+ */
+function extractYouTubeId(input='') {
+  const str = String(input).trim()
+
+  // Si on a un iframe collé, on tente d’en extraire src="..."
+  const iframeSrcMatch = str.match(/<iframe[^>]+src="([^"]+)"/i)
+  const url = new URL(iframeSrcMatch ? iframeSrcMatch[1] : str, 'https://dummy.base')
+
+  // Cas youtu.be/<id>
+  if (/youtu\.be$/i.test(url.hostname)) {
+    const id = url.pathname.split('/').filter(Boolean)[0]
+    return id || null
+  }
+
+  // Cas youtube.com/embed/<id>
+  if (/youtube\.com$/i.test(url.hostname) && /\/embed\//i.test(url.pathname)) {
+    const id = url.pathname.split('/').filter(Boolean).pop()
+    return id || null
+  }
+
+  // Cas youtube.com/watch?v=<id>
+  if (/youtube\.com$/i.test(url.hostname) && url.searchParams.get('v')) {
+    return url.searchParams.get('v')
+  }
+
+  // Dernier recours : regex large
+  const r = str.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{6,})/)
+  if (r && r[1]) return r[1]
+
+  return null
+}
+
+// Charge le script IFrame API si absent. Retourne une Promise<YT>.
+function loadYouTubeAPI() {
+  if (typeof window === 'undefined') return Promise.reject('no window')
+  if (window.YT && window.YT.Player) return Promise.resolve(window.YT)
+
+  return new Promise((resolve) => {
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    document.body.appendChild(tag)
+    window.onYouTubeIframeAPIReady = () => resolve(window.YT)
+  })
+}
+
+// ---------- Page
+export default function OffRecordsPage() {
+  const [session, setSession] = useState(null)
+
+  // Playlists de l’utilisateur
+  const [lists, setLists] = useState([]) // [{id, slug, title}]
+  const [loadingLists, setLoadingLists] = useState(true)
+
+  // Création playlist
+  const [titleInput, setTitleInput] = useState('')
+  const slug = useMemo(() => normSlug(titleInput || 'playlist'), [titleInput])
+
+  // Playlist active
+  const [active, setActive] = useState(null) // {id, slug, title}
+  const [tracks, setTracks] = useState([])   // [{id, video_id, title, created_at}]
+  const [loadingTracks, setLoadingTracks] = useState(false)
+
+  // Ajout titre
+  const [paste, setPaste] = useState('')     // url ou iframe
+  const [pasteTitle, setPasteTitle] = useState('')
+
+  // Player YT
+  const playerRef = useRef(null)
+  const playerElRef = useRef(null)
+  const [playerReady, setPlayerReady] = useState(false)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const videoIds = useMemo(() => tracks.map(t => t.video_id), [tracks])
+
+  // ------- Init
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data?.session || null))
+    loadMyLists()
+  }, [])
+
+  async function loadMyLists() {
+    setLoadingLists(true)
+    // lecture des playlists appartenant à l’utilisateur (ou toutes si RLS laxiste)
+    const { data, error } = await supabase
+      .from('off_playlists')
+      .select('id, slug, title, owner_id, created_at')
+      .order('created_at', { ascending: false })
+    if (!error) setLists(data || [])
+    setLoadingLists(false)
+  }
+
+  async function createList() {
+    if (!session) { alert('Connecte-toi'); return }
+    const t = (titleInput || '').trim()
+    if (!t) { alert('Titre requis'); return }
+    const s = normSlug(t)
+    const { error } = await supabase
+      .from('off_playlists')
+      .insert({ slug: s, title: t, owner_id: session.user.id })
+    if (error) { alert(error.message); return }
+    setTitleInput('')
+    await loadMyLists()
+  }
+
+  async function openList(list) {
+    setActive(list)
+    setCurrentIndex(0)
+    await loadTracks(list)
+    // prépare le player si pas prêt
+    ensurePlayer()
+  }
+
+  async function loadTracks(list) {
+    if (!list) return
+    setLoadingTracks(true)
+    const { data, error } = await supabase
+      .from('off_tracks')
+      .select('id, video_id, title, created_at')
+      .eq('playlist_id', list.id)
+      .order('created_at', { ascending: true })
+    if (!error) setTracks(data || [])
+    setLoadingTracks(false)
+  }
+
+  async function addTrack() {
+    if (!session) { alert('Connecte-toi'); return }
+    if (!active) { alert('Choisis une playlist'); return }
+    const id = extractYouTubeId(paste)
+    if (!id) { alert('URL/iframe YouTube invalide'); return }
+
+    const { error } = await supabase
+      .from('off_tracks')
+      .insert({ playlist_id: active.id, video_id: id, title: pasteTitle?.trim() || null })
+    if (error) { alert(error.message); return }
+
+    setPaste(''); setPasteTitle('')
+    await loadTracks(active)
+
+    // si le player est prêt et vide, charge immédiatement
+    if (playerReady && videoIds.length === 0) {
+      loadPlaylistToPlayer([id])
+    }
+  }
+
+  async function removeTrack(id) {
+    if (!confirm('Supprimer ce titre ?')) return
+    const { error } = await supabase.from('off_tracks').delete().eq('id', id)
+    if (error) { alert(error.message); return }
+    await loadTracks(active)
+  }
+
+  // ------- YouTube Player
+  async function ensurePlayer() {
+    if (playerRef.current) return
+    const YT = await loadYouTubeAPI()
+    playerRef.current = new YT.Player(playerElRef.current, {
+      height: '240', width: '426',
+      playerVars: {
+        modestbranding: 1, rel: 0, controls: 1, // on laisse le player visible (conforme)
+      },
+      events: {
+        onReady: () => {
+          setPlayerReady(true)
+          if (videoIds.length) loadPlaylistToPlayer(videoIds)
+        },
+        onStateChange: (e) => {
+          // si fin de vidéo → suivant
+          if (e.data === YT.PlayerState.ENDED) next()
+          // maj index courant
+          if (playerRef.current?.getPlaylistIndex) {
+            const i = playerRef.current.getPlaylistIndex()
+            if (typeof i === 'number' && i >= 0) setCurrentIndex(i)
+          }
+        }
+      }
+    })
+  }
+
+  function loadPlaylistToPlayer(ids) {
+    if (!playerRef.current || !ids?.length) return
+    playerRef.current.loadPlaylist(ids, 0, 0, 'large')
+    setCurrentIndex(0)
+  }
+
+  useEffect(() => {
+    // recharge la playlist si la liste change et player prêt
+    if (playerReady && videoIds.length) {
+      loadPlaylistToPlayer(videoIds)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerReady, tracks.length])
+
+  function play() { playerRef.current?.playVideo?.() }
+  function pause() { playerRef.current?.pauseVideo?.() }
+  function next() { playerRef.current?.nextVideo?.() }
+  function prev() { playerRef.current?.previousVideo?.() }
+  function selectAt(i) {
+    if (!playerRef.current || i<0 || i>=videoIds.length) return
+    playerRef.current.playVideoAt(i)
+    setCurrentIndex(i)
+  }
+function shuffle() {
+  if (!playerRef.current || !videoIds.length) return
+  const r = Math.floor(Math.random() * videoIds.length)
+  playerRef.current.playVideoAt(r)
+  setCurrentIndex(r)
+}
+
+  const currentTitle = tracks[currentIndex]?.title || `Piste #${currentIndex+1}`
+
+  return (
+    <main className="fixed inset-0 overflow-hidden">
+      {/* BG */}
+      <div className="absolute inset-0 -z-20">
+        <Image src="/images/radio-bg.webp" alt="" fill priority className="object-cover" />
+      </div>
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
+
+      {/* Header */}
+      <header className="absolute top-6 left-8 right-8 z-40 flex items-center justify-between">
+        <h1 className="text-white text-2xl font-semibold drop-shadow">📻 OffRecords</h1>
+        <Link href="/dashboard" className="rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20">
+          ← Dashboard
+        </Link>
+      </header>
+
+      {/* Content */}
+      <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-y-auto">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
+          {/* Playlists */}
+          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white">
+            <h2 className="font-semibold mb-3">Mes playlists</h2>
+
+            <div className="flex gap-2 mb-3">
+              <input
+                value={titleInput}
+                onChange={e=>setTitleInput(e.target.value)}
+                placeholder="Titre (ex: Playlist d’Alyx)"
+                className="flex-1 rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
+              />
+              <button
+                onClick={createList}
+                disabled={!session || !titleInput.trim()}
+                className="rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2 hover:bg-amber-200 disabled:opacity-50"
+              >
+                Créer
+              </button>
+            </div>
+            <div className="text-xs text-white/70 mb-2">Slug : <code>{slug || 'playlist'}</code></div>
+
+            {loadingLists ? (
+              <div className="text-white/70 text-sm">Chargement…</div>
+            ) : (
+              <div className="space-y-2">
+                {lists.map(L => (
+                  <button
+                    key={L.id}
+                    onClick={()=>openList(L)}
+                    className={`w-full text-left rounded-lg px-3 py-2 border transition
+                      ${active?.id===L.id ? 'bg-white/15 border-white/35' : 'bg-white/6 border-white/15 hover:bg-white/10'}`}
+                  >
+                    <div className="font-medium">{L.title || L.slug}</div>
+                    <div className="text-xs text-white/70">{L.slug}</div>
+                  </button>
+                ))}
+                {!lists.length && <div className="text-white/70 text-sm">Aucune playlist pour l’instant.</div>}
+              </div>
+            )}
+          </section>
+
+          {/* Lecteur + pistes */}
+          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white min-h-[60vh]">
+            {!active ? (
+              <div className="text-white/70">Sélectionne une playlist à gauche.</div>
+            ) : (
+              <>
+                {/* Lecteur (style hifi oldschool) */}
+                <div className="rounded-xl border border-white/20 bg-gradient-to-b from-black/50 to-black/30 p-4 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-white/70">Lecture : {active.title || active.slug}</div>
+                    <div className="text-sm text-white/70">Piste : {currentIndex+1}/{tracks.length || 0}</div>
+                  </div>
+
+                  {/* Le player visible (conformité YouTube) */}
+                  <div className="rounded-lg overflow-hidden border border-white/15 bg-black/60 mb-3">
+                    <div ref={playerElRef} className="w-full aspect-video" />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button onClick={prev} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏮︎</button>
+                    <button onClick={play} className="rounded-md bg-emerald-400/90 text-slate-900 px-3 py-1.5 hover:bg-emerald-300">▶︎</button>
+                    <button onClick={pause} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏸︎</button>
+                    <button onClick={next} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏭︎</button>
+<button onClick={shuffle} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">🔀</button>
+                    <div className="ml-auto text-sm text-white/80 truncate" title={currentTitle}>🎵 {currentTitle}</div>
+                  </div>
+                </div>
+
+                {/* Ajout de titre */}
+                <div className="rounded-lg border border-white/15 bg-white/5 p-3 mb-3">
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_240px_auto] gap-2">
+                    <input
+                      value={paste}
+                      onChange={e=>setPaste(e.target.value)}
+                      placeholder='Colle ici un lien YouTube ou un <iframe …>'
+                      className="rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
+                    />
+                    <input
+                      value={pasteTitle}
+                      onChange={e=>setPasteTitle(e.target.value)}
+                      placeholder='Titre (optionnel)'
+                      className="rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
+                    />
+                    <button
+                      onClick={addTrack}
+                      disabled={!session || !paste.trim()}
+                      className="rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2 hover:bg-amber-200 disabled:opacity-50"
+                    >
+                      + Ajouter
+                    </button>
+                  </div>
+                  <div className="mt-1 text-xs text-white/60">
+                    Astuce : colle un lien <code>https://youtu.be/…</code>, <code>https://www.youtube.com/watch?v=…</code> ou un <code>&lt;iframe …&gt;</code>
+                  </div>
+                </div>
+
+                {/* Pistes */}
+                {loadingTracks ? (
+                  <div className="text-white/70">Chargement des titres…</div>
+                ) : !tracks.length ? (
+                  <div className="text-white/70">Aucun titre pour l’instant.</div>
+                ) : (
+                  <div className="rounded-lg border border-white/15 bg-white/5">
+                    <ul className="divide-y divide-white/10">
+                      {tracks.map((t, i) => (
+                        <li key={t.id} className="flex items-center gap-2 p-2">
+                          <button
+                            onClick={()=>selectAt(i)}
+                            className={`rounded-md px-2 py-1 text-sm border
+                              ${i===currentIndex ? 'bg-emerald-400/20 border-emerald-300/40' : 'bg-white/10 border-white/20 hover:bg-white/15'}`}
+                          >
+                            ▶︎
+                          </button>
+                          <div className="flex-1 truncate">
+                            <div className="truncate">{t.title || `Piste #${i+1}`}</div>
+                            <div className="text-xs text-white/60 truncate">ID: {t.video_id}</div>
+                          </div>
+                          {!!session && (
+                            <button
+                              onClick={()=>removeTrack(t.id)}
+                              className="rounded-md bg-white/10 border border-white/20 px-2 py-1 text-sm hover:bg-white/15"
+                            >
+                              Suppr
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      </div>
+    </main>
+  )
+}
