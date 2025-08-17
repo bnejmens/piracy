@@ -102,6 +102,7 @@ export default function OffRecordsPage() {
   const [playerReady, setPlayerReady] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const videoIds = useMemo(() => tracks.map(t => t.video_id), [tracks])
+  const idsKey   = useMemo(() => videoIds.join('|'), [videoIds]) //
 
   // ------- Init
   useEffect(() => {
@@ -111,7 +112,6 @@ export default function OffRecordsPage() {
 
   async function loadMyLists() {
     setLoadingLists(true)
-    // lecture des playlists appartenant à l’utilisateur (ou toutes si RLS laxiste)
     const { data, error } = await supabase
       .from('off_playlists')
       .select('id, slug, title, owner_id, created_at')
@@ -137,7 +137,6 @@ export default function OffRecordsPage() {
     setActive(list)
     setCurrentIndex(0)
     await loadTracks(list)
-    // prépare le player si pas prêt
     ensurePlayer()
   }
 
@@ -167,9 +166,8 @@ export default function OffRecordsPage() {
     setPaste(''); setPasteTitle('')
     await loadTracks(active)
 
-    // si le player est prêt et vide, charge immédiatement
     if (playerReady && videoIds.length === 0) {
-      loadPlaylistToPlayer([id])
+      cuePlaylistToPlayer([id])
     }
   }
 
@@ -187,17 +185,16 @@ export default function OffRecordsPage() {
     playerRef.current = new YT.Player(playerElRef.current, {
       height: '240', width: '426',
       playerVars: {
-        modestbranding: 1, rel: 0, controls: 1, // on laisse le player visible (conforme)
+        modestbranding: 1, rel: 0, controls: 1,
+        autoplay: 0, // ❌ pas d’autoplay
       },
       events: {
         onReady: () => {
           setPlayerReady(true)
-          if (videoIds.length) loadPlaylistToPlayer(videoIds)
+          if (videoIds.length) cuePlaylistToPlayer(videoIds) // ✅ prépare sans jouer
         },
         onStateChange: (e) => {
-          // si fin de vidéo → suivant
           if (e.data === YT.PlayerState.ENDED) next()
-          // maj index courant
           if (playerRef.current?.getPlaylistIndex) {
             const i = playerRef.current.getPlaylistIndex()
             if (typeof i === 'number' && i >= 0) setCurrentIndex(i)
@@ -207,19 +204,25 @@ export default function OffRecordsPage() {
     })
   }
 
-  function loadPlaylistToPlayer(ids) {
+  // ✅ Prépare la playlist sans démarrer
+  function cuePlaylistToPlayer(ids) {
     if (!playerRef.current || !ids?.length) return
-    playerRef.current.loadPlaylist(ids, 0, 0, 'large')
+    if (playerRef.current.cuePlaylist) {
+      playerRef.current.cuePlaylist(ids, 0, 0, 'large')
+    } else {
+      playerRef.current.cueVideoById(ids[0])
+    }
     setCurrentIndex(0)
   }
 
+  function loadPlaylistToPlayer(ids) { cuePlaylistToPlayer(ids) }
+
   useEffect(() => {
-    // recharge la playlist si la liste change et player prêt
     if (playerReady && videoIds.length) {
-      loadPlaylistToPlayer(videoIds)
+      cuePlaylistToPlayer(videoIds)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerReady, tracks.length])
+  }, [playerReady, idsKey])
 
   function play() { playerRef.current?.playVideo?.() }
   function pause() { playerRef.current?.pauseVideo?.() }
@@ -230,12 +233,12 @@ export default function OffRecordsPage() {
     playerRef.current.playVideoAt(i)
     setCurrentIndex(i)
   }
-function shuffle() {
-  if (!playerRef.current || !videoIds.length) return
-  const r = Math.floor(Math.random() * videoIds.length)
-  playerRef.current.playVideoAt(r)
-  setCurrentIndex(r)
-}
+  function shuffle() {
+    if (!playerRef.current || !videoIds.length) return
+    const r = Math.floor(Math.random() * videoIds.length)
+    playerRef.current.playVideoAt(r)
+    setCurrentIndex(r)
+  }
 
   const currentTitle = tracks[currentIndex]?.title || `Piste #${currentIndex+1}`
 
@@ -256,10 +259,12 @@ function shuffle() {
       </header>
 
       {/* Content */}
-      <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-y-auto">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
-          {/* Playlists */}
-          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white">
+      {/* ⬇️ NE PLUS SCROLLER LA PAGE : on masque le scroll global ici */}
+      <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden">
+        {/* ⬇️ La grid occupe toute la hauteur, et autorise la contraction */}
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-full min-h-0">
+          {/* Playlists (colonne gauche) */}
+          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white flex flex-col min-h-0">
             <h2 className="font-semibold mb-3">Mes playlists</h2>
 
             <div className="flex gap-2 mb-3">
@@ -282,7 +287,8 @@ function shuffle() {
             {loadingLists ? (
               <div className="text-white/70 text-sm">Chargement…</div>
             ) : (
-              <div className="space-y-2">
+              // ⬇️ Zone scrollable interne : prend tout l’espace restant
+              <div className="space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
                 {lists.map(L => (
                   <button
                     key={L.id}
@@ -299,20 +305,19 @@ function shuffle() {
             )}
           </section>
 
-          {/* Lecteur + pistes */}
-          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white min-h-[60vh]">
+          {/* Lecteur + pistes (colonne droite) */}
+          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white flex flex-col min-h-0">
             {!active ? (
               <div className="text-white/70">Sélectionne une playlist à gauche.</div>
             ) : (
               <>
-                {/* Lecteur (style hifi oldschool) */}
+                {/* Lecteur */}
                 <div className="rounded-xl border border-white/20 bg-gradient-to-b from-black/50 to-black/30 p-4 mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm text-white/70">Lecture : {active.title || active.slug}</div>
                     <div className="text-sm text-white/70">Piste : {currentIndex+1}/{tracks.length || 0}</div>
                   </div>
 
-                  {/* Le player visible (conformité YouTube) */}
                   <div className="rounded-lg overflow-hidden border border-white/15 bg-black/60 mb-3">
                     <div ref={playerElRef} className="w-full aspect-video" />
                   </div>
@@ -322,7 +327,7 @@ function shuffle() {
                     <button onClick={play} className="rounded-md bg-emerald-400/90 text-slate-900 px-3 py-1.5 hover:bg-emerald-300">▶︎</button>
                     <button onClick={pause} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏸︎</button>
                     <button onClick={next} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏭︎</button>
-<button onClick={shuffle} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">🔀</button>
+                    <button onClick={shuffle} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">🔀</button>
                     <div className="ml-auto text-sm text-white/80 truncate" title={currentTitle}>🎵 {currentTitle}</div>
                   </div>
                 </div>
@@ -355,13 +360,13 @@ function shuffle() {
                   </div>
                 </div>
 
-                {/* Pistes */}
-                {loadingTracks ? (
-                  <div className="text-white/70">Chargement des titres…</div>
-                ) : !tracks.length ? (
-                  <div className="text-white/70">Aucun titre pour l’instant.</div>
-                ) : (
-                  <div className="rounded-lg border border-white/15 bg-white/5">
+                {/* Pistes — zone scrollable interne qui prend tout le reste */}
+                <div className="rounded-lg border border-white/15 bg-white/5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                  {loadingTracks ? (
+                    <div className="p-3 text-white/70">Chargement des titres…</div>
+                  ) : !tracks.length ? (
+                    <div className="p-3 text-white/70">Aucun titre pour l’instant.</div>
+                  ) : (
                     <ul className="divide-y divide-white/10">
                       {tracks.map((t, i) => (
                         <li key={t.id} className="flex items-center gap-2 p-2">
@@ -387,8 +392,8 @@ function shuffle() {
                         </li>
                       ))}
                     </ul>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
           </section>
