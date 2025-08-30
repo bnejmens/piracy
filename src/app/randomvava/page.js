@@ -139,7 +139,7 @@ const copyText = async (text) => {
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
       <header className="absolute top-6 left-8 right-8 z-40 flex items-center justify-between">
-        <h1 className="text-white text-2xl font-semibold drop-shadow">🎲 Random Avatars — Pools (par slug)</h1>
+        <h1 className="text-white text-2xl font-semibold drop-shadow">Librairie d'Avatars</h1>
         <Link href="/dashboard" className="rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20">
           ← Dashboard
         </Link>
@@ -147,15 +147,15 @@ const copyText = async (text) => {
 
       <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-y-auto">
         {/* Création/Upload */}
-        <section className="max-w-5xl mx-auto rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white mb-6">
-          <h2 className="text-lg font-semibold mb-3">Créer/Alimenter un pool</h2>
+        <section className="max-w-5xl mx-auto rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white mb-6">
+          <h2 className="text-lg font-semibold mb-3">Ajouter des portraits</h2>
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
             <div className="space-y-2">
-              <label className="text-sm text-white/80">Slug du pool</label>
+              <label className="text-sm text-white/80">Nom de la Galerie</label>
               <input
                 value={slugInput}
                 onChange={(e)=>setSlugInput(e.target.value)}
-                placeholder="Ex: alyx"
+                placeholder="Ex: Michel Michel"
                 className="w-full rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
               />
               <div className="text-xs text-white/60">Dossier: <code>/avatars/{slug || "…"}</code></div>
@@ -178,7 +178,7 @@ const copyText = async (text) => {
 
         {/* Liste des pools (slugs) + sélection */}
         <section className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white min-h-[50vh]">
+          <div className="rounded-2xl border border-white/30 bg-black/25 backdrop-blur p-4 text-white min-h-[50vh]">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Pools existants</h3>
               {loadingSlugs && <span className="text-white/70 text-sm">Chargement…</span>}
@@ -201,10 +201,10 @@ const copyText = async (text) => {
                       href={randomUrlFor(s)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-md bg-emerald-400/90 text-slate-900 text-xs px-3 py-1.5 hover:bg-emerald-300"
+                      className="rounded-md bg-cyan-600/90 text-slate-900 text-xs px-3 py-1.5 hover:bg-emerald-300"
                       onClick={(e)=>e.stopPropagation()}
                     >
-                      🎲 Ouvrir random
+                      Ouvrir la Galerie
                     </a>
                   </div>
                 </button>
@@ -216,7 +216,7 @@ const copyText = async (text) => {
           </div>
 
           {/* Détails du pool sélectionné */}
-          <div className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white min-h-[50vh]">
+          <div className="rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white min-h-[50vh]">
             {activeSlug ? (
               <>
                 <div className="flex items-center justify-between mb-3">

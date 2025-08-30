@@ -285,7 +285,7 @@ export default function MessagesPage() {
       {/* Layout : grille desktop, pile mobile */}
       <div className="relative z-10 h-full grid gap-4 sm:gap-6 p-3 sm:p-6 grid-cols-1 md:grid-cols-[360px_minmax(0,1fr)] lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
         {/* COLONNE GAUCHE (desktop/tablette ≥ md) */}
-        <aside className="hidden md:flex rounded-2xl bg-black/45 backdrop-blur-md border border-white/15 overflow-hidden flex-col">
+        <aside className="hidden md:flex rounded-2xl bg-black/45 backdrop-blur-md border border-white/20 overflow-hidden flex-col">
           {/* En-tête */}
           <div className="px-4 py-3 border-b border-white/10 text-white/80 flex items-center justify-between">
             <div className="font-medium">
@@ -438,9 +438,9 @@ export default function MessagesPage() {
           </div>
 
           {/* Téléphone */}
-          <div className="rounded-[24px] bg-black/40 backdrop-blur-md border border-white/15 overflow-hidden w-full sm:w-[min(92vw,560px)] h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] flex flex-col">
+          <div className="rounded-[24px] bg-black/40 backdrop-blur-md border border-white/20 overflow-hidden w-full sm:w-[min(92vw,560px)] h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] flex flex-col">
             {/* En-tête conv */}
-            <div className="px-3 sm:px-4 py-3 border-b border-white/10 flex items-center gap-3">
+            <div className="px-3 sm:px-4 py-3 border-b border-white/20 flex items-center gap-3">
               <button
                 className="md:hidden rounded-lg bg-white/10 border border-white/20 px-3 py-2"
                 onClick={() => setSidebarOpen(true)}
@@ -582,7 +582,7 @@ export default function MessagesPage() {
 
             {/* Actions rapides */}
             <div className="flex gap-2 mb-3">
-              <button onClick={() => setNewConvOpen(true)} className="flex-1 rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2">Start New ✉</button>
+              <button onClick={() => setNewConvOpen(true)} className="flex-1 rounded-lg bg-amber-500 text-slate-900 font-medium px-3 py-2">Start New ✉</button>
               <button onClick={() => { setSidebarOpen(false); router.push('/dashboard') }} className="flex-1 rounded-lg bg-white/10 border border-white/20 text-white/80 font-medium px-3 py-2">dashboard ↩︎</button>
             </div>
 
@@ -634,7 +634,7 @@ export default function MessagesPage() {
       {/* MODALE — Nouvelle conversation */}
       {newConvOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4" onClick={() => setNewConvOpen(false)}>
-          <div className="w-[min(96vw,640px)] rounded-2xl border border-white/15 bg-slate-950/90 p-5 text-white shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-[min(96vw,640px)] rounded-2xl border border-white/20 bg-slate-950/90 p-5 text-white shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Nouvelle conversation</h3>
               <button onClick={() => setNewConvOpen(false)} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">Fermer</button>

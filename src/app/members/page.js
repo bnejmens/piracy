@@ -98,7 +98,7 @@ export default function MembersPage() {
     <main className="fixed inset-0 overflow-hidden">
       {/* BACKGROUND */}
       <div className="absolute inset-0 -z-20">
-        <Image src="/images/dashboard-bg.webp" alt="" fill priority className="object-cover" />
+        <Image src="/images/members-bg.webp" alt="" fill priority className="object-cover" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
@@ -112,7 +112,7 @@ export default function MembersPage() {
 
       {/* Carte centrale */}
       <div className="absolute inset-0 grid place-items-center p-4">
-        <div className="w-full max-w-6xl rounded-2xl border border-white/15 bg-white/10 backdrop-blur-x2 ring-1 ring-white/10 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
+        <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x2 ring-1 ring-white/30 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
           {/* Header + filtres */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h1 className="text-xl font-semibold">Personnages</h1>
@@ -290,9 +290,28 @@ export default function MembersPage() {
 
       {/* Scrollbar fine pour la description */}
       <style jsx>{`
-        .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 8px; }
+         .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.15);
+          border-radius: 8px;
+        }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+
+        /* Tablette paysage : avatars plus petits */
+        @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
+          .members-grid .group[style] {
+            width: 96px !important;
+            height: 96px !important;
+          }
+        }
+
+        /* Mobile : encore plus petits */
+        @media (max-width: 640px) {
+          .members-grid .group[style] {
+            width: 90px !important;
+            height: 90px !important;
+          }
+        }
       `}</style>
     </div>
   </div>

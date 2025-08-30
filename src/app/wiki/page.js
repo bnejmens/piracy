@@ -252,7 +252,7 @@ export default function WikiPage() {
   const [viewing, setViewing] = useState(null)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('newest')
-  const [dimUncollected, setDimUncollected] = useState(true)
+  const [dimUncollected, setDimUncollected] = useState(false)
 
   // Sélections (ids)
   const roots = tree
@@ -477,7 +477,7 @@ const isCollected = (id) => collectedSet.has(id)
       {/* Bouton retour */}
       <button
         onClick={() => { window.location.href = '/dashboard' }}
-        className="fixed left-60 bottom-[20px] z-50 rounded-full border border-white/25 bg-white/20 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/60"
+        className="fixed left-60 bottom-[20px] z-50 rounded-full border border-white/25 bg-white/20 backdrop-blur-md px-3.5 py-1.5 text-white/90 text-md hover:bg-white/60"
       >
         ← Tableau de bord
       </button>
@@ -590,7 +590,7 @@ const isCollected = (id) => collectedSet.has(id)
         </section>
 
         {/* ---- Grille ---- */}
-        <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md overflow-hidden flex flex-col">
+        <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xxs overflow-hidden flex flex-col">
           <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <div className="text-white/90 font-medium">
               {l1Node?.label || 'Catégorie'} — {l2List.find(x=>x.id===l2)?.label || 'Sous-catégorie'}

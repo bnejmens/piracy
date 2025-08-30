@@ -264,20 +264,20 @@ export default function OffRecordsPage() {
         {/* ⬇️ La grid occupe toute la hauteur, et autorise la contraction */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-full min-h-0">
           {/* Playlists (colonne gauche) */}
-          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white flex flex-col min-h-0">
+          <section className="rounded-2xl border border-white/20 bg-black/30 backdrop-blur p-4 text-white flex flex-col min-h-0">
             <h2 className="font-semibold mb-3">Mes playlists</h2>
 
             <div className="flex gap-2 mb-3">
               <input
                 value={titleInput}
                 onChange={e=>setTitleInput(e.target.value)}
-                placeholder="Titre (ex: Playlist d’Alyx)"
+                placeholder="Titre (ex: SMOG oh go)"
                 className="flex-1 rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
               />
               <button
                 onClick={createList}
                 disabled={!session || !titleInput.trim()}
-                className="rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2 hover:bg-amber-200 disabled:opacity-50"
+                className="rounded-lg bg-cyan-300 text-slate-900 font-medium px-1.3 py-2 hover:bg-amber-200 disabled:opacity-50"
               >
                 Créer
               </button>
@@ -306,7 +306,7 @@ export default function OffRecordsPage() {
           </section>
 
           {/* Lecteur + pistes (colonne droite) */}
-          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white flex flex-col min-h-0">
+          <section className="rounded-2xl border border-white/20 bg-black/30 backdrop-blur p-4 text-white flex flex-col min-h-0">
             {!active ? (
               <div className="text-white/70">Sélectionne une playlist à gauche.</div>
             ) : (

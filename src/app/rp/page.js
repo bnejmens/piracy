@@ -297,14 +297,14 @@ export default function RPPage() {
   className={`
     fixed z-50
     bottom-6
-    left-[95px]   /* ~24px (left-7) + ~56px (diamètre Ambiance) + ~8px gap */
+    left-[105px]   /* ~24px (left-7) + ~58px (diamètre Ambiance) + ~8px gap */
     sm:left-[98px]
     md:left-[116px]
     lg:left-[122px]
     xl:left-[136px]
     2xl:left-[150px]
     rounded-full border border-white/25 bg-white/15 backdrop-blur-md
-    px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 focus:outline-none
+    px-3 py-1.5 text-white/90 text-md hover:bg-white/20 focus:outline-none
   `}
   title="Retour au dashboard"
 >
@@ -583,41 +583,48 @@ export default function RPPage() {
       )}
 
       {/* 🔧 Ajustements ciblés tablette paysage (1024–1279px) */}
-      <style jsx global>{`
-        @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
-  .rp-grid {
-    padding: 16px !important;
-    gap: 12px !important; /* un poil moins de gap pour gagner de la place */
-    grid-template-columns: 360px minmax(0, 1fr) !important;
-    grid-auto-rows: minmax(0, 1fr) !important;
+<style jsx global>{`
+  @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
+    .rp-grid {
+      padding: 16px !important;
+      gap: 12px !important; /* un poil moins de gap pour gagner de la place */
+      grid-template-columns: 360px minmax(0, 1fr) !important;
+      grid-auto-rows: minmax(0, 1fr) !important;
+    }
+
+    /* Assure l'ordre et évite tout chevauchement visuel */
+    .rp-posts { min-height: 60vh !important; z-index: 10; }
+    .rp-editor { min-height: 36vh !important; z-index: 20; } /* éditeur au-dessus au cas où */
+    .rp-button { left: 16px !important; bottom: 16px !important; }
+    .rp-posts .prose { font-size: 0.95rem; }
+
+    /* Lisibilité tablette : garder le noir PAR DÉFAUT
+       mais NE PAS écraser les couleurs inline (ex: [color=#...]) */
+    .rp-posts .rp-body { color: #0f172a; }
+
+    /* Forcer le noir UNIQUEMENT si l’élément n’a pas déjà de couleur inline */
+    .rp-posts .rp-body :not([style*="color"]) { color: #0f172a !important; }
+
+    /* Liens / citations / code – idem, sans écraser les couleurs inline */
+    .rp-posts .rp-body a:not([style*="color"]) { color: #a16207 !important; }
+    .rp-posts .rp-body blockquote:not([style*="color"]) { color: #0f172a !important; }
+    .rp-posts .rp-body code:not([style*="color"]),
+    .rp-posts .rp-body pre:not([style*="color"]) { color: #0f172a !important; }
+
+    /* Séparateurs / images */
+    .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
+    .rp-posts .rp-body img { background: transparent !important; }
   }
-
-  /* Assure l'ordre et évite tout chevauchement visuel */
-  .rp-posts { min-height: 60vh !important; z-index: 10; }
-  .rp-editor { min-height: 36vh !important; z-index: 20; } /* éditeur au-dessus au cas où */
-  .rp-button { left: 16px !important; bottom: 16px !important; }
-  .rp-posts .prose { font-size: 0.95rem; }
-
-  /* Lisibilité : neutralise texte blanc inline */
-  .rp-posts .rp-body,
-  .rp-posts .rp-body * { color: #0f172a !important; }
-  .rp-posts .rp-body a { color: #a16207 !important; }
-  .rp-posts .rp-body blockquote { color: #0f172a !important; }
-  .rp-posts .rp-body code,
-  .rp-posts .rp-body pre { color: #0f172a !important; }
-  .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
-  .rp-posts .rp-body img { background: transparent !important; }
-}
-      `}</style>
+`}</style>
 
 <style jsx global>{`
   /* Base : texte noir par défaut */
   .rp-posts .rp-body { color: #0f172a; }
 
-  /* Forcer le noir UNIQUEMENT si l’élément n’a PAS de couleur inline (préserve [color=#...]) */
+  /* Ne force pas si l’élément a déjà une couleur inline (préserve [color=#...]) */
   .rp-posts .rp-body :not([style*="color"]) { color: #0f172a !important; }
 
-  /* Variantes usuelles, mais toujours sans écraser les couleurs inline des joueurs */
+  /* Variantes usuelles, sans écraser les couleurs inline des joueurs */
   .rp-posts .rp-body a:not([style*="color"]) { color: #0f172a !important; text-decoration: underline; }
   .rp-posts .rp-body blockquote:not([style*="color"]) { color: #0f172a !important; }
   .rp-posts .rp-body code:not([style*="color"]),
@@ -627,6 +634,7 @@ export default function RPPage() {
   .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
   .rp-posts .rp-body img { background: transparent !important; }
 `}</style>
+
 
     </main>
   )
