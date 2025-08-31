@@ -26,9 +26,9 @@ export default function DashboardPage() {
   const [hasNewNotif, setHasNewNotif] = useState(false)
 
   // responsive geometry
-  const [radius, setRadius] = useState(220)
+  const [radius, setRadius] = useState(180)
   const [iconSize, setIconSize] = useState(110)
-  const [centerSize, setCenterSize] = useState(320)
+  const [centerSize, setCenterSize] = useState(180)
 
   // hook de souscriptions temps réel
   useCharacterSubscriptions(character?.id, {
@@ -37,13 +37,13 @@ export default function DashboardPage() {
   })
 
   const actions = useMemo(() => ([
-    { key:'messages', label:'Messages', href:'/messages', icon:'/images/msg-icon.png',    ring:'ring-amber-300/80',  glow:'bg-amber-300/25'  },
-    { key:'rp',       label:'RP',       href:'/rp',       icon:'/images/rp-icon.png',     ring:'ring-cyan-300/80',   glow:'bg-cyan-300/25'   },
-    { key:'lore',     label:'Lore',     href:'/wiki',     icon:'/images/lore-icon.png',   ring:'ring-violet-300/80', glow:'bg-violet-300/25' },
-    { key:'members',  label:'Membres',  href:'/members',  icon:'/images/member-icon.png', ring:'ring-fuchsia-300/80',glow:'bg-fuchsia-300/25'},
-    { key:'profile',  label:'Profil',   href:'/profile',  icon:'/images/profile-icon.png',ring:'ring-sky-300/80',    glow:'bg-sky-300/25'    },
-{ key:'randomvava', label:'Random Vava', href:'/randomvava', icon:'/images/vava-icon.png', ring:'ring-emerald-300/80', glow:'bg-emerald-300/25' },
-{ key:'offrecords', label:'OffRecords', href:'/offrecords', icon:'/images/radio-icon.png', ring:'ring-rose-300/80', glow:'bg-rose-300/25' },
+    { key:'messages', label:'Messages', href:'/messages', icon:'/images/msg-icon.png',    ring:'ring-amber-300/80',  glow:'bg-amber-300/30'  },
+    { key:'rp',       label:'RP',       href:'/rp',       icon:'/images/rp-icon.png',     ring:'ring-cyan-300/80',   glow:'bg-cyan-300/30'   },
+    { key:'lore',     label:'Lore',     href:'/wiki',     icon:'/images/lore-icon.png',   ring:'ring-violet-300/80', glow:'bg-violet-300/30' },
+    { key:'members',  label:'Membres',  href:'/members',  icon:'/images/member-icon.png', ring:'ring-fuchsia-300/80',glow:'bg-fuchsia-300/30'},
+    { key:'profile',  label:'Profil',   href:'/profile',  icon:'/images/profile-icon.png',ring:'ring-sky-300/80',    glow:'bg-sky-300/20'    },
+{ key:'randomvava', label:'Random Vava', href:'/randomvava', icon:'/images/vava-icon.png', ring:'ring-emerald-300/80', glow:'bg-emerald-300/30' },
+{ key:'offrecords', label:'OffRecords', href:'/offrecords', icon:'/images/radio-icon.png', ring:'ring-rose-300/80', glow:'bg-rose-300/30' },
 
   ]), [])
 
@@ -61,9 +61,9 @@ export default function DashboardPage() {
       const w = window.innerWidth
       const h = window.innerHeight
       const base = Math.min(w, h)
-      setCenterSize(Math.round(clamp(base * 0.34, 220, 320)))
+      setCenterSize(Math.round(clamp(base * 0.34, 180,180)))
       setRadius(Math.round(clamp(base * 0.33, 140, 260)))
-      setIconSize(Math.round(clamp(base * 0.12, 80, 140)))
+      setIconSize(Math.round(clamp(base * 0.10, 90, 120)))
     }
     onResize()
     window.addEventListener('resize', onResize)
@@ -186,7 +186,7 @@ setPickerOpen(false)
 <div className="absolute top-6 right-8 z-40 flex flex-col items-end gap-2">
   <button
     onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
-    className="rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20 focus:outline-none"
+    className="rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-md hover:bg-white/20 focus:outline-none"
   >
     Se déconnecter
   </button>
@@ -206,7 +206,7 @@ setPickerOpen(false)
         <div className="absolute inset-0 grid place-items-center">
           <div className="relative">
             {/* Avatar central */}
-            <div className="group relative w-[min(64vw,360px)] h-[min(64vw,360px)] rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto">
+            <div className="group relative w-[min(60vw,340px)] h-[min(60vw,345px)] rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto">
               {displayAvatar
                 ? <img src={displayAvatar} alt="Avatar" className="w-full h-full object-cover" />
                 : <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-6xl">
@@ -263,7 +263,7 @@ setPickerOpen(false)
                       if (a.key === 'rp') setHasNewRP(false)
                     }}
                     className="pointer-events-auto group absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
-                    style={{ left:`calc(50% + ${a.x}px)`, top:`calc(45% + ${a.y}px)`, width:iconSize, height:iconSize }}
+                    style={{ left:`calc(50% + ${a.x}px)`, top:`calc(50% + ${a.y}px)`, width:iconSize, height:iconSize }}
                     aria-label={a.label}
                   >
                     <div className="relative w-full h-full rounded-full border border-white/45 bg-white/6 backdrop-blur-sm p-2 transition">
