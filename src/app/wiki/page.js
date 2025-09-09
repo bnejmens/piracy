@@ -502,7 +502,7 @@ const isCollected = (id) => collectedSet.has(id)
 
       <div className="relative z-10 h-full grid gap-6 p-6 grid-cols-[30%_1fr] xl:grid-cols-[28%_1fr] lg:grid-cols-1">
         {/* ---- Colonne gauche ---- */}
-        <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md overflow-hidden flex flex-col">
+        <section className="rounded-2xl border border-white/15 bg-black/30 backdrop-blur-md overflow-hidden flex flex-col">
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between">
             <span>Wiki / Lore</span>
             <Link href="/wiki/create" className="rounded-lg bg-amber-300 text-slate-900 text-xs font-medium px-2.5 py-1 hover:bg-amber-200">+ Créer</Link>
@@ -590,7 +590,7 @@ const isCollected = (id) => collectedSet.has(id)
         </section>
 
         {/* ---- Grille ---- */}
-        <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xxs overflow-hidden flex flex-col">
+        <section className="rounded-2xl border border-black/30 bg-white/10 backdrop-blur-xxs overflow-hidden flex flex-col">
           <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <div className="text-white/90 font-medium">
               {l1Node?.label || 'Catégorie'} — {l2List.find(x=>x.id===l2)?.label || 'Sous-catégorie'}
