@@ -149,8 +149,8 @@ function seedTree() {
     {
       id: 'seed-univers', slug: 'univers', label: 'Univers', color: '#0ea5e9',
       children: [
-        { id:'seed-univers-faune', slug:'faune', label:'Faune', color:'#0ea5e9', children:[] },
-        { id:'seed-univers-flore', slug:'flore', label:'Flore', color:'#0ea5e9', children:[] },
+        { id:'seed-univers-faune', slug:'faune', label:'Faune et flore', color:'#0ea5e9', children:[] },
+        { id:'seed-univers-flore', slug:'flore', label:'navires', color:'#0ea5e9', children:[] },
         { id:'seed-univers-historique', slug:'historique', label:'Historique', color:'#0ea5e9', children:[] },
       ]
     },
@@ -158,16 +158,16 @@ function seedTree() {
       id: 'seed-personnages', slug: 'personnages', label: 'Personnages', color: '#f59e0b',
       children: [
         { id:'seed-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
-        { id:'seed-personnages-creatures', slug:'creatures', label:'Créatures', color:'#f59e0b', children:[] },
-        { id:'seed-personnages-groupes', slug:'groupes', label:'Groupes', color:'#f59e0b', children:[] },
+        { id:'seed-personnages-pnj', slug:'scenario', label:'scenario', color:'#f59e0b', children:[] },
+        { id:'seed-personnages-groupes', slug:'groupes', label:'"équipages et groupes', color:'#f59e0b', children:[] },
       ]
     },
     {
-      id: 'seed-magie', slug: 'magie', label: 'Magie', color: '#8b5cf6',
+      id: 'magie', slug: 'magie', label: 'Jouabilité', color: '#8b5cf6',
       children: [
-        { id:'seed-magie-sorts', slug:'sorts', label:'Sorts', color:'#8b5cf6', children:[] },
-        { id:'seed-magie-potions', slug:'potions', label:'Potions', color:'#8b5cf6', children:[] },
-        { id:'seed-magie-objets', slug:'objets', label:'Objets magiques', color:'#8b5cf6', children:[] },
+        { id:'seed-magie-sorts', slug:'sorts', label:'Règles et Must Do', color:'#8b5cf6', children:[] },
+        { id:'seed-magie-potions', slug:'potions', label:'Intrigue', color:'#8b5cf6', children:[] },
+        { id:'seed-magie-objets', slug:'objets', label:'Lieux', color:'#8b5cf6', children:[] },
       ]
     },
   ]
