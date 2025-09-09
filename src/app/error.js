@@ -1,28 +1,20 @@
 'use client'
 
-import { useEffect } from 'react'
-
 export default function Error({ error, reset }) {
-  useEffect(() => {
-    // Affiche l’erreur brute + ses propriétés (cause Supabase, etc.)
-    console.error('App error:', error)
-    try {
-      // Beaucoup d'erreurs Supabase sont dans error.cause
-      if (error?.cause) console.error('Cause:', error.cause)
-    } catch {}
-  }, [error])
-
-  // Tentative de rendu lisible
-  const details = JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2)
-
   return (
-    <div style={{padding:24,fontFamily:'system-ui'}}>
-      <h1>Oups 😅</h1>
-      <p>Une erreur s'est produite. Ci-dessous le détail pour debug :</p>
-      <pre style={{whiteSpace:'pre-wrap',background:'#111',color:'#0f0',padding:12,borderRadius:8}}>
-        {details}
-      </pre>
-      <button onClick={() => reset()} style={{marginTop:12,padding:'8px 12px'}}>Réessayer</button>
+    <div className="p-10 text-white">
+      <h2 className="text-xl font-semibold mb-2">Oups… une erreur est survenue</h2>
+      {error?.message && (
+        <pre className="text-sm opacity-80 whitespace-pre-wrap">
+          {String(error.message)}
+        </pre>
+      )}
+      <button
+        onClick={() => reset()}
+        className="mt-4 rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"
+      >
+        Réessayer
+      </button>
     </div>
   )
 }
