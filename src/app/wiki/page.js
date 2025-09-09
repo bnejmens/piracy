@@ -143,33 +143,24 @@ function buildTreeFromCategoriesRows(rows) {
   return roots
 }
 
-// --- seed canonique toujours visible (même sans carte) ---
-function seedTree() {
+// seed toujours visible (même sans cartes)
+function seedTree(){
   return [
-    {
-      id: 'seed-univers', slug: 'univers', label: 'Univers', color: '#0ea5e9',
-      children: [
-        { id:'seed-univers-faune', slug:'faune', label:'Faune et flore', color:'#0ea5e9', children:[] },
-        { id:'seed-univers-flore', slug:'flore', label:'navires', color:'#0ea5e9', children:[] },
-        { id:'seed-univers-historique', slug:'historique', label:'Historique', color:'#0ea5e9', children:[] },
-      ]
-    },
-    {
-      id: 'seed-personnages', slug: 'personnages', label: 'Personnages', color: '#f59e0b',
-      children: [
-        { id:'seed-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
-        { id:'seed-personnages-pnj', slug:'scenario', label:'scenario', color:'#f59e0b', children:[] },
-        { id:'seed-personnages-groupes', slug:'groupes', label:'équipages et groupes', color:'#f59e0b', children:[] },
-      ]
-    },
-    {
-      id: 'magie', slug: 'magie', label: 'Jouabilité', color: '#8b5cf6',
-      children: [
-        { id:'seed-magie-sorts', slug:'sorts', label:'Règles et Must Do', color:'#8b5cf6', children:[] },
-        { id:'seed-magie-potions', slug:'potions', label:'Intrigue', color:'#8b5cf6', children:[] },
-        { id:'seed-magie-objets', slug:'objets', label:'Lieux', color:'#8b5cf6', children:[] },
-      ]
-    },
+    { id:'cat-univers', slug:'univers', label:'Univers', color:'#0ea5e9', children:[
+      { id:'cat-univers-fauneetflore', slug:'faune-et-flore', label:'Faune et Flore', color:'#0ea5e9', children:[] },
+      { id:'cat-univers-navires', slug:'navires', label:'Navires', color:'#0ea5e9', children:[] },
+      { id:'cat-univers-historique', slug:'historique', label:'Historique', color:'#0ea5e9', children:[] },
+    ]},
+    { id:'cat-personnages', slug:'personnages', label:'Personnages', color:'#f59e0b', children:[
+      { id:'cat-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
+      { id:'cat-personnages-scenarii', slug:'scenarii', label:'Scenarii', color:'#f59e0b', children:[] },
+      { id:'cat-personnages-groupes', slug:'equipages-et-groupes', label:'Equipages et Groupes', color:'#f59e0b', children:[] },
+    ]},
+    { id:'cat-jouabilite', slug:'jouabilite', label:'Jouabilité', color:'#8b5cf6', children:[
+      { id:'cat-jouabilite-regles', slug:'regles-et-must-do', label:'Règles et Must Do', color:'#8b5cf6', children:[] },
+      { id:'cat-jouabilite-lieux', slug:'lieux', label:'Lieux', color:'#8b5cf6', children:[] },
+      { id:'cat-jouabilité-intrigues', slug:'intrigues', label:'Intrigues', color:'#8b5cf6', children:[] },
+    ]},
   ]
 }
 
