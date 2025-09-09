@@ -9,6 +9,7 @@ const BUCKET = "avatars"
 
 export default function RandomVavaPage() {
   const [session, setSession] = useState(null)
+  const [me, setMe] = useState(null) // { user_id, is_admin }
 
   // pools = slugs distincts
   const [slugs, setSlugs] = useState([])
@@ -28,19 +29,35 @@ export default function RandomVavaPage() {
   const fileRef = useRef(null)
   const [uploading, setUploading] = useState(false)
 
-const copyText = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    alert("Lien copié ✅")
-  } catch {
-    alert("Impossible de copier")
-  }
-}
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data?.session || null))
+    let ignore = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (ignore) return
+      setSession(session || null)
+
+      // charger le profil pour savoir si admin
+      if (session?.user?.id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("user_id, is_admin")
+          .eq("user_id", session.user.id)
+          .single()
+        setMe(prof || null)
+      }
+    })()
     loadSlugs()
+    return () => { ignore = true }
   }, [])
+
+  const copyText = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      alert("Lien copié ✅")
+    } catch {
+      alert("Impossible de copier")
+    }
+  }
 
   async function loadSlugs() {
     setLoadingSlugs(true); setError("")
@@ -59,11 +76,12 @@ const copyText = async (text) => {
   async function loadImages(s) {
     if (!s) return
     setLoadingImages(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("pool_images")
-      .select("id, url, title, created_at")
+      .select("id, url, title, created_at, owner_id") // ← owner_id important
       .eq("pool_slug", s)
       .order("created_at", { ascending: false })
+    if (error) console.error(error)
     setImages(data || [])
     setLoadingImages(false)
   }
@@ -101,9 +119,10 @@ const copyText = async (text) => {
         const url = publicUrl(path)
         if (!url) throw new Error("URL publique introuvable")
 
+        // insère la ligne avec owner_id = user courant (RLS-friendly)
         const { error: insErr } = await supabase
           .from("pool_images")
-          .insert({ pool_slug: slug, url, title: file.name })
+          .insert({ pool_slug: slug, url, title: file.name, owner_id: session.user.id })
         if (insErr) throw insErr
       }
       // refresh
@@ -118,11 +137,36 @@ const copyText = async (text) => {
     }
   }
 
-  async function removeImage(id) {
+  async function removeImage(img) {
+    if (!session) return
+    const canDelete = me?.is_admin || img.owner_id === session.user.id
+    if (!canDelete) { alert("Action non autorisée"); return }
     if (!confirm("Supprimer cette image ?")) return
-    const { error } = await supabase.from("pool_images").delete().eq("id", id)
+
+    // 1) supprimer la ligne (protégé par RLS côté DB)
+    const { error } = await supabase.from("pool_images").delete().eq("id", img.id)
     if (error) { alert(error.message); return }
+
+    // 2) supprimer le fichier Storage (best effort)
+    const path = storagePathFromPublicURL(img.url, BUCKET)
+    if (path) {
+      const { error: sErr } = await supabase.storage.from(BUCKET).remove([path])
+      if (sErr) console.warn("Storage remove failed:", sErr.message)
+    }
+
+    // 3) refresh
     await loadImages(activeSlug)
+  }
+
+  // extrait le chemin d'objet Storage depuis l’URL publique
+  function storagePathFromPublicURL(url, bucket) {
+    try {
+      const u = new URL(url)
+      const marker = `/storage/v1/object/public/${bucket}/`
+      const i = u.pathname.indexOf(marker)
+      if (i === -1) return null
+      return decodeURIComponent(u.pathname.slice(i + marker.length))
+    } catch { return null }
   }
 
   const randomUrlFor = (s) =>
@@ -139,13 +183,13 @@ const copyText = async (text) => {
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
       <header className="absolute top-6 left-8 right-8 z-40 flex items-center justify-between">
-+ <h1 className="text-white text-2xl font-semibold drop-shadow">Librairie d&apos;Avatars</h1>
+        <h1 className="text-white text-2xl font-semibold drop-shadow">Librairie d&apos;Avatars</h1>
         <Link href="/dashboard" className="rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20">
           ← Dashboard
         </Link>
       </header>
 
-<div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden">
+      <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden">
         {/* Création/Upload */}
         <section className="max-w-5xl mx-auto rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white mb-6">
           <h2 className="text-lg font-semibold mb-3">Ajouter des portraits</h2>
@@ -177,7 +221,7 @@ const copyText = async (text) => {
         </section>
 
         {/* Liste des pools (slugs) + sélection */}
-<section className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
+        <section className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
           <div className="rounded-2xl border border-white/30 bg-black/25 backdrop-blur p-4 text-white min-h-[50vh]">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Pools existants</h3>
@@ -222,35 +266,37 @@ const copyText = async (text) => {
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">Pool : {activeSlug}</h3>
                   <button
-  onClick={() => copyText(randomUrlFor(activeSlug))}
-  className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"
-  title="Copier l’URL random"
->
-  Copier le lien random
-</button>
-
+                    onClick={() => copyText(randomUrlFor(activeSlug))}
+                    className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"
+                    title="Copier l’URL random"
+                  >
+                    Copier le lien random
+                  </button>
                 </div>
 
                 {loadingImages ? (
                   <div className="text-white/70">Chargement des images…</div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {images.map(img => (
-                      <figure key={img.id} className="group relative rounded-lg overflow-hidden border border-white/15 bg-white/5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.url} alt={img.title||""} className="w-full h-40 object-cover" />
-                        <figcaption className="p-1 text-xs text-white/80 truncate">{img.title || "Image"}</figcaption>
-                        {!!session && (
-                          <button
-                            onClick={()=>removeImage(img.id)}
-                            className="absolute top-2 right-2 rounded bg-black/60 text-white text-xs px-2 py-0.5 hover:bg-black/80"
-                            title="Supprimer"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </figure>
-                    ))}
+                    {images.map(img => {
+                      const canDelete = !!session && (me?.is_admin || img.owner_id === session?.user?.id)
+                      return (
+                        <figure key={img.id} className="group relative rounded-lg overflow-hidden border border-white/15 bg-white/5">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img.url} alt={img.title||""} className="w-full h-40 object-cover" />
+                          <figcaption className="p-1 text-xs text-white/80 truncate">{img.title || "Image"}</figcaption>
+                          {canDelete && (
+                            <button
+                              onClick={()=>removeImage(img)}
+                              className="absolute top-2 right-2 rounded bg-black/60 text-white text-xs px-2 py-0.5 hover:bg-black/80"
+                              title="Supprimer"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </figure>
+                      )
+                    })}
                     {!images.length && (
                       <div className="text-white/70 text-sm">Aucune image dans ce pool.</div>
                     )}
