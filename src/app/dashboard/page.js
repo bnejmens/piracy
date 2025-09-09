@@ -39,10 +39,10 @@ export default function DashboardPage() {
   const actions = useMemo(() => ([
     { key:'messages', label:'Messages', href:'/messages', icon:'/images/msg-icon.png',    ring:'ring-amber-300/80',  glow:'bg-amber-300/30'  },
     { key:'rp',       label:'RP',       href:'/rp',       icon:'/images/rp-icon.png',     ring:'ring-cyan-300/80',   glow:'bg-cyan-300/30'   },
+    { key:'profile',  label:'Profil',   href:'/profile',  icon:'/images/profile-icon.png',ring:'ring-sky-300/80',    glow:'bg-sky-300/30'    },
     { key:'lore',     label:'Lore',     href:'/wiki',     icon:'/images/lore-icon.png',   ring:'ring-violet-300/80', glow:'bg-violet-300/30' },
     { key:'members',  label:'Membres',  href:'/members',  icon:'/images/member-icon.png', ring:'ring-fuchsia-300/80',glow:'bg-fuchsia-300/30'},
-    { key:'profile',  label:'Profil',   href:'/profile',  icon:'/images/profile-icon.png',ring:'ring-sky-300/80',    glow:'bg-sky-300/20'    },
-{ key:'randomvava', label:'Random Vava', href:'/randomvava', icon:'/images/vava-icon.png', ring:'ring-emerald-300/80', glow:'bg-emerald-300/30' },
+{ key:'randomvava', label:'Random Vava', href:'/randomvava', icon:'/images/avatar-icon.png', ring:'ring-emerald-300/80', glow:'bg-emerald-300/30' },
 { key:'offrecords', label:'OffRecords', href:'/offrecords', icon:'/images/radio-icon.png', ring:'ring-rose-300/80', glow:'bg-rose-300/30' },
 
   ]), [])
@@ -148,7 +148,7 @@ setPickerOpen(false)
     || profile?.email?.split('@')[0]
     || 'Joueur'
 
-  const displayGenre  = character?.genre || profile?.genre || null
+  const displayGenre  = character?.gender || profile?.gender || null
   const displayAvatar = character?.avatar_url || profile?.avatar_url || null
   const nameClass =
     displayGenre === 'féminin'

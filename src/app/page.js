@@ -44,7 +44,7 @@ export default function AuthPage() {
      {/* BACKGROUND */}
 <div className="absolute inset-0 -z-10">
   <Image
-    src="/images/apasonia-bg.webp"
+    src="/images/crimson-bg.webp"
     alt=""
     fill
     priority
@@ -63,10 +63,10 @@ export default function AuthPage() {
 
           <div className="p-6 sm:p-8 text-slate-100">
             <h1 className="text-2xl font-semibold tracking-wide mb-2">
-                ⭒   GLEESON   ⭒
+                ⭒   CRIMNSON CURSE   ⭒
             </h1>
             <p className="text-slate-200/80 mb-6">
-              Where the line between tech and magic begins
+              Puissent les courants te venir en aide.
             </p>
 
             {errorMsg && (

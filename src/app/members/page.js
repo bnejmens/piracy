@@ -12,7 +12,7 @@ export default function MembersPage() {
   const [error, setError] = useState(null);
 
   // Affiche des PERSONNAGES (pas seulement le profil actif)
-  const [items, setItems] = useState([]); // [{ id, user_id, name, genre, avatar_url, bio, age, occupation, traits, relationships, ownerName }]
+  const [items, setItems] = useState([]); // [{ id, user_id, name, gender, avatar_url, bio, age, occupation, traits, relationships, ownerName }]
   const [filter, setFilter] = useState("tous"); // 'tous' | 'féminin' | 'masculin'
   const [modalChar, setModalChar] = useState(null);
 
@@ -30,7 +30,7 @@ export default function MembersPage() {
          const { data: chars, error: e1 } = await supabase
   .from('characters')
   .select(`
-    id, user_id, name, genre, avatar_url, bio, created_at,
+    id, user_id, name, gender, avatar_url, bio, created_at,
     age, occupation, traits,
     companion_name, companion_avatar_url,
     character_relationships:character_relationships!character_id (
@@ -63,7 +63,7 @@ export default function MembersPage() {
   }, [router]);
 
   const filtered = useMemo(() => {
-    const f = filter === "tous" ? items : items.filter(m => m.genre === filter);
+    const f = filter === "tous" ? items : items.filter(m => m.gender === filter);
     setPage(1);
     return f;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -192,7 +192,7 @@ export default function MembersPage() {
   <div className="min-w-0">
     <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{modalChar.name}</h3>
     <p className="text-xs text-white/60">
-      {modalChar.genre || "Genre non renseigné"} • Joueur : {modalChar.ownerName}
+      {modalChar.gender || "Genre non renseigné"} • Joueur : {modalChar.ownerName}
     </p>
     <div className="mt-1 text-xs text-white/70 space-x-3">
       {modalChar.age ? <span>Âge : {modalChar.age}</span> : null}

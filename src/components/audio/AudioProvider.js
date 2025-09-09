@@ -19,6 +19,10 @@ export default function AudioProvider({ children }) {
     { src: '/audio/fireplace.mp3', label: '	cheminée' },
     { src: '/audio/rain.mp3',  label: 'Pluie' },
     { src: '/audio/nature.mp3',  label: 'Nature' },
+    { src: '/audio/ocean.mp3',  label: 'Ocean' },
+    { src: '/audio/inwater.mp3',  label: 'Inwater' },
+    { src: '/audio/reef.mp3',  label: 'Reef' },
+    { src: '/audio/tavern.mp3',  label: 'Tavern' },
   ]), [])
 
   const storageKey = 'ambient:global'

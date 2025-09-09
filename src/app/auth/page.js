@@ -130,7 +130,7 @@ export default function AuthPage() {
       {/* BACKGROUND */}
       <div className="absolute inset-0 -z-20">
         <Image
-          src="/images/apasonia-bg.webp"
+          src="/images/crimson-bg.webp"
           alt=""
           fill
           priority
