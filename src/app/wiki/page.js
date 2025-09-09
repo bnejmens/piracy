@@ -159,7 +159,7 @@ function seedTree() {
       children: [
         { id:'seed-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
         { id:'seed-personnages-pnj', slug:'scenario', label:'scenario', color:'#f59e0b', children:[] },
-        { id:'seed-personnages-groupes', slug:'groupes', label:'"équipages et groupes', color:'#f59e0b', children:[] },
+        { id:'seed-personnages-groupes', slug:'groupes', label:'équipages et groupes', color:'#f59e0b', children:[] },
       ]
     },
     {
