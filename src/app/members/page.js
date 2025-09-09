@@ -15,6 +15,8 @@ export default function MembersPage() {
   const [items, setItems] = useState([]); // [{ id, user_id, name, gender, avatar_url, bio, age, occupation, traits, relationships, ownerName }]
   const [filter, setFilter] = useState("tous"); // 'tous' | 'féminin' | 'masculin'
   const [modalChar, setModalChar] = useState(null);
+  const [includeArchivedMine, setIncludeArchivedMine] = useState(false);
+
 
   const PAGE_SIZE = 16;
   const [page, setPage] = useState(1);
@@ -27,11 +29,11 @@ export default function MembersPage() {
 
       try {
         // 1) Tous les personnages + nouveaux champs + relations (jointure)
-         const { data: chars, error: e1 } = await supabase
+   let query = supabase
   .from('characters')
   .select(`
     id, user_id, name, gender, avatar_url, bio, created_at,
-    age, occupation, traits,
+    age, occupation, traits, is_active, is_archived,
     companion_name, companion_avatar_url,
     character_relationships:character_relationships!character_id (
       id, type, other_character_id,
@@ -39,6 +41,10 @@ export default function MembersPage() {
     )
   `)
   .order('created_at', { ascending: false });
+
+ // Par défaut : tout le monde voit les non-archivés ; toi tu vois aussi TES archivés
+ query = query.or(`is_archived.eq.false,user_id.eq.${session.user.id}`);
+ const { data: chars, error: e1 } = await query;
 
         // 2) Profils -> nom joueur
         const { data: profs, error: e2 } = await supabase
@@ -124,6 +130,14 @@ export default function MembersPage() {
               <FilterBtn active={filter === "masculin"} onClick={() => setFilter("masculin")}>
                 Masculin
               </FilterBtn>
+    <label className="ml-3 flex items-center gap-2 text-sm opacity-90">
+      <input
+        type="checkbox"
+       checked={includeArchivedMine}
+        onChange={(e)=>setIncludeArchivedMine(e.target.checked)}
+      />
+      Inclure mes archivés
+    </label>
             </div>
           </div>
 
