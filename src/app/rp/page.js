@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabaseClient'
 const GLASS = {
   left:      { bg: 'rgba(0,0,0,0.4)',  blur: '2px'  },
   editor:    { bg: 'rgba(255,255,255,0.12)', blur: '10px' },
-  right:     { bg: 'rgba(255,255,255,0.15)', blur: '14px' },
+  right:     { bg: 'rgba(255,255,255,0.15)', blur: '80px' },
   cardMine:  { bg: 'rgba(255,255,255,0.12)', blur: '14px' },
   cardOther: { bg: 'rgba(255,255,255,0.10)', blur: '8px'  },
 }
