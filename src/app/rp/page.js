@@ -82,6 +82,55 @@ export default function RPPage() {
   const endRef = useRef(null)
   const scrollToEnd = () => endRef.current?.scrollIntoView({ behavior: 'smooth' })
 
+// --- fiche "profil posteur" (perso si dispo, sinon profil user)
+const [viewer, setViewer] = useState(null); // { type: 'char'|'user', data: {...} }
+
+async function openPosterCard(authorId, authorCharacterId) {
+  try {
+    if (authorCharacterId) {
+      // charger le PERSONNAGE complet (comme Members)
+      const { data: ch, error: e1 } = await supabase
+        .from('characters')
+        .select(`
+          id, user_id, name, gender, avatar_url, bio, created_at,
+          age, occupation, traits,
+          companion_name, companion_avatar_url,
+          character_relationships:character_relationships!character_id (
+            id, type, other_character_id,
+            other:other_character_id ( id, name, avatar_url )
+          )
+        `)
+        .eq('id', authorCharacterId)
+        .maybeSingle();
+      if (e1) throw e1;
+
+      // nom du joueur
+      let ownerName = 'Joueur';
+      if (ch?.user_id) {
+        const { data: owner } = await supabase
+          .from('profiles')
+          .select('pseudo, email')
+          .eq('user_id', ch.user_id)
+          .maybeSingle();
+        ownerName = owner?.pseudo?.trim() || owner?.email?.split('@')[0] || ownerName;
+      }
+
+      setViewer({ type: 'char', data: { ...ch, ownerName } });
+    } else {
+      // pas de perso : simple profil utilisateur
+      const { data: p, error: e2 } = await supabase
+        .from('profiles')
+        .select('user_id, pseudo, avatar_url, email')
+        .eq('user_id', authorId)
+        .maybeSingle();
+      if (e2) throw e2;
+      setViewer({ type: 'user', data: p });
+    }
+  } catch (err) {
+    alert(err.message || 'Impossible de charger la fiche.');
+  }
+}
+
   // PREVIEW
   const htmlPreview = useMemo(() => {
     const html = bbcodeToHtml(raw)
@@ -514,10 +563,11 @@ export default function RPPage() {
                   )}
 
                   <PostHeader
-                    authorId={p.author_id}
-                    authorCharacterId={p.author_character_id}
-                    createdAt={p.created_at}
-                  />
+  authorId={p.author_id}
+  authorCharacterId={p.author_character_id}
+  createdAt={p.created_at}
+  onAvatarClick={() => openPosterCard(p.author_id, p.author_character_id)}
+/>
 
                   {editingPostId === p.id ? (
                     <div className="space-y-2">
@@ -558,6 +608,10 @@ export default function RPPage() {
           </div>
         </section>
       </div>
+
+{viewer && (
+  <ProfileModal viewer={viewer} onClose={() => setViewer(null)} />
+)}
 
       {/* -------- MODALE PRÉVISUALISATION -------- */}
       {isPreviewOpen && (
@@ -720,7 +774,7 @@ function TopicParticipants({ topicId }) {
   )
 }
 
-function PostHeader({ authorId, authorCharacterId, createdAt }) {
+function PostHeader({ authorId, authorCharacterId, createdAt, onAvatarClick }) {
   const [display, setDisplay] = useState(null)
   useEffect(() => {
     let ok = true
@@ -745,11 +799,15 @@ function PostHeader({ authorId, authorCharacterId, createdAt }) {
 
   return (
     <div className="flex items-center gap-3 mb-3">
-      <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_8px_24px_rgba(0,0,0,.25)]">
+      <button
+        onClick={onAvatarClick}
+        className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_8px_24px_rgba(0,0,0,.25)] focus:outline-none hover:ring-amber-300/60 transition"
+        title="Voir la fiche"
+      >
         {display?.avatar_url
           ? <img src={display.avatar_url} alt="" className="w-full h-full object-cover" />
           : <div className="grid place-items-center w-full h-full text-white/80 text-lg">{initial}</div>}
-      </div>
+      </button>
       <div className="leading-tight">
         <div className="text-white text-lg font-semibold">{name}</div>
         <div className="text-white/60 text-xs">{new Date(createdAt).toLocaleString()}</div>
@@ -824,3 +882,154 @@ function EditorToolbar({
     </div>
   )
 }
+
+function ProfileModal({ viewer, onClose }) {
+  if (!viewer) return null
+  const { type, data } = viewer
+  const stop = (e) => e.stopPropagation()
+
+  if (type === 'user') {
+    const name = data?.pseudo?.trim() || data?.email?.split('@')[0] || 'Joueur'
+    return (
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+        <div className="w-[min(96vw,720px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-6 text-white" onClick={stop}>
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full overflow-hidden ring-1 ring-white/20 bg-white/10">
+              {data?.avatar_url
+                ? <img src={data.avatar_url} alt="" className="w-full h-full object-cover" />
+                : <div className="grid place-items-center w-full h-full text-white/80 text-xl">{name[0]}</div>}
+            </div>
+            <div>
+              <div className="text-xl font-semibold">{name}</div>
+              <div className="text-white/60 text-sm">{data?.email}</div>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <button onClick={onClose} className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15">Fermer</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // type === 'char'
+  const c = data || {}
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+      <div className="w-[min(96vw,980px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-6 sm:p-8 text-white max-h-[90vh] overflow-y-auto" onClick={stop}>
+        {/* Header identité */}
+        <div className="flex items-center gap-5 pb-5 border-b border-white/10">
+          <div className="relative w-[120px] h-[120px] rounded-2xl overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5">
+            {c.avatar_url
+              ? <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-3xl">
+                  {(c.name?.[0] || '?').toUpperCase()}
+                </div>}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{c.name}</h3>
+            <p className="text-xs text-white/60">
+              {c.gender || 'Genre non renseigné'} • Joueur : {c.ownerName || '—'}
+            </p>
+            <div className="mt-1 text-xs text-white/70 space-x-3">
+              {c.age ? <span>Âge : {c.age}</span> : null}
+              {c.occupation ? <span>Occupation : {c.occupation}</span> : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Colonne traits + relations + bio */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={c.traits?.intro_extro} />
+              <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={c.traits?.egoiste_altruiste} />
+              <Bipolar leftLabel="Prudent" rightLabel="Téméraire" value={c.traits?.prudent_temer} />
+              <Bipolar leftLabel="Réfléchi" rightLabel="Impulsif" value={c.traits?.reflechi_impulsif} />
+              <Bipolar leftLabel="Obéissant" rightLabel="Rebelle" value={c.traits?.obeissant_rebelle} />
+            </div>
+            <div className="space-y-4">
+              <Bipolar leftLabel="Méthodique" rightLabel="Chaotique" value={c.traits?.methodique_chaotique} />
+              <Bipolar leftLabel="Idéaliste" rightLabel="Cynique" value={c.traits?.idealiste_cynique} />
+              <Bipolar leftLabel="Résilient" rightLabel="Vulnérable" value={c.traits?.resil_vulnerable} />
+              <Bipolar leftLabel="Loyal" rightLabel="Opportuniste" value={c.traits?.loyal_opportuniste} />
+              <Bipolar leftLabel="Créatif" rightLabel="Pragmatique" value={c.traits?.creatif_pragmatique} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <h4 className="text-sm font-semibold mb-2">Relations</h4>
+            <RelationsList relations={c.character_relationships} />
+          </div>
+        </div>
+
+        <section className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="mb-2 text-sm font-semibold text-white/80">Description</div>
+          {c.bio ? (
+            <p className="whitespace-pre-wrap text-white/90">{c.bio}</p>
+          ) : (
+            <div className="text-white/60 text-sm">Aucune bio.</div>
+          )}
+        </section>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15">Fermer</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RelationsList({ relations }) {
+  if (!relations || relations.length === 0) {
+    return <p className="text-white/60 text-sm">Aucune relation connue.</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {relations.map((rel) => (
+        <li key={rel.id} className="flex items-center gap-2 text-sm">
+          {rel.other?.avatar_url ? (
+            <img src={rel.other.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-white/10 grid place-items-center text-[10px]">?</div>
+          )}
+          <span className="truncate">{rel.other?.name || rel.other_character_id}</span>
+          <span className="text-white/50">·</span>
+          <span className="text-white/70">{relationLabel(rel.type)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Bipolar({ leftLabel, rightLabel, value=5 }) {
+  const v = Math.max(0, Math.min(10, Number(value ?? 5)));
+  const pct = (v / 10) * 100;
+  const gradient = `linear-gradient(90deg, #6ea8ff 0%, #6ea8ff ${pct}%, #f6d24a ${pct}%, #f6d24a 100%)`;
+  return (
+    <div className="space-y-2 select-none">
+      <div className="flex justify-between text-white/70 text-sm">
+        <span>{leftLabel}</span><span>{rightLabel}</span>
+      </div>
+      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
+        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `calc(${pct}% - 6px)` }}>
+          <div className="w-3 h-3 rounded-full bg-white shadow" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function relationLabel(type) {
+  const map = {
+    love_interest: "Love interest",
+    ami: "Ami",
+    ennemi: "Ennemi",
+    indifferent: "Indifférent",
+    nemesis: "Némésis",
+    inconnu: "Inconnu",
+  };
+  return map[type] || type;
+}
+
