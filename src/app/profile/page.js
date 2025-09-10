@@ -80,13 +80,17 @@ const toEnumOrNull = (v, allowed) => {
       const active = (chars || []).find(c => c.is_active) || (chars || [])[0] || null;
       setCharId(active?.id || "");
 
-      // Tous les persos actifs (pour carnet relations)
-      const { data: all } = await supabase
-  .from("characters")
-  .select("id, name, avatar_url, is_listed, is_active")
-  .or("is_listed.is.true,is_active.is.true")
-  .order("name", { ascending: true });
+// Tous les personnages visibles dans le picker (hors archivés)
+const { data: all, error } = await supabase
+  .from('characters')
+  .select('id, name, avatar_url, user_id, is_archived')
+  .eq('is_archived', false)
+  .order('name', { ascending: true });
+
+if (error) console.error('[characters]', error);
 setAllChars(all || []);
+// Dans le picker : characters={(allChars||[]).filter(c => c.id !== charId)}
+
 
       setLoading(false);
     })();
