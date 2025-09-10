@@ -60,6 +60,40 @@ export default function MessagesPage() {
   const [showEmoji, setShowEmoji] = useState(false)
   const fileRef = useRef(null)
 
+// --- fiche perso modale
+const [viewer, setViewer] = useState(null); // { ...character, ownerName }
+async function openCharCard(characterId) {
+  try {
+    const { data: ch, error: e1 } = await supabase
+      .from('characters')
+      .select(`
+        id, user_id, name, gender, avatar_url, bio, created_at,
+        age, occupation, traits,
+        companion_name, companion_avatar_url,
+        character_relationships:character_relationships!character_id (
+          id, type, other_character_id,
+          other:other_character_id ( id, name, avatar_url )
+        )
+      `)
+      .eq('id', characterId)
+      .maybeSingle();
+    if (e1) throw e1;
+
+    let ownerName = 'Joueur';
+    if (ch?.user_id) {
+      const { data: owner } = await supabase
+        .from('profiles')
+        .select('pseudo, email')
+        .eq('user_id', ch.user_id)
+        .maybeSingle();
+      ownerName = owner?.pseudo?.trim() || owner?.email?.split('@')[0] || ownerName;
+    }
+    setViewer({ ...ch, ownerName });
+  } catch (err) {
+    alert(err.message || 'Impossible de charger la fiche.');
+  }
+}
+
   // Messages: lazy load older
   const [oldestLoadedAt, setOldestLoadedAt] = useState(null)
   const [hasMoreOld, setHasMoreOld] = useState(false)
@@ -370,52 +404,39 @@ export default function MessagesPage() {
             )}
           </div>
 
-          {/* Carnet de contact */}
-          <div className="border-b border-white/10">
-            <button
-              onClick={() => setOpenContacts(o => !o)}
-              className="w-full px-4 py-3 text-left text-white/90 font-medium hover:bg-white/5 flex items-center justify-between"
-            >
-              <span>Carnet de contact</span>
-              <span className="text-white/60 text-sm">{openContacts ? '▼' : '▲'}</span>
-            </button>
+         {/* Carnet de contact */}
+<div className="border-b border-white/10">
+  <button
+    onClick={() => setOpenContacts(o => !o)}
+    className="w-full px-4 py-3 text-left text-white/90 font-medium hover:bg-white/5 flex items-center justify-between"
+  >
+    <span>Carnet de contact</span>
+    <span className="text-white/60 text-sm">{openContacts ? '▼' : '▲'}</span>
+  </button>
 
-            {openContacts && (
-              <div className="p-3 space-y-2">
-                {pagedContacts.map(ch => (
-                  <div key={ch.id} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15">
-                      {ch.avatar_url
-                        ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <div className="grid place-items-center w-full h-full text-white/70">{(ch.name?.[0] || '?').toUpperCase()}</div>}
-                    </div>
-                    <div className="text-white/90 text-sm truncate">{ch.name}</div>
-                  </div>
-                ))}
-                {!pagedContacts.length && <div className="text-white/60 text-sm">Aucun personnage.</div>}
+  {openContacts && (
+    <div className="p-3 space-y-2 max-h-[42vh] overflow-y-auto pr-1 custom-scroll">
+      {(allCharacters || []).map(ch => (
+        <div key={ch.id} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+          <button
+            onClick={() => openCharCard(ch.id)}
+            title="Voir la fiche"
+            className="w-9 h-9 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15 shrink-0"
+          >
+            {ch.avatar_url
+              ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <div className="grid place-items-center w-full h-full text-white/70">
+                  {(ch.name?.[0] || '?').toUpperCase()}
+                </div>}
+          </button>
+          <div className="text-white/90 text-sm truncate">{ch.name}</div>
+        </div>
+      ))}
+      {!allCharacters?.length && <div className="text-white/60 text-sm">Aucun personnage.</div>}
+    </div>
+  )}
+</div>
 
-                {contactsPageCount > 1 && (
-                  <div className="pt-2 flex items-center justify-between text-white/70 text-sm">
-                    <button
-                      className="px-2 py-1 rounded bg-white/10 border border-white/15 disabled:opacity-50"
-                      onClick={() => setContactPage(p => Math.max(0, p - 1))}
-                      disabled={contactPage === 0}
-                    >
-                      ← Préc.
-                    </button>
-                    <div>Page {contactPage + 1} / {contactsPageCount}</div>
-                    <button
-                      className="px-2 py-1 rounded bg-white/10 border border-white/15 disabled:opacity-50"
-                      onClick={() => setContactPage(p => Math.min(contactsPageCount - 1, p + 1))}
-                      disabled={contactPage >= contactsPageCount - 1}
-                    >
-                      Suiv. →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </aside>
 
         {/* COLONNE PRINCIPALE — Effet téléphone */}
@@ -604,28 +625,34 @@ export default function MessagesPage() {
                 </div>
               )}
 
-              {/* Bloc Contacts */}
               <div className="border-t border-white/10 mt-2">
-                <button onClick={() => setOpenContacts(o => !o)} className="w-full px-3 py-2 text-left text-white/90 font-medium hover:bg-white/5 flex items-center justify-between">
-                  <span>Carnet de contact</span>
-                  <span className="text-white/60 text-sm">{openContacts ? '▼' : '▲'}</span>
-                </button>
-                {openContacts && (
-                  <div className="p-2 space-y-2">
-                    {pagedContacts.map(ch => (
-                      <div key={ch.id} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                        <div className="w-9 h-9 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15">
-                          {ch.avatar_url
-                            ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
-                            : <div className="grid place-items-center w-full h-full text-white/70">{(ch.name?.[0] || '?').toUpperCase()}</div>}
-                        </div>
-                        <div className="text-white/90 text-sm truncate">{ch.name}</div>
-                      </div>
-                    ))}
-                    {!pagedContacts.length && <div className="text-white/60 text-sm">Aucun personnage.</div>}
-                  </div>
-                )}
-              </div>
+  <button onClick={() => setOpenContacts(o => !o)} className="w-full px-3 py-2 text-left text-white/90 font-medium hover:bg-white/5 flex items-center justify-between">
+    <span>Carnet de contact</span>
+    <span className="text-white/60 text-sm">{openContacts ? '▼' : '▲'}</span>
+  </button>
+  {openContacts && (
+    <div className="p-2 space-y-2 max-h-[40vh] overflow-y-auto pr-1 custom-scroll">
+      {(allCharacters || []).map(ch => (
+        <div key={ch.id} className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+          <button
+            onClick={() => openCharCard(ch.id)}
+            title="Voir la fiche"
+            className="w-9 h-9 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15 shrink-0"
+          >
+            {ch.avatar_url
+              ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <div className="grid place-items-center w-full h-full text-white/70">
+                  {(ch.name?.[0] || '?').toUpperCase()}
+                </div>}
+          </button>
+          <div className="text-white/90 text-sm truncate">{ch.name}</div>
+        </div>
+      ))}
+      {!allCharacters?.length && <div className="text-white/60 text-sm">Aucun personnage.</div>}
+    </div>
+  )}
+</div>
+
             </div>
           </div>
         </div>
@@ -654,6 +681,11 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
+
+{viewer && (
+  <ProfileModal viewer={viewer} onClose={() => setViewer(null)} />
+)}
+
     </main>
   )
 }
@@ -763,4 +795,136 @@ function FakeAzertyKeyboard() {
       </div>
     </div>
   )
+}
+
+function ProfileModal({ viewer, onClose }) {
+  if (!viewer) return null
+  const c = viewer
+  const stop = (e) => e.stopPropagation()
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+      <div className="w-[min(96vw,980px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-6 sm:p-8 text-white max-h-[90vh] overflow-y-auto overscroll-contain" onClick={stop}>
+        {/* Header identité */}
+        <div className="flex items-center gap-5 pb-5 border-b border-white/10">
+          <div className="relative w-[120px] h-[120px] rounded-2xl overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5">
+            {c.avatar_url
+              ? <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-3xl">
+                  {(c.name?.[0] || '?').toUpperCase()}
+                </div>}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{c.name}</h3>
+            <p className="text-xs text-white/60">
+              {c.gender || 'Genre non renseigné'} • Joueur : {c.ownerName || '—'}
+            </p>
+            <div className="mt-1 text-xs text-white/70 space-x-3">
+              {c.age ? <span>Âge : {c.age}</span> : null}
+              {c.occupation ? <span>Occupation : {c.occupation}</span> : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Traits + Relations */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={c.traits?.intro_extro} />
+              <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={c.traits?.egoiste_altruiste} />
+              <Bipolar leftLabel="Prudent" rightLabel="Téméraire" value={c.traits?.prudent_temer} />
+              <Bipolar leftLabel="Réfléchi" rightLabel="Impulsif" value={c.traits?.reflechi_impulsif} />
+              <Bipolar leftLabel="Obéissant" rightLabel="Rebelle" value={c.traits?.obeissant_rebelle} />
+            </div>
+            <div className="space-y-4">
+              <Bipolar leftLabel="Méthodique" rightLabel="Chaotique" value={c.traits?.methodique_chaotique} />
+              <Bipolar leftLabel="Idéaliste" rightLabel="Cynique" value={c.traits?.idealiste_cynique} />
+              <Bipolar leftLabel="Résilient" rightLabel="Vulnérable" value={c.traits?.resil_vulnerable} />
+              <Bipolar leftLabel="Loyal" rightLabel="Opportuniste" value={c.traits?.loyal_opportuniste} />
+              <Bipolar leftLabel="Créatif" rightLabel="Pragmatique" value={c.traits?.creatif_pragmatique} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <h4 className="text-sm font-semibold mb-2">Relations</h4>
+            <RelationsList relations={c.character_relationships} />
+          </div>
+        </div>
+
+        {/* Bio */}
+        <section className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="mb-2 text-sm font-semibold text-white/80">Description</div>
+          {c.bio ? (
+            <p className="whitespace-pre-wrap text-white/90">{c.bio}</p>
+          ) : (
+            <div className="text-white/60 text-sm">Aucune bio.</div>
+          )}
+        </section>
+
+        <div className="mt-6 flex justify-end">
+          <button onClick={onClose} className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15">Fermer</button>
+        </div>
+      </div>
+
+      {/* Scrollbar fine */}
+      <style jsx>{`
+        .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+      `}</style>
+    </div>
+  )
+}
+
+function Bipolar({ leftLabel, rightLabel, value=5 }) {
+  const v = Math.max(0, Math.min(10, Number(value ?? 5)));
+  const pct = (v / 10) * 100;
+  const gradient = `linear-gradient(90deg, #6ea8ff 0%, #6ea8ff ${pct}%, #f6d24a ${pct}%, #f6d24a 100%)`;
+  return (
+    <div className="space-y-2 select-none">
+      <div className="flex justify-between text-white/70 text-sm">
+        <span>{leftLabel}</span><span>{rightLabel}</span>
+      </div>
+      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
+        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `calc(${pct}% - 6px)` }}>
+          <div className="w-3 h-3 rounded-full bg-white shadow" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RelationsList({ relations }) {
+  if (!relations || relations.length === 0) {
+    return <p className="text-white/60 text-sm">Aucune relation connue.</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {relations.map((rel) => (
+        <li key={rel.id} className="flex items-center gap-2 text-sm">
+          {rel.other?.avatar_url ? (
+            <img src={rel.other.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-white/10 grid place-items-center text-[10px]">?</div>
+          )}
+          <span className="truncate">{rel.other?.name || rel.other_character_id}</span>
+          <span className="text-white/50">·</span>
+          <span className="text-white/70">{relationLabel(rel.type)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function relationLabel(type) {
+  const map = {
+    love_interest: "Love interest",
+    ami: "Ami",
+    ennemi: "Ennemi",
+    indifferent: "Indifférent",
+    nemesis: "Némésis",
+    inconnu: "Inconnu",
+  };
+  return map[type] || type;
 }
