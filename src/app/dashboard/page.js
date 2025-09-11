@@ -9,6 +9,40 @@ import useCharacterSubscriptions from '@/hooks/useCharacterSubscriptions'
 import { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 import NotificationsWidget from '@/components/NotificationsWidget'
 
+function timeAgo(ts) {
+  if (!ts) return 'inconnu';
+  const d = new Date(ts).getTime();
+  if (Number.isNaN(d)) return 'inconnu';
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s/60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h} h`;
+  const days = Math.floor(h/24);
+  return `${days} j`;
+}
+
+function stripHtml(html) {
+  if (!html) return '';
+  const tmp = typeof window !== 'undefined' ? document.createElement('div') : null;
+  if (!tmp) return html.replace(/<[^>]+>/g, '');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+function snippet10(html) {
+  const txt = stripHtml(html);
+  return txt.length <= 10 ? txt : txt.slice(0, 10) + '…';
+}
+
+function resolveAvatar(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  // si tu stockes uniquement le chemin dans le bucket "avatars"
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return `${base}/storage/v1/object/public/avatars/${url.replace(/^\/+/, '')}`;
+}
+
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
 export default function DashboardPage() {
@@ -24,6 +58,17 @@ export default function DashboardPage() {
   const [hasNewMessage, setHasNewMessage] = useState(false)
   const [hasNewRP, setHasNewRP] = useState(false)
   const [hasNewNotif, setHasNewNotif] = useState(false)
+
+// Derniers posts (QEEL-like)
+const [recentPosts, setRecentPosts] = useState([]); // [{id, content_html, author_id, created_at, author:{avatar_url,name}}]
+const [recentLoading, setRecentLoading] = useState(false);
+
+
+  // QEEL (Qui Est En Ligne)
+const [qeelOpen, setQeelOpen] = useState(false);
+const [qeelLoading, setQeelLoading] = useState(false);
+const [qeel, setQeel] = useState([]);
+
 
   // responsive geometry
   const [radius, setRadius] = useState(180)
@@ -48,6 +93,95 @@ export default function DashboardPage() {
    setProfile(p => ({ ...(p||{}), pseudo: v }));
    alert('Pseudo mis à jour ✓');
  }
+
+async function loadRecentPosts() {
+  setRecentLoading(true);
+
+  // 1) on récupère les 3 derniers posts (en prenant bien author_character_id)
+  const { data: posts, error: pErr } = await supabase
+    .from('rp_posts')
+    .select('id, content_html, author_character_id, created_at')
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  if (pErr || !posts?.length) {
+    if (pErr) console.error('rp_posts error:', pErr);
+    setRecentPosts([]);
+    setRecentLoading(false);
+    return;
+  }
+
+  // 2) jointure auteurs → characters.id
+  const charIds = [...new Set(posts.map(p => p.author_character_id).filter(Boolean))];
+
+  let authorsById = {};
+  if (charIds.length) {
+    const { data: chars, error: cErr } = await supabase
+      .from('characters')
+      .select('id, name, avatar_url')
+      .in('id', charIds);
+
+    if (cErr) console.error('characters error:', cErr);
+    if (chars) authorsById = Object.fromEntries(chars.map(a => [a.id, a]));
+  }
+
+  // 3) merge
+  const merged = posts.map(p => ({
+    ...p,
+    author: authorsById[p.author_character_id] || null
+  }));
+
+  setRecentPosts(merged);
+  setRecentLoading(false);
+}
+
+async function loadQeel() {
+  setQeelLoading(true);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id, pseudo, last_seen_at, avatar_url')
+    .order('last_seen_at', { ascending: false })
+    .limit(200);
+  if (!error) setQeel(data || []);
+  setQeelLoading(false);
+}
+
+// charge quand on ouvre la pop-up
+useEffect(() => {
+  if (qeelOpen) loadQeel();
+}, [qeelOpen]);
+
+useEffect(() => {
+  if (!profile?.user_id) return;
+
+  const ping = async () => {
+    await supabase
+      .from('profiles')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('user_id', profile.user_id);
+  };
+
+  // ping immédiat + toutes les 60s
+  ping();
+  const id = setInterval(ping, 60_000);
+
+  // quand l'onglet redevient visible
+  const onVis = () => { if (document.visibilityState === 'visible') ping(); };
+  document.addEventListener('visibilitychange', onVis);
+
+  // ping avant fermeture
+  const onUnload = () => { navigator.sendBeacon?.(
+    // fallback en no-op si pas d’URL Beacon côté Supabase ; on garde l’interval au pire
+    '', ''
+  ); };
+  window.addEventListener('beforeunload', onUnload);
+
+  return () => {
+    clearInterval(id);
+    document.removeEventListener('visibilitychange', onVis);
+    window.removeEventListener('beforeunload', onUnload);
+  };
+}, [profile?.user_id]);
 
   // hook de souscriptions temps réel
   useCharacterSubscriptions(character?.id, {
@@ -127,6 +261,26 @@ setPickerOpen(false)
     setPickerOpen(false)
   }
 
+useEffect(() => {
+  // premier chargement
+  loadRecentPosts();
+
+  // abonnement aux insert/update sur rp_posts
+  const channel = supabase
+    .channel('rp_posts_live')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'rp_posts' },
+      () => { loadRecentPosts(); }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
+
   // chargement initial
   useEffect(() => {
     const run = async () => {
@@ -180,7 +334,7 @@ setPickerOpen(false)
     <main className="fixed inset-0 overflow-hidden">
 
       {/* Nom + bouton changement perso */}
-      <div className="absolute top-6 left-8 z-40">
+      <div className="absolute top-6 left-8 z-40"> 
         <span className={`text-xl md:text-2xl font-semibold tracking-wide drop-shadow ${nameClass}`} style={{ textShadow: '0 1px 10px rgba(0,0,0,.5)' }}>
           {displayName}
         </span>
@@ -193,7 +347,87 @@ setPickerOpen(false)
             Changer
           </button>
         )}
+
       </div>
+
+{/* Pop-up QEEL */}
+{qeelOpen && (
+  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4">
+    <div className="w-[min(94vw,720px)] max-h-[80vh] overflow-hidden rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl text-white shadow-2xl">
+      <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <h3 className="text-lg font-semibold">Qui est en ligne ?</h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadQeel}
+            className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15"
+          >
+            Rafraîchir
+          </button>
+          <button
+            onClick={() => setQeelOpen(false)}
+            className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+
+      <div className="p-4 overflow-auto max-h-[calc(80vh-64px)]">
+        {qeelLoading ? (
+          <div className="text-white/80">Chargement…</div>
+        ) : (
+          (() => {
+            const onlineThresholdMs = 5 * 60 * 1000; // 5 min
+            const rows = (qeel || []).map(u => {
+              const last = u.last_seen_at ? new Date(u.last_seen_at).getTime() : 0;
+              const online = last && (Date.now() - last) <= onlineThresholdMs;
+              return { ...u, online };
+            });
+
+            // online d'abord, puis par last_seen_at desc
+            rows.sort((a, b) => {
+              if (a.online !== b.online) return a.online ? -1 : 1;
+              return (new Date(b.last_seen_at || 0)) - (new Date(a.last_seen_at || 0));
+            });
+
+            if (!rows.length) return <div className="text-white/60">Aucun membre trouvé.</div>;
+
+            return (
+              <ul className="divide-y divide-white/10">
+                {rows.map((u) => (
+                  <li key={u.user_id} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15 shrink-0">
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full grid place-items-center text-white/70">
+                            {(u.pseudo?.[0] || '?').toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="truncate">
+                        <div className="truncate">{u.pseudo || 'Sans pseudo'}</div>
+                        <div className="text-xs text-white/60">
+                          {u.online ? 'En ligne' : `Vu il y a ${timeAgo(u.last_seen_at)}`}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`ml-3 inline-flex h-2.5 w-2.5 rounded-full ${u.online ? 'bg-emerald-400' : 'bg-white/30'}`}
+                      title={u.online ? 'En ligne' : 'Hors ligne'}
+                    />
+                  </li>
+                ))}
+              </ul>
+            );
+          })()
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* BG */}
       <div className="absolute inset-0 -z-20">
@@ -303,7 +537,6 @@ setPickerOpen(false)
   </div>
 )}
 
-
             {/* Anneau d’actions avec notifications */}
             <div className="pointer-events-none absolute inset-0">
               {positioned.map(a => {
@@ -338,6 +571,58 @@ setPickerOpen(false)
           </div>
         </div>
       )}
+
+{/* Bas-droit : derniers posts + QEEL */}
+<div className="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-3">
+  {/* Derniers posts */}
+  <div className="w-64 rounded-xl border border-white/15 bg-black/20 backdrop-blur-md p-3 space-y-2">
+    <div className="text-white/70 text-sm mb-1">Derniers posts</div>
+    {recentPosts.length ? (
+      recentPosts.map(p => (
+        <div key={p.id} className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15">
+            {p.author?.avatar_url ? (
+              <img src={p.author.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="grid place-items-center w-full h-full text-white/60 text-xs">
+                {(p.author?.name?.[0] || '?').toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="text-white/90 text-xs font-medium truncate">
+              {p.author?.name || 'Anonyme'}
+            </div>
+            <div className="text-white/60 text-xs truncate">
+              {snippet10(p.content_html)}
+            </div>
+          </div>
+        </div>
+      ))
+    ) : (
+      <div className="text-white/50 text-xs">Aucun post récent</div>
+    )}
+  </div>
+
+  {/* Bouton QEEL */}
+  <button
+    onClick={() => setQeelOpen(true)}
+    className="rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-4 py-2 text-white hover:bg-white/20 shadow-lg"
+  >
+    QEEL
+  </button>
+</div>
+
+
+{/* Bouton QEEL (bas droite) */}
+<button
+  onClick={() => setQeelOpen(true)}
+  className="fixed bottom-6 right-6 z-50 rounded-full border border-white/25 bg-black/20 backdrop-blur-md px-4 py-2 text-white/90 hover:bg-white/25 shadow-lg"
+  title="Qui est en ligne ?"
+>
+  QEEL
+</button>
+
     </main>
   )
 }
