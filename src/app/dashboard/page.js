@@ -30,6 +30,25 @@ export default function DashboardPage() {
   const [iconSize, setIconSize] = useState(110)
   const [centerSize, setCenterSize] = useState(180)
 
+ // Pseudo joueur (profil)
+ const [pseudoInput, setPseudoInput] = useState('');
+ const [savingPseudo, setSavingPseudo] = useState(false);
+
+ async function savePseudo() {
+   if (!profile?.user_id) return;
+   const v = (pseudoInput || '').trim();
+   if (v.length < 2) { alert("Ton pseudo doit faire au moins 2 caractères."); return; }
+   setSavingPseudo(true);
+   const { error } = await supabase
+     .from('profiles')
+     .update({ pseudo: v })
+     .eq('user_id', profile.user_id);
+   setSavingPseudo(false);
+   if (error) { alert(error.message); return; }
+   setProfile(p => ({ ...(p||{}), pseudo: v }));
+   alert('Pseudo mis à jour ✓');
+ }
+
   // hook de souscriptions temps réel
   useCharacterSubscriptions(character?.id, {
     onNewMessage: () => setHasNewMessage(true),
@@ -218,37 +237,72 @@ setPickerOpen(false)
             </div>
 
             {/* Choix personnage */}
-            {pickerOpen && (
-              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4">
-                <div className="w-[min(94vw,720px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-5 text-white shadow-2xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Choisir le personnage actif</h3>
-                    <button onClick={()=>setPickerOpen(false)} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">Fermer</button>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {myChars.map(ch => (
-                      <button key={ch.id} onClick={()=>setActiveCharacter(ch.id)}
-                        className={`group relative rounded-xl p-3 border transition text-left
-                          ${ch.is_active ? 'bg-white/15 border-white/35' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
-                        title={ch.name}
-                      >
-                        <div className="w-20 h-20 mx-auto rounded-full overflow-hidden ring-2 ring-white/20 bg-white/5">
-                          {ch.avatar_url
-                            ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
-                            : <div className="grid place-items-center w-full h-full text-white/70 text-xl">
-                                {(ch.name?.[0]||'?').toUpperCase()}
-                              </div>}
-                        </div>
-                        <div className="mt-2 text-center text-sm truncate">{ch.name}</div>
-                        {ch.is_active && (
-                          <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/20 border border-emerald-300/40 text-emerald-100">Actif ✓</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+{pickerOpen && (
+  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4">
+    <div className="w-[min(94vw,720px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-5 text-white shadow-2xl">
+
+      {/* Pseudo joueur */}
+      <div className="mb-4 rounded-xl border border-white/15 bg-white/5 p-3">
+        <label className="text-sm text-white/90">Ton pseudo de joueur</label>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={pseudoInput}
+            onChange={(e)=>setPseudoInput(e.target.value)}
+            onKeyDown={(e)=>{ if (e.key==='Enter') savePseudo() }}
+            placeholder="Ex: BlackBeard"
+            className="flex-1 rounded-md bg-white/10 border border-white/20 px-3 py-2 outline-none placeholder-white/60"
+          />
+          <button
+            onClick={savePseudo}
+            disabled={savingPseudo}
+            className="rounded-md border border-white/20 bg-emerald-300 text-slate-900 px-3 py-2 hover:bg-emerald-200 disabled:opacity-60"
+          >
+            {savingPseudo ? '…' : 'Enregistrer'}
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] text-white/60">Met à jour le pseudo du compte.</p>
+      </div>
+
+      <div className="my-3 h-px bg-white/10" aria-hidden />
+
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">Choisir le personnage actif</h3>
+        <button
+          onClick={()=>setPickerOpen(false)}
+          className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15"
+        >
+          Fermer
+        </button>
+      </div>
+
+      {/* Grille des personnages */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {myChars.map(ch => (
+          <button key={ch.id} onClick={()=>setActiveCharacter(ch.id)}
+            className={`group relative rounded-xl p-3 border transition text-left
+              ${ch.is_active ? 'bg-white/15 border-white/35' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
+            title={ch.name}
+          >
+            <div className="w-20 h-20 mx-auto rounded-full overflow-hidden ring-2 ring-white/20 bg-white/5">
+              {ch.avatar_url
+                ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
+                : <div className="grid place-items-center w-full h-full text-white/70 text-xl">
+                    {(ch.name?.[0]||'?').toUpperCase()}
+                  </div>}
+            </div>
+            <div className="mt-2 text-center text-sm truncate">{ch.name}</div>
+            {ch.is_active && (
+              <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/20 border border-emerald-300/40 text-emerald-100">
+                Actif ✓
               </div>
             )}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+
 
             {/* Anneau d’actions avec notifications */}
             <div className="pointer-events-none absolute inset-0">
