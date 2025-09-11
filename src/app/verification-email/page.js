@@ -14,7 +14,7 @@ export default function VerificationEmailPage() {
           href="https://mvp-rpg-platform.vercel.app/auth"
           className="text-amber-300 underline hover:text-amber-200"
         >
-          https://mvp-rpg-platform.vercel.app/auth
+          https://piracy-seven.vercel.app/auth
         </a>
         <p className="mt-4 text-sm text-slate-400">
           Si tu ne vois pas le mail, vérifie aussi ton dossier de courriers indésirables.
