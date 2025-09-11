@@ -106,7 +106,7 @@ export default function AuthPage() {
         password: signupPassword,
         options: {
           data: { pseudo: p, username: p }, // compat + trigger
-          // emailRedirectTo: 'https://ton-domaine.xyz/auth/callback'
+          // emailRedirectTo: 'https://piracy-seven.vercel.app/dashboard'
         },
       });
       if (signErr) throw signErr;
