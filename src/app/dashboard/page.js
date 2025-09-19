@@ -208,20 +208,32 @@ useEffect(() => {
     })
   }, [actions, radius])
 
-  // responsive resize
   useEffect(() => {
-    const onResize = () => {
-      const w = window.innerWidth
-      const h = window.innerHeight
-      const base = Math.min(w, h)
-      setCenterSize(Math.round(clamp(base * 0.34, 180,180)))
-      setRadius(Math.round(clamp(base * 0.33, 140, 260)))
-      setIconSize(Math.round(clamp(base * 0.10, 90, 120)))
+  const onResize = () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const base = Math.min(w, h);
+
+    // Heuristiques : en "mobile haut" (~400x900), on écarte davantage,
+    // on réduit un peu l’avatar et on diminue un poil les icônes.
+    if (w <= 480 && h >= 800) {
+      // Avatar ~150–220px
+      setCenterSize(Math.round(clamp(base * 0.40, 150, 220)));
+      // Radius plus grand pour dégager le visage (≈ 0.46 * base)
+      setRadius(Math.round(clamp(base * 0.32, 180, 320)));
+      // Icônes un peu plus petites
+      setIconSize(Math.round(clamp(base * 0.14, 64, 92)));
+    } else {
+      // Comportement par défaut (desktop/tablette)
+      setCenterSize(Math.round(clamp(base * 0.34, 180, 380)));
+      setRadius(Math.round(clamp(base * 0.38, 160, 300)));
+      setIconSize(Math.round(clamp(base * 0.12, 80, 110)));
     }
-    onResize()
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
+  };
+  onResize();
+  window.addEventListener('resize', onResize);
+  return () => window.removeEventListener('resize', onResize);
+}, []);
 
   // changement du personnage actif
   const setActiveCharacter = async (charId) => {
@@ -458,17 +470,21 @@ useEffect(() => {
       ) : (
         <div className="absolute inset-0 grid place-items-center">
           <div className="relative">
+
             {/* Avatar central */}
-            <div className="group relative w-[min(60vw,340px)] h-[min(60vw,345px)] rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto">
-              {displayAvatar
-                ? <img src={displayAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                : <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-6xl">
-                    {(displayName||'?')[0]?.toUpperCase()||'?'}
-                  </div>
-              }
-              <div className="pointer-events-none absolute -inset-3 rounded-full blur-2xl bg-sky-300/20 opacity-0 group-hover:opacity-80 transition duration-300" />
-              <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-amber-300/45" />
-            </div>
+<div
+  className="group relative rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto"
+  style={{ width: centerSize, height: centerSize }}
+>
+  {displayAvatar
+    ? <img src={displayAvatar} alt="Avatar" className="w-full h-full object-cover" />
+    : <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-6xl">
+        {(displayName||'?')[0]?.toUpperCase()||'?'}
+      </div>
+  }
+  <div className="pointer-events-none absolute -inset-3 rounded-full blur-2xl bg-sky-300/20 opacity-0 group-hover:opacity-80 transition duration-300" />
+  <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-amber-300/45" />
+</div>
 
             {/* Choix personnage */}
 {pickerOpen && (
@@ -622,6 +638,8 @@ useEffect(() => {
 >
   QEEL
 </button>
+
+
 
     </main>
   )

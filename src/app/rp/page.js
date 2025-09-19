@@ -5,8 +5,31 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import ColorPalette from '@/components/ColorPalette'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { sanitize } from 'isomorphic-dompurify'
+import DOMPurify from 'isomorphic-dompurify'
 import { supabase } from '../../lib/supabaseClient'
+
+ // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
+ const IFRAME_HOST_OK = /(^|\.)((youtube\.com)|(youtube-nocookie\.com)|(youtu\.be)|(player\.vimeo\.com))$/i;
+ DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+   if (data.tagName === 'iframe') {
+     const src = node.getAttribute('src') || '';
+     let hostOk = false;
+     try {
+       const u = new URL(src, 'https://x');
+       hostOk = IFRAME_HOST_OK.test(u.hostname);
+     } catch {}
+     if (!hostOk) {
+       node.parentNode && node.parentNode.removeChild(node);
+       return;
+     }
+     node.setAttribute('loading', 'lazy');
+     node.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+     node.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+     node.setAttribute('frameborder', '0');
+     node.setAttribute('allowfullscreen', '');
+     // largeur responsive gérée en CSS; on n'impose pas width/height ici
+   }
+ });
 
 /* ------------ Réglages “verre flou” ------------ */
 const GLASS = {
@@ -21,7 +44,14 @@ const frost = v => ({ backgroundColor: v.bg, backdropFilter: `blur(${v.blur})`, 
 /* -------------------- BBCode -> HTML -------------------- */
 function bbcodeToHtml(src) {
   if (!src) return ''
-  let s = src.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // 3.a) Capturer les iframes « bruts » collés par l’utilisateur (YouTube/Vimeo only)
+  let s = src.replace(/<iframe[^>]*src=["']([^"']+)["'][^>]*>\s*<\/iframe>/gi, (_, url) => {
+    if (/youtube|youtu\.be|youtube-nocookie/i.test(url)) return `[youtube]${url}[/youtube]`;
+    if (/vimeo\.com/i.test(url)) return `[vimeo]${url}[/vimeo]`;
+    return ''; // on jette tout le reste par sécurité
+  });
+  // 3.b) Échapper le reste normalement
+  s = s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>')
   s = s.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>')
   s = s.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>')
@@ -39,12 +69,29 @@ function bbcodeToHtml(src) {
   s = s.replace(/\[ol\]([\s\S]*?)\[\/ol\]/gi, (_, body) => `<ol>${body.replace(/\[li\]([\s\S]*?)\[\/li\]/gi,'<li>$1</li>')}</ol>`)
   s = s.replace(/\[url=(https?:\/\/[^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>')
   s = s.replace(/\[img\](https?:\/\/[^\]]+)\[\/img\]/gi, '<img src="$1" alt="" />')
+  // 3.c) BBCode YouTube/Vimeo → iframe propre (nocookie pour YouTube)
+  s = s.replace(/\[youtube\]([\s\S]*?)\[\/youtube\]/gi, (_, raw) => {
+    const url = String(raw).trim();
+    // Essayer d’extraire l'ID si on nous donne une URL « watch », « youtu.be », etc.
+    const m = url.match(/(?:v=|\/embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{6,})/);
+    const id = m ? m[1] : null;
+    const src = id ? `https://www.youtube-nocookie.com/embed/${id}` : url;
+    return `<div class="video-embed"><iframe src="${src}" title="YouTube video player"></iframe></div>`;
+  });
+  s = s.replace(/\[vimeo\]([\s\S]*?)\[\/vimeo\]/gi, (_, raw) => {
+    const url = String(raw).trim();
+    // On accepte directement les URLs player.vimeo.com (sinon l’utilisateur colle l'URL de partage → à convertir côté UX si besoin)
+    return `<div class="video-embed"><iframe src="${url}" title="Vimeo player"></iframe></div>`;
+  });
   s = s.replace(/\r?\n/g, '<br/>')
   return s
 }
-const ALLOWED_TAGS = ['a','b','strong','i','em','u','s','blockquote','pre','code','span','div','ul','ol','li','br','hr','img','h2','p']
-const ALLOWED_ATTR = ['href','target','rel','style','src','alt','title','width','height']
-
+ const ALLOWED_TAGS = ['a','b','strong','i','em','u','s','blockquote','pre','code','span','div','ul','ol','li','br','hr','img','h2','p','iframe']
+ const ALLOWED_ATTR = [
+   'href','target','rel','style','src','alt','title','width','height',
+   // iframe
+   'allow','allowfullscreen','frameborder','referrerpolicy','loading'
+ ];
 /* --------------------------- Page RP --------------------------- */
 export default function RPPage() {
   const router = useRouter()
@@ -134,7 +181,11 @@ async function openPosterCard(authorId, authorCharacterId) {
   // PREVIEW
   const htmlPreview = useMemo(() => {
     const html = bbcodeToHtml(raw)
-    return sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
+ return DOMPurify.sanitize(html, {
+   ALLOWED_TAGS, ALLOWED_ATTR,
+   ADD_TAGS: ['iframe'],
+   ADD_ATTR: ['allow','allowfullscreen','frameborder','referrerpolicy','loading']
+ })
   }, [raw])
 
   // Source de vérité = me.active_character_id ; fallback = premier perso actif
@@ -237,7 +288,11 @@ async function openPosterCard(authorId, authorCharacterId) {
       return
     }
 
-    const processedHtml = sanitize(bbcodeToHtml(raw), { ALLOWED_TAGS, ALLOWED_ATTR })
+ const processedHtml = DOMPurify.sanitize(bbcodeToHtml(raw), {
+   ALLOWED_TAGS, ALLOWED_ATTR,
+   ADD_TAGS: ['iframe'],
+   ADD_ATTR: ['allow','allowfullscreen','frameborder','referrerpolicy','loading']
+ })
     const payload = {
       topic_id: activeTopic.id,
       author_id: session.user.id,
@@ -272,7 +327,11 @@ async function openPosterCard(authorId, authorCharacterId) {
   const cancelEditPost = () => { setEditingPostId(null); setEditingRaw('') }
   const saveEditPost = async () => {
     if (!editingPostId || !editingRaw.trim()) return
-    const html = sanitize(bbcodeToHtml(editingRaw), { ALLOWED_TAGS, ALLOWED_ATTR })
+ const processedHtml = DOMPurify.sanitize(bbcodeToHtml(raw), {
+   ALLOWED_TAGS, ALLOWED_ATTR,
+   ADD_TAGS: ['iframe'],
+   ADD_ATTR: ['allow','allowfullscreen','frameborder','referrerpolicy','loading']
+ })
     const { data, error } = await supabase
       .from('rp_posts')
       .update({ content_raw: editingRaw, content_html: html })
@@ -664,6 +723,21 @@ async function openPosterCard(authorId, authorCharacterId) {
     .rp-posts .rp-body blockquote:not([style*="color"]) { color: #0f172a !important; }
     .rp-posts .rp-body code:not([style*="color"]),
     .rp-posts .rp-body pre:not([style*="color"]) { color: #0f172a !important; }
+
+/* Iframes responsives & jolis */
+.rp-posts .video-embed {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+.rp-posts .video-embed iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;   /* Next.js moderne → OK */
+  border: 0;
+  border-radius: 12px;
+}
+
 
     /* Séparateurs / images */
     .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }

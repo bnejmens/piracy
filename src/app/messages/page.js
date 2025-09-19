@@ -442,47 +442,37 @@ async function openCharCard(characterId) {
         {/* COLONNE PRINCIPALE — Effet téléphone */}
         <section className="flex items-center justify-center">
           {/* Toolbar mobile/tablette (visible < md) */}
-          <div className="md:hidden mb-3 w-full flex items-center justify-between gap-2">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="rounded-xl bg-white/10 border border-white/20 text-white/90 px-3 py-2"
-            >
-              ☰ Menu
-            </button>
-            <div className="text-white/80 text-sm truncate">téléphone de <span className="text-amber-300">{activeCharName}</span></div>
-            <button
-              onClick={() => setNewConvOpen(true)}
-              className="rounded-xl bg-amber-300 text-slate-900 font-medium px-3 py-2"
-            >
-              + Nouveau
-            </button>
-          </div>
+          {/* En-tête mobile : titre + boutons */}
+<div className="md:hidden mb-3 w-full">
+  <div className="text-white text-xl font-semibold leading-tight text-center">
+    téléphone de <span className="text-amber-300">{activeCharName}</span>
+  </div>
+  <div className="mt-2 flex items-center gap-2">
+    <button
+      onClick={() => setSidebarOpen(true)}
+      className="flex-1 rounded-xl bg-white/10 border border-white/20 text-white/90 px-3 py-2"
+    >
+      ☰ Menu
+    </button>
+    <button
+      onClick={() => setNewConvOpen(true)}
+      className="flex-1 rounded-xl bg-amber-300 text-slate-900 font-medium px-3 py-2"
+    >
+      + Nouveau
+    </button>
+  </div>
+</div>
 
           {/* Téléphone */}
-          <div className="rounded-[24px] bg-black/40 backdrop-blur-md border border-white/20 overflow-hidden w-full sm:w-[min(92vw,560px)] h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] flex flex-col">
-            {/* En-tête conv */}
-            <div className="px-3 sm:px-4 py-3 border-b border-white/20 flex items-center gap-3">
-              <button
-                className="md:hidden rounded-lg bg-white/10 border border-white/20 px-3 py-2"
-                onClick={() => setSidebarOpen(true)}
-                title="Ouvrir le menu"
-              >
-                ☰
-              </button>
-              {myChars.length > 1 && (
-                <select
-                  value={currentSpeakerId || ''}
-                  onChange={e => setCurrentSpeakerId(e.target.value || null)}
-                  className="md:hidden rounded-md bg-white/20 border border-white/30 text-black/70 text-sm px-2 py-1"
-                  title="Parler en tant que…"
-                >
-                  {myChars.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
-                </select>
-              )}
-              <div className="text-white/90 font-medium truncate flex-1">
-                {activeConv ? (activeConv.title?.trim() || 'Sujet sans titre') : 'Sélectionnez une conversation'}
-              </div>
-            </div>
+<div className="rounded-[24px] bg-black/40 backdrop-blur-md border border-white/20 overflow-hidden w-full sm:w-[min(92vw,560px)] h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] flex flex-col">
+
+  {/* En-tête conv — visible uniquement ≥ md (on cache en mobile) */}
+  <div className="hidden md:flex px-4 py-3 border-b border-white/20 items-center gap-3">
+    <div className="text-white/90 font-medium truncate flex-1">
+      {activeConv ? (activeConv.title?.trim() || 'Sujet sans titre') : 'Sélectionnez une conversation'}
+    </div>
+  </div>
+
 
             {/* Corps : messages + barre écrire + clavier */}
             <div className="flex-1 min-h-0 flex flex-col">
