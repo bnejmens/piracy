@@ -45,11 +45,20 @@ const frost = v => ({ backgroundColor: v.bg, backdropFilter: `blur(${v.blur})`, 
 function bbcodeToHtml(src) {
   if (!src) return ''
   // 3.a) Capturer les iframes « bruts » collés par l’utilisateur (YouTube/Vimeo only)
-  let s = src.replace(/<iframe[^>]*src=["']([^"']+)["'][^>]*>\s*<\/iframe>/gi, (_, url) => {
-    if (/youtube|youtu\.be|youtube-nocookie/i.test(url)) return `[youtube]${url}[/youtube]`;
-    if (/vimeo\.com/i.test(url)) return `[vimeo]${url}[/vimeo]`;
-    return ''; // on jette tout le reste par sécurité
-  });
+  let s = src.replace(/<iframe([^>]*)src=["']([^"']+)["']([^>]*)>\s*<\/iframe>/gi,
+   (_, pre, url, post) => {
+     const attrs = `${pre} ${post}`.toLowerCase();
+     const w = (attrs.match(/\bwidth=["']?(\d{2,4})["']?/)||[])[1];
+     const h = (attrs.match(/\bheight=["']?(\d{2,4})["']?/)||[])[1];
+     const opts = [
+       w ? `width=${w}` : null,
+       h ? `height=${h}` : null
+     ].filter(Boolean).join(' ');
+     if (/youtube|youtu\.be|youtube-nocookie/i.test(url)) return `[youtube ${opts}]${url}[/youtube]`.trim();
+     if (/vimeo\.com/i.test(url)) return `[vimeo ${opts}]${url}[/vimeo]`.trim();
+     return '';
+   }
+ );
   // 3.b) Échapper le reste normalement
   s = s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>')
@@ -68,20 +77,54 @@ function bbcodeToHtml(src) {
   s = s.replace(/\[ul\]([\s\S]*?)\[\/ul\]/gi, (_, body) => `<ul>${body.replace(/\[li\]([\s\S]*?)\[\/li\]/gi,'<li>$1</li>')}</ul>`)
   s = s.replace(/\[ol\]([\s\S]*?)\[\/ol\]/gi, (_, body) => `<ol>${body.replace(/\[li\]([\s\S]*?)\[\/li\]/gi,'<li>$1</li>')}</ol>`)
   s = s.replace(/\[url=(https?:\/\/[^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>')
+ // Si un [youtube]/[vimeo] est entouré par [center], convertir en option align=center
+ s = s.replace(/\[center\]\s*(\[youtube[^\]]*\][\s\S]*?\[\/youtube\])\s*\[\/center\]/gi,
+   (_, inner) => inner.replace(/\[youtube(\s+[^\]]+)?\]/i, (m, opts='') => `[youtube align=center${opts||''}]`)
+ );
+ s = s.replace(/\[center\]\s*(\[vimeo[^\]]*\][\s\S]*?\[\/vimeo\])\s*\[\/center\]/gi,
+   (_, inner) => inner.replace(/\[vimeo(\s+[^\]]+)?\]/i, (m, opts='') => `[vimeo align=center${opts||''}]`)
+ );
   s = s.replace(/\[img\](https?:\/\/[^\]]+)\[\/img\]/gi, '<img src="$1" alt="" />')
   // 3.c) BBCode YouTube/Vimeo → iframe propre (nocookie pour YouTube)
-  s = s.replace(/\[youtube\]([\s\S]*?)\[\/youtube\]/gi, (_, raw) => {
+  s = s.replace(/\[youtube(?:\s+([^\]]+))?\]([\s\S]*?)\[\/youtube\]/gi, (_, opts, raw) => {
     const url = String(raw).trim();
     // Essayer d’extraire l'ID si on nous donne une URL « watch », « youtu.be », etc.
     const m = url.match(/(?:v=|\/embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{6,})/);
     const id = m ? m[1] : null;
     const src = id ? `https://www.youtube-nocookie.com/embed/${id}` : url;
-    return `<div class="video-embed"><iframe src="${src}" title="YouTube video player"></iframe></div>`;
+   // parse options: width=..., height=..., align=left|center|right
+   const o = Object.fromEntries(String(opts||'').split(/\s+/).map(kv => kv.split('=').map(x=>x?.trim())).filter(x=>x[0]));
+   const w = o.width && /^\d+$/.test(o.width) ? `${o.width}px` : null;
+   const h = o.height && /^\d+$/.test(o.height) ? `${o.height}px` : null;
+   const align = /^(left|center|right)$/.test(o.align||'') ? o.align : null;
+   // 🔧 Inline styles fort priorité (comme pour Vimeo)
+   const wrapStyles = [];
+   if (w) wrapStyles.push(`width:${w}`);
+   if (align === 'center') { wrapStyles.push('margin-left:auto','margin-right:auto'); }
+   if (align === 'right')  { wrapStyles.push('margin-left:auto'); }
+   const wrapStyle = wrapStyles.join(';');
+   const dataAlign = align ? ` data-align="${align}"` : '';
+   const dataFixed = (w || h) ? ` data-fixed="true"` : '';
+   const iframeStyle = [h ? `height:${h}` : null].filter(Boolean).join(';');
+   return `<div class="video-embed"${dataAlign}${dataFixed}${wrapStyle ? ` style="${wrapStyle}"` : ''}><iframe src="${src}" title="YouTube video player"${iframeStyle ? ` style="${iframeStyle}"` : ''}></iframe></div>`;
   });
-  s = s.replace(/\[vimeo\]([\s\S]*?)\[\/vimeo\]/gi, (_, raw) => {
+  s = s.replace(/\[vimeo(?:\s+([^\]]+))?\]([\s\S]*?)\[\/vimeo\]/gi, (_, opts, raw) => {
     const url = String(raw).trim();
     // On accepte directement les URLs player.vimeo.com (sinon l’utilisateur colle l'URL de partage → à convertir côté UX si besoin)
-    return `<div class="video-embed"><iframe src="${url}" title="Vimeo player"></iframe></div>`;
+    const o = Object.fromEntries(String(opts||'').split(/\s+/).map(kv => kv.split('=').map(x=>x?.trim())).filter(x=>x[0]));
+   const w = o.width && /^\d+$/.test(o.width) ? `${o.width}px` : null;
+   const h = o.height && /^\d+$/.test(o.height) ? `${o.height}px` : null;
+   const align = /^(left|center|right)$/.test(o.align||'') ? o.align : null;
+   // style inline prioritaire (évite les overrides de .prose)
+  const wrapStyles = [];
+  if (w) wrapStyles.push(`width:${w}`);
+  if (align === 'center') { wrapStyles.push('margin-left:auto','margin-right:auto'); }
+  if (align === 'right')  { wrapStyles.push('margin-left:auto'); }
+  const wrapStyle = wrapStyles.join(';');
+  const dataAlign = align ? ` data-align="${align}"` : '';
+   const dataFixed = (w || h) ? ` data-fixed="true"` : '';
+   const iframeStyle = [h ? `height:${h}` : null].filter(Boolean).join(';');
+   return `<div class="video-embed"${dataAlign}${dataFixed}${wrapStyle ? ` style="${wrapStyle}"` : ''}><iframe src="${url}" title="Vimeo player"${iframeStyle ? ` style="${iframeStyle}"` : ''}></iframe></div>`;
   });
   s = s.replace(/\r?\n/g, '<br/>')
   return s
@@ -327,14 +370,14 @@ async function openPosterCard(authorId, authorCharacterId) {
   const cancelEditPost = () => { setEditingPostId(null); setEditingRaw('') }
   const saveEditPost = async () => {
     if (!editingPostId || !editingRaw.trim()) return
- const processedHtml = DOMPurify.sanitize(bbcodeToHtml(raw), {
+ const processedHtml = DOMPurify.sanitize(bbcodeToHtml(editingRaw), {
    ALLOWED_TAGS, ALLOWED_ATTR,
    ADD_TAGS: ['iframe'],
    ADD_ATTR: ['allow','allowfullscreen','frameborder','referrerpolicy','loading']
  })
     const { data, error } = await supabase
       .from('rp_posts')
-      .update({ content_raw: editingRaw, content_html: html })
+      .update({ content_raw: editingRaw, content_html: processedHtml })
       .eq('id', editingPostId)
       .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
       .single()
@@ -539,6 +582,19 @@ async function openPosterCard(authorId, authorCharacterId) {
       onLink={() => insertAroundSelection('[url=https://]','[/url]','lien')}
       onImage={() => insertAroundSelection('[img]https://…[/img]','')}
       onPickColor={() => setShowPalette(v => !v)}
+onYouTube={() => {
+    const url = prompt('URL YouTube (watch / youtu.be / embed) ?')?.trim()
+    if (!url) return
+    const w = prompt('Largeur (px, optionnel)', '720')?.trim()
+    const h = prompt('Hauteur (px, optionnel)', '405')?.trim()
+    const al = (prompt('Alignement (left|center|right, optionnel)', 'center')||'').trim().toLowerCase()
+    const opts = [
+      w && /^\d+$/.test(w) ? `width=${w}` : null,
+      h && /^\d+$/.test(h) ? `height=${h}` : null,
+      /^(left|center|right)$/.test(al) ? `align=${al}` : null,
+    ].filter(Boolean).join(' ')
+    insertAroundSelection(`[youtube${opts ? ' ' + opts : ''}]`, `[/youtube]`, url)
+  }}
     />
   </div>
 
@@ -726,17 +782,23 @@ async function openPosterCard(authorId, authorCharacterId) {
 
 /* Iframes responsives & jolis */
 .rp-posts .video-embed {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-}
-.rp-posts .video-embed iframe {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;   /* Next.js moderne → OK */
-  border: 0;
-  border-radius: 12px;
-}
+   position: relative;
+   display: block;          /* wrapper bloc par défaut */
+   max-width: 100%;         /* jamais dépasser la colonne */
+   margin: 8px 0;
+ }
+.rp-posts .video-embed[data-align="center"] { margin-left: auto !important; margin-right: auto !important; }
+.rp-posts .video-embed[data-align="right"]  { margin-left: auto !important; }
+ .rp-posts .video-embed > iframe {
+   display: block;
+   border: 0;
+   border-radius: 12px;
+   width: 100%;             /* par défaut : remplir le wrapper */
+ }
+ /* Aspect ratio par défaut UNIQUEMENT si aucune hauteur forcée */
+ .rp-posts .video-embed:not([data-fixed="true"]) > iframe:not([style*="height"]) {
+   aspect-ratio: 16 / 9;
+ }
 
 
     /* Séparateurs / images */
@@ -761,6 +823,26 @@ async function openPosterCard(authorId, authorCharacterId) {
   /* Séparateurs / images */
   .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
   .rp-posts .rp-body img { background: transparent !important; }
+
+/* Iframes responsives & alignements — GLOBAL */
+  .rp-posts .video-embed {
+    position: relative;
+    display: block;
+    max-width: 100%;
+    margin: 8px 0;
+  }
+  .rp-posts .video-embed[data-align="center"] { margin-left: auto; margin-right: auto; }
+  .rp-posts .video-embed[data-align="right"]  { margin-left: auto; }
+  .rp-posts .video-embed > iframe {
+    display: block;
+    border: 0;
+    border-radius: 12px;
+    width: 100%;
+  }
+  /* Aspect ratio auto seulement si aucune hauteur n'est imposée */
+  .rp-posts .video-embed:not([data-fixed="true"]) > iframe:not([style*="height"]) {
+    aspect-ratio: 16 / 9;
+  }
 `}</style>
 
 
@@ -922,7 +1004,7 @@ function PostAsBadge({ characterId }) {
 function EditorToolbar({
   onBold, onItalic, onUnderline, onStrike,
   onQuote, onCode, onUL, onOL, onCenter, onRight, onH2, onHR, onSize,
-  onLink, onImage, onPickColor
+  onLink, onImage, onPickColor, onYouTube
 }) {
   const Btn = ({ children, onClick, title }) => (
     <button type="button" title={title} onClick={onClick}
@@ -952,6 +1034,7 @@ function EditorToolbar({
       <Btn onClick={onSize}>Size</Btn>
       <Btn onClick={onLink}>Lien</Btn>
       <Btn onClick={onImage}>Img</Btn>
+      <Btn onClick={onYouTube} title="Insérer une vidéo YouTube">YT</Btn>
       <Btn onClick={onPickColor}>Couleur</Btn>
     </div>
   )
