@@ -4,7 +4,8 @@ import { supabase } from "@/lib/supabaseClient"
 const BUCKET = "avatars"
 
 export async function GET(_req, { params }) {
-  const { slug } = params
+  const { slug } = await params
+
   if (!slug) return new Response("Missing slug", { status: 400 })
 
   // 1) BDD d'abord
