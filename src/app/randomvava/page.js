@@ -276,7 +276,7 @@ export default function RandomVavaPage() {
                 {loadingImages ? (
                   <div className="text-white/70">Chargement des images…</div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[560px] overflow-y-auto overscroll-contain content-start pr-2">
                     {images.map(img => {
                       const canDelete = !!session && (me?.is_admin || img.owner_id === session?.user?.id)
                       return (
