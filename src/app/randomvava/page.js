@@ -189,9 +189,8 @@ export default function RandomVavaPage() {
         </Link>
       </header>
 
-      <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden">
-        {/* Création/Upload */}
-        <section className="max-w-5xl mx-auto rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white mb-6">
+<div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden flex flex-col min-h-0">        {/* Création/Upload */}
+        <section className="max-w-5xl mx-auto rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white mb-6 shrink-0">
           <h2 className="text-lg font-semibold mb-3">Ajouter des portraits</h2>
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
             <div className="space-y-2">
