@@ -317,7 +317,13 @@ export default function EditCardPage(){
             <div className="text-white/80 text-sm mb-3">Aperçu</div>
             <div className={`relative aspect-[4/5] rounded-xl overflow-hidden ring-2 ${rarityDef.ring}`}
                  style={{ borderColor: currentCatColor }} title={title || 'Aperçu'}>
-              <Image src={srcForDisplay(imageUrl)} alt="" fill className="object-cover" />
+             <Image
+  src={srcForDisplay(viewing.image_url)}
+  alt=""
+  fill
+  unoptimized
+  className="object-cover"
+/>
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-white font-medium truncate">{title || 'Titre de la carte'}</div>
