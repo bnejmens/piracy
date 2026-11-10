@@ -315,7 +315,6 @@ export default function CreateCardPage(){
             <div className="text-white/80 text-sm mb-3">Aperçu</div>
             <div className={`relative aspect-[4/5] rounded-xl overflow-hidden ring-2 ${rarityDef.ring}`}
                  style={{ borderColor: currentCatColor }} title={title || 'Aperçu'}>
-              <Image
  <Image
   src={srcForDisplay(imageUrl)}
   alt=""
