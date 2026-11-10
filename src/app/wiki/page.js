@@ -603,7 +603,7 @@ const isCollected = (id) => collectedSet.has(id)
                   style={{ borderColor: currentCatColor }}
                   title={card.title}
                 >
-                  <Image src={srcForDisplay(card.image_url)} alt="" fill className={`object-cover ${(!collected && dimUncollected) ? 'opacity-40 grayscale' : ''}`} />
+                  <Image src={srcForDisplay(card.image_url)} alt="" fill unoptimized className={`object-cover ${(!collected && dimUncollected) ? 'opacity-40 grayscale' : ''}`} />
                   <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-white text-sm font-medium truncate">{card.title}</div>
@@ -656,7 +656,7 @@ const isCollected = (id) => collectedSet.has(id)
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative aspect-[4/5] rounded-xl overflow-hidden ring-2" style={{ borderColor: currentCatColor }}>
-                <Image src={srcForDisplay(viewing.image_url)} alt="" fill className="object-cover" />
+               <Image src={srcForDisplay(viewing.image_url)} alt="" fill unoptimized className="object-cover" />
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-2"><span className="text-white/70 text-sm">Catégorie :</span><span className="text-white/90 text-sm">{viewing.category || '—'}</span></div>
