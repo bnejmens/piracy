@@ -316,7 +316,8 @@ export default function CreateCardPage(){
             <div className={`relative aspect-[4/5] rounded-xl overflow-hidden ring-2 ${rarityDef.ring}`}
                  style={{ borderColor: currentCatColor }} title={title || 'Aperçu'}>
               <Image
-  src={srcForDisplay(viewing.image_url)}
+ <Image
+  src={srcForDisplay(imageUrl)}
   alt=""
   fill
   unoptimized
