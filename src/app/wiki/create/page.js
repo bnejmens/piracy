@@ -273,32 +273,6 @@ async function reloadTree() {
           </section>
         </div>
       </div>
-
-      {/* Modale "nouvelle catégorie/sous-cat/sous-sous-cat" → crée une CARTE stub dans cards */}
-      {newLevel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={()=>{setNewLevel(null); setNewLabel('')}} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl bg-slate-900 border border-white/15 p-5">
-            <h3 className="text-white text-lg font-semibold mb-4">
-              {newLevel==='l1'?'Nouvelle catégorie':newLevel==='l2'?'Nouvelle sous-catégorie':'Nouvelle sous-sous-catégorie'}
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm text-white/80 mb-1">Libellé</div>
-                <input className="w-full rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white outline-none"
-                       value={newLabel} onChange={e=>setNewLabel(e.target.value)} placeholder="ex: Bestiaire des Ombres" />
-                <small className="text-white/60">Slug prévisionnel : {slugify(newLabel)}</small>
-              </div>
-            </div>
-            <div className="mt-5 flex gap-3 justify-end">
-              <button onClick={()=>{setNewLevel(null); setNewLabel('')}}
-                      className="rounded-lg bg-white/10 hover:bg-white/15 px-4 py-2 border border-white/20 text-white">Annuler</button>
-              <button onClick={()=>createStubCard(newLevel)} disabled={!newLabel.trim()}
-                      className="rounded-lg bg-emerald-500/90 hover:bg-emerald-500 px-4 py-2 text-white disabled:opacity-50">Créer</button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }
