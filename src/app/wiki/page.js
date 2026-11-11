@@ -563,7 +563,8 @@ setTree(seedTree())
         </section>
 
         {/* ---- Grille ---- */}
-        <section className="rounded-2xl border border-black/30 bg-white/10 backdrop-blur-xxs overflow-hidden flex flex-col">
+        
+<section className="rounded-2xl border border-black/30 bg-white/10 backdrop-blur-xxs overflow-hidden flex flex-col min-h-0">
           <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <div className="text-white/90 font-medium">
               {l1Node?.label || 'Catégorie'} — {l2List.find(x=>x.id===l2)?.label || 'Sous-catégorie'}
@@ -573,33 +574,72 @@ setTree(seedTree())
             </div>
           </header>
 
-          <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map(card => {
-              const r = RARITY[card.rarity] || RARITY.commun
-              const collected = isCollected(card.id)
-              return (
-                <button
-                  key={card.id}
-                  onClick={() => setViewing(card)}
-                  className={`group relative aspect-[4/5] rounded-xl overflow-hidden ring-2 ${r.ring}`}
-                  style={{ borderColor: currentCatColor }}
-                  title={card.title}
-                >
-                  <Image src={srcForDisplay(card.image_url)} alt="" fill unoptimized className={`object-cover ${(!collected && dimUncollected) ? 'opacity-40 grayscale' : ''}`} />
-                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-white text-sm font-medium truncate">{card.title}</div>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.text} ${r.ring}`}>{r.label}</span>
-                    </div>
-                  </div>
-                  {!collected && (
-                    <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white">
-                      Non collectée
-                    </div>
-                  )}
-                </button>
-              )
-            })}
+          
+<div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-y-auto content-start">
+           
+{filtered.map(card => {
+  const r = RARITY[card.rarity] || RARITY.commun
+  const collected = isCollected(card.id)
+
+  return (
+    <div
+      key={card.id}
+      className="relative aspect-[4/5]"
+    >
+      {/* Carte : clic pour ouvrir */}
+      <button
+        type="button"
+        onClick={() => setViewing(card)}
+        className={`group absolute inset-0 w-full h-full rounded-xl overflow-hidden ring-2 ${r.ring}`}
+        style={{ borderColor: currentCatColor }}
+        title={card.title}
+      >
+        <Image
+          src={srcForDisplay(card.image_url)}
+          alt=""
+          fill
+          unoptimized
+          className={`object-cover ${
+            (!collected && dimUncollected)
+              ? 'opacity-40 grayscale'
+              : ''
+          }`}
+        />
+
+        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-white text-sm font-medium truncate">
+              {card.title}
+            </div>
+
+            <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.text} ${r.ring}`}>
+              {r.label}
+            </span>
+          </div>
+        </div>
+      </button>
+
+      {/* Collecter / décollecter sans ouvrir */}
+      <button
+        type="button"
+        disabled={!session}
+        onClick={(e) => {
+          e.stopPropagation()
+          toggleCollect(card)
+        }}
+        title={collected ? 'Retirer de ma collection' : 'Ajouter à ma collection'}
+        aria-label={collected ? 'Retirer de ma collection' : 'Ajouter à ma collection'}
+        className={`absolute top-2 right-2 z-10 text-[10px] px-2 py-1 rounded-full border transition-colors ${
+          collected
+            ? 'bg-emerald-600/80 border-emerald-300/50 text-white hover:bg-emerald-500'
+            : 'bg-slate-900/80 border-white/30 text-white hover:bg-slate-700'
+        } disabled:cursor-not-allowed`}
+      >
+        {collected ? '✓ Collectée' : 'Non collectée'}
+      </button>
+    </div>
+  )
+})}
             {!filtered.length && <div className="text-white/60 text-sm">Aucune carte dans cette sélection.</div>}
           </div>
 
