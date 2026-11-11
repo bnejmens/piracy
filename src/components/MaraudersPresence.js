@@ -7,8 +7,9 @@ import { supabase } from '@/lib/supabaseClient'
 const ONLINE_WINDOW_MS = 5 * 60 * 1000
 const REFRESH_MS = 30000
 const MAX_MARKERS = 18
-const DECOY_COUNT = 5
+const DECOY_COUNT = 6
 
+// 36 personnages fictifs
 const DECOY_NAMES = [
   'Kaur Nutti',
   'Fronk Leboeuf',
@@ -36,18 +37,175 @@ const DECOY_NAMES = [
   'Archibald Gerble',
   'Twiggly Sprinkly',
   'Luzie Sunbutt',
+  'Barnaby Thistlewick',
+  'Mildred Bumblecroft',
+  'Oswald Puddlemore',
+  'Euphemia Wobblethorn',
+  'Percival Crumblebottom',
+  'Agatha Fizzlesworth',
+  'Wilfred Tumbleby',
+  'Cordelia Nettlewick',
+  'Basil Widdershins',
+  'Prudence Featherbottom',
 ]
 
-// Tirage aléatoire de cinq leurres sans doublons.
-function pickDecoys() {
-  const available = [...DECOY_NAMES]
+// 120 activités : magie, quotidien et interactions sociales
+const ACTIVITIES = [
+  // Poudlard
+  'Se rend à son cours de potions en traînant les pieds.',
+  'Dévore une Chocogrenouille en espérant trouver une carte rare.',
+  'Se contemple amoureusement dans un miroir.',
+  'Cherche désespérément la salle sur demande.',
+  "S'endort sur un livre d'histoire de la magie.",
+  'Essaie de convaincre un escalier de changer de direction.',
+  'Fait semblant de réviser à la bibliothèque.',
+  'Se précipite vers la Grande Salle pour le dîner.',
+  "Rédige une lettre qu'il n'osera jamais envoyer.",
+  'Se cache derrière une tapisserie pour éviter un professeur.',
+  'Tente un sortilège informulé avec un résultat douteux.',
+  'Essaie de faire disparaître une tache de jus de citrouille.',
+  'Cherche sa baguette alors qu’elle est dans sa poche.',
+  "Prépare une potion dont la couleur n'inspire aucune confiance.",
+  'Se dispute avec un portrait particulièrement bavard.',
+  'Essaie de transfigurer une tasse en souris.',
+  'Soupçonne son chaudron de lui en vouloir personnellement.',
+  'S’entraîne au Wingardium Leviosa avec beaucoup trop de conviction.',
+  'Fait exploser accidentellement une plume.',
+  'Tente de réparer ses lunettes d’un coup de baguette.',
+  'Suit discrètement un chat dans les couloirs.',
+  'Cherche un passage secret derrière une statue.',
+  'Prétend ne pas entendre Rusard approcher.',
+  'Tente d’apprivoiser un Niffleur attiré par ses poches.',
+  'Observe le terrain de Quidditch en rêvant de gloire.',
+  'Écoute une conversation qui ne le regarde absolument pas.',
+  'Se demande si Peeves prépare encore un mauvais coup.',
+  'Essaie de rejoindre Pré-au-Lard sans se faire remarquer.',
+  "S'arrête pour observer les mouvements du lac Noir.",
+  'Élabore un plan très compliqué pour éviter ses devoirs.',
 
-  for (let i = available.length - 1; i > 0; i--) {
+  // Habitudes ordinaires
+  'Se brosse les dents avec application.',
+  'Prend une douche beaucoup trop longue.',
+  'Se coiffe devant un miroir.',
+  'Essaie de dompter une mèche rebelle.',
+  'Se coupe les ongles.',
+  'Cherche une chaussette disparue.',
+  'Se gratte le dos avec difficulté.',
+  'Se parfume avec un peu trop d’enthousiasme.',
+  'Se regarde sous tous les angles dans un miroir.',
+  'Essaie de retirer quelque chose coincé entre ses dents.',
+  'Écoute de la musique en hochant la tête.',
+  'Fredonne une chanson dont il a oublié les paroles.',
+  'Lit tranquillement un roman.',
+  'Dessine dans un carnet.',
+  'Observe les nuages sans penser à rien.',
+  'Fait une petite sieste.',
+  'Siffle un air entraînant.',
+  'Écrit quelques lignes dans son journal intime.',
+  'Joue avec une pièce entre ses doigts.',
+  'Regarde la pluie tomber par la fenêtre.',
+  'Grignote quelque chose en cachette.',
+  'Se prépare une tasse de thé.',
+  'Mange une pomme à pleines dents.',
+  'Trempe un biscuit dans sa boisson.',
+  'Cherche quelque chose à manger.',
+  'Se brûle la langue avec une boisson chaude.',
+  'Savoure un gâteau en fermant les yeux.',
+  'Ramasse discrètement une miette sur ses vêtements.',
+  'Regrette d’avoir mangé autant.',
+  'Essaie de résister à une deuxième part de dessert.',
+  'Parle tout seul sans s’en rendre compte.',
+  'Cherche quelque chose qu’il tient déjà dans sa main.',
+  'Se demande pourquoi il est entré dans cette pièce.',
+  'Éternue trois fois de suite.',
+  'Répète une conversation imaginaire.',
+  'Regarde autour de lui pour vérifier que personne ne l’observe.',
+  'Essaie de se souvenir d’un prénom.',
+  'Fait semblant de comprendre une conversation.',
+  'Raconte une blague à laquelle personne ne rit.',
+  'Se prend les pieds dans son propre pantalon.',
+
+  // Romance et sentiments
+  'Échange des regards insistants avec quelqu’un.',
+  'Tente une approche romantique particulièrement maladroite.',
+  'Embrasse quelqu’un à l’abri des regards.',
+  'Attend désespérément que son béguin lui adresse la parole.',
+  'Répète une déclaration d’amour devant un miroir.',
+  'Rougit après avoir reçu un compliment.',
+  'Se fait gentiment repousser après une tentative de séduction.',
+  'Écrit un petit mot doux à quelqu’un.',
+  'Observe discrètement une personne qui lui plaît.',
+  'Tente de rendre quelqu’un jaloux.',
+
+  // Amitié
+  'Raconte sa journée à un ami.',
+  'Éclate de rire au milieu d’une conversation.',
+  'Console quelqu’un qui semble avoir du chagrin.',
+  'Partage quelques friandises avec un camarade.',
+  'Fait une accolade un peu trop enthousiaste.',
+  'Écoute les problèmes amoureux de quelqu’un.',
+  'Essaie de convaincre un ami de l’accompagner quelque part.',
+  'Organise une petite fête en secret.',
+  'Se lance dans une discussion interminable.',
+  'Retrouve une vieille connaissance.',
+
+  // Disputes
+  'Se dispute pour une histoire sans importance.',
+  'Lance un regard noir à quelqu’un.',
+  'Refuse obstinément de reconnaître ses torts.',
+  'Boude dans un coin en attendant des excuses.',
+  'Accuse quelqu’un d’avoir volé ses affaires.',
+  'Se moque gentiment de la nouvelle coiffure d’un camarade.',
+  'Se retrouve au milieu d’une dispute qui ne le concerne pas.',
+  'Essaie de calmer deux personnes sur le point de se battre.',
+  'Prépare une réplique cinglante avec beaucoup trop de retard.',
+  'Tourne les talons au beau milieu d’une conversation.',
+
+  // Ragots et manigances
+  'Échange des ragots avec un camarade.',
+  'Chuchote quelque chose à l’oreille de quelqu’un.',
+  'Espionne discrètement une conversation.',
+  'Prétend ne pas avoir entendu un secret.',
+  'Répand une rumeur absolument invérifiable.',
+  'Essaie de deviner qui sort avec qui.',
+  'Se cache pour surprendre quelqu’un.',
+  'Prépare une mauvaise blague avec un complice.',
+  'Fait semblant de ne pas reconnaître quelqu’un.',
+  'Écoute derrière une porte.',
+
+  // Situations décalées
+  'Tente de séduire quelqu’un qui ne remarque même pas sa présence.',
+  'Se retrouve involontairement à tenir la chandelle.',
+  'Ment effrontément sur ses exploits au Quidditch.',
+  'Essaie de récupérer une lettre envoyée à la mauvaise personne.',
+  'Fait semblant de rire à une blague incompréhensible.',
+  'S’invente une vie passionnante pour impressionner quelqu’un.',
+  'Se fait surprendre en train de parler dans le dos d’un professeur.',
+  'S’entraîne à avoir l’air mystérieux.',
+  'Fuit une conversation devenue beaucoup trop personnelle.',
+  'Débat très sérieusement de la plus belle personne de Poudlard.',
+]
+
+function random(min, max) {
+  return min + Math.random() * (max - min)
+}
+
+function randomPoint() {
+  return {
+    x: random(8, 92),
+    y: random(13, 87),
+  }
+}
+
+function pickDecoys() {
+  const shuffled = [...DECOY_NAMES]
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[available[i], available[j]] = [available[j], available[i]]
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
 
-  return available.slice(0, DECOY_COUNT).map((name, index) => ({
+  return shuffled.slice(0, DECOY_COUNT).map((name, index) => ({
     user_id: `decoy-${index}`,
     name,
     decoy: true,
@@ -55,14 +213,21 @@ function pickDecoys() {
   }))
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value))
+function pickActivity(previous) {
+  if (ACTIVITIES.length === 1) return ACTIVITIES[0]
+
+  let next
+
+  do {
+    next = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)]
+  } while (next === previous)
+
+  return next
 }
 
-// Empreinte stylisée : semelle, talon et orteils.
-function ShoePrint({ side }) {
+function ShoePrint() {
   return (
-    <g className={`marauder-print marauder-print-${side}`}>
+    <g className="marauder-print">
       <path d="M-6.4 -7.3 C-9 -3.7 -8.9 1 -7.4 4.1 C-5.7 7.9 -5 12.4 -1 13.2 C3.7 13.9 6.7 10.7 7 6.6 C7.3 2.9 8.8 -1.8 6.1 -6.7 C3.9 -10.6 -3.5 -11.7 -6.4 -7.3 Z" />
       <ellipse cx="-0.1" cy="12" rx="4.9" ry="3.4" />
       <circle cx="-6.1" cy="-13.3" r="2.7" />
@@ -83,122 +248,203 @@ function Footprints({ walking }) {
       aria-hidden="true"
     >
       <g transform="translate(23 41) rotate(-18)">
-        <ShoePrint side="left" />
+        <ShoePrint />
       </g>
-
       <g transform="translate(46 24) rotate(15)">
-        <ShoePrint side="right" />
+        <ShoePrint />
       </g>
     </svg>
   )
 }
 
-// Les personnages peuvent se déplacer sur tout l'écran.
-function randomPoint() {
-  return {
-    x: 8 + Math.random() * 84,
-    y: 13 + Math.random() * 72,
-  }
-}
-
 function FootprintWalker({ player }) {
-  const [pos, setPos] = useState(randomPoint)
-  const posRef = useRef(pos)
+  const walkerRef = useRef(null)
+  const pausedRef = useRef(false)
+  const positionRef = useRef(null)
+  const previousActivityRef = useRef(null)
+
+  const [hovered, setHovered] = useState(false)
+  const [activity, setActivity] = useState('')
   const [heading, setHeading] = useState(0)
-  const [moving, setMoving] = useState(false)
-  const [duration, setDuration] = useState(24000)
+  const [walking, setWalking] = useState(false)
 
+  // Animation calculée image par image.
+  // Le survol fige réellement la position.
   useEffect(() => {
-    let cancelled = false
-    let timer
+    let frame
+    let lastTime = 0
 
-    function walk() {
-      if (cancelled) return
+    const start = randomPoint()
+    positionRef.current = start
 
-      const from = posRef.current
-      let to = randomPoint()
-
-      // Favorise les trajets longs.
-      for (
-        let i = 0;
-        i < 24 && Math.hypot(to.x - from.x, to.y - from.y) < 28;
-        i++
-      ) {
-        to = randomPoint()
-      }
-
-      const dx = to.x - from.x
-      const dy = to.y - from.y
-      const distance = Math.hypot(dx, dy)
-
-      // Déplacement lent entre 18 et 42 secondes.
-      const travelTime = clamp(
-        Math.round(distance * 510),
-        18000,
-        42000
-      )
-
-      setHeading(Math.atan2(dy, dx) * 180 / Math.PI + 90)
-      setDuration(travelTime)
-      setMoving(true)
-
-      posRef.current = to
-      setPos(to)
-
-      timer = window.setTimeout(() => {
-        if (cancelled) return
-
-        setMoving(false)
-
-        // Pause entre deux promenades.
-        timer = window.setTimeout(
-          walk,
-          1400 + Math.random() * 4400
-        )
-      }, travelTime)
+    if (walkerRef.current) {
+      walkerRef.current.style.left = `${start.x}%`
+      walkerRef.current.style.top = `${start.y}%`
     }
 
-    timer = window.setTimeout(
-      walk,
-      1200 + Math.random() * 1300
-    )
+    let destination = null
+    let travelDuration = 24000
+    let elapsed = 0
+
+    // Petite pause avant le premier déplacement.
+    let pauseRemaining = random(800, 2200)
+
+    function chooseDestination() {
+      const current = positionRef.current
+      if (!current) return
+
+      let next = randomPoint()
+
+      // On recherche de préférence une destination éloignée.
+      for (
+        let i = 0;
+        i < 30 &&
+        Math.hypot(next.x - current.x, next.y - current.y) < 32;
+        i++
+      ) {
+        next = randomPoint()
+      }
+
+      destination = {
+        from: { ...current },
+        to: next,
+      }
+
+      elapsed = 0
+
+      const distance = Math.hypot(
+        next.x - current.x,
+        next.y - current.y
+      )
+
+      travelDuration = Math.max(
+        18000,
+        Math.min(42000, distance * 510)
+      )
+
+      setHeading(
+        Math.atan2(
+          next.y - current.y,
+          next.x - current.x
+        ) * 180 / Math.PI + 90
+      )
+
+      setWalking(true)
+    }
+
+    function animate(time) {
+      if (!lastTime) lastTime = time
+
+      // Limite les grands sauts après un onglet inactif.
+      const delta = Math.min(time - lastTime, 60)
+      lastTime = time
+
+      if (!pausedRef.current) {
+        if (!destination) {
+          pauseRemaining -= delta
+
+          if (pauseRemaining <= 0) {
+            chooseDestination()
+          }
+        } else {
+          elapsed = Math.min(
+            elapsed + delta,
+            travelDuration
+          )
+
+          const progress = elapsed / travelDuration
+
+          // Mouvement linéaire et continu.
+          const x =
+            destination.from.x +
+            (destination.to.x - destination.from.x) *
+              progress
+
+          const y =
+            destination.from.y +
+            (destination.to.y - destination.from.y) *
+              progress
+
+          positionRef.current = { x, y }
+
+          if (walkerRef.current) {
+            walkerRef.current.style.left = `${x}%`
+            walkerRef.current.style.top = `${y}%`
+          }
+
+          if (progress >= 1) {
+            destination = null
+            pauseRemaining = random(1800, 6200)
+            setWalking(false)
+          }
+        }
+      }
+
+      frame = window.requestAnimationFrame(animate)
+    }
+
+    frame = window.requestAnimationFrame(animate)
 
     return () => {
-      cancelled = true
-      window.clearTimeout(timer)
+      window.cancelAnimationFrame(frame)
     }
   }, [player.user_id])
 
+  function stopForInspection() {
+    if (pausedRef.current) return
+
+    pausedRef.current = true
+
+    const nextActivity = pickActivity(
+      previousActivityRef.current
+    )
+
+    previousActivityRef.current = nextActivity
+
+    setActivity(nextActivity)
+    setHovered(true)
+  }
+
+  function resumeWalking() {
+    pausedRef.current = false
+    setHovered(false)
+  }
+
   return (
     <div
+      ref={walkerRef}
       className={[
         'marauder-walker',
         player.decoy ? 'marauder-decoy' : '',
         player.leaving ? 'marauder-leaving' : '',
+        hovered ? 'marauder-inspecting' : '',
       ].join(' ')}
-      style={{
-        left: `${pos.x}%`,
-        top: `${pos.y}%`,
-        transitionDuration: `${duration}ms, ${duration}ms, 1200ms`,
-      }}
-      title={
-        player.decoy
-          ? player.name
-          : `${player.name} — en ligne`
-      }
     >
       <div
         className="marauder-steps"
-        style={{
-          transform: `rotate(${heading}deg)`,
-        }}
+        style={{ transform: `rotate(${heading}deg)` }}
+        onMouseEnter={stopForInspection}
+        onMouseLeave={resumeWalking}
+        onFocus={stopForInspection}
+        onBlur={resumeWalking}
+        tabIndex={0}
+        role="button"
+        aria-label={`${player.name}, consulter son activité`}
       >
-        <Footprints walking={moving} />
+        <Footprints walking={walking && !hovered} />
       </div>
 
-      <span className="marauder-name">
-        {player.name}
-      </span>
+      <div className="marauder-label">
+        <span className="marauder-name">
+          {player.name}
+        </span>
+
+        {hovered && (
+          <span className="marauder-activity">
+            {activity}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -211,7 +457,29 @@ export default function MaraudersPresence() {
   const layerRef = useRef(null)
   const [maskImage, setMaskImage] = useState(null)
 
-  // Masquage des empreintes derrière les boutons et l'avatar.
+  // Les noms sont retirés au hasard à chaque chargement.
+  useEffect(() => {
+    setDecoys(pickDecoys())
+  }, [])
+
+  // Préférences d'accessibilité.
+  useEffect(() => {
+    const mq = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    )
+
+    const update = () => setReducedMotion(mq.matches)
+
+    update()
+    mq.addEventListener?.('change', update)
+
+    return () => {
+      mq.removeEventListener?.('change', update)
+    }
+  }, [])
+
+  // Masque les empreintes et les noms lorsqu'ils passent
+  // derrière l'avatar central et les boutons de navigation.
   useEffect(() => {
     let frame = 0
     let observer
@@ -234,8 +502,12 @@ export default function MaraudersPresence() {
       ])
 
       const buttons = Array.from(
-        document.querySelectorAll('main button[aria-label]')
-      ).filter(el => navNames.has(el.getAttribute('aria-label')))
+        document.querySelectorAll(
+          'main button[aria-label]'
+        )
+      ).filter(el =>
+        navNames.has(el.getAttribute('aria-label'))
+      )
 
       const avatar = document.querySelector(
         'main .group.relative.rounded-full.overflow-hidden'
@@ -251,14 +523,17 @@ export default function MaraudersPresence() {
         return
       }
 
-      const holes = targets.map(el => {
+      const circles = targets.map(el => {
         const rect = el.getBoundingClientRect()
 
-        const cx = rect.left - region.left + rect.width / 2
-        const cy = rect.top - region.top + rect.height / 2
+        const cx =
+          rect.left - region.left + rect.width / 2
+
+        const cy =
+          rect.top - region.top + rect.height / 2
 
         const radius =
-          Math.max(rect.width, rect.height) / 2 + 12
+          Math.max(rect.width, rect.height) / 2 + 16
 
         return `
           <circle
@@ -284,10 +559,9 @@ export default function MaraudersPresence() {
                 height="100%"
                 fill="white"
               />
-              ${holes}
+              ${circles}
             </mask>
           </defs>
-
           <rect
             width="100%"
             height="100%"
@@ -311,7 +585,6 @@ export default function MaraudersPresence() {
 
     window.addEventListener('resize', scheduleMask)
 
-    // Recalcul après chargement du dashboard.
     const main = document.querySelector('main')
 
     if (main) {
@@ -334,30 +607,7 @@ export default function MaraudersPresence() {
     }
   }, [])
 
-  // Choix des cinq leurres au chargement.
-  useEffect(() => {
-    setDecoys(pickDecoys())
-  }, [])
-
-  // Respect des préférences d'animation de Windows.
-  useEffect(() => {
-    const mq = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    )
-
-    const onMotion = () => {
-      setReducedMotion(mq.matches)
-    }
-
-    onMotion()
-    mq.addEventListener?.('change', onMotion)
-
-    return () => {
-      mq.removeEventListener?.('change', onMotion)
-    }
-  }, [])
-
-  // Récupération des joueurs connectés.
+  // Présence des joueurs réels via Supabase.
   useEffect(() => {
     let active = true
     let requestSerial = 0
@@ -374,7 +624,7 @@ export default function MaraudersPresence() {
 
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('user_id, last_seen_at')
+        .select('user_id, last_seen_at, active_character_id')
         .gte('last_seen_at', since)
         .order('last_seen_at', { ascending: false })
         .limit(200)
@@ -386,25 +636,27 @@ export default function MaraudersPresence() {
             error.message
           )
         }
-
         return
       }
 
-      const ids = (profiles || [])
-        .map(p => p.user_id)
-        .filter(Boolean)
+      const characterIds = [
+        ...new Set(
+          (profiles || [])
+            .map(p => p.active_character_id)
+            .filter(Boolean)
+        ),
+      ]
 
-      const names = {}
+      const charactersById = {}
 
-      if (ids.length) {
+      if (characterIds.length) {
         const {
           data: characters,
           error: charsError,
         } = await supabase
           .from('characters')
-          .select('id, user_id, name, is_active')
-          .in('user_id', ids)
-          .eq('is_active', true)
+          .select('id, user_id, name')
+          .in('id', characterIds)
 
         if (charsError) {
           console.warn(
@@ -414,22 +666,30 @@ export default function MaraudersPresence() {
         }
 
         for (const ch of characters || []) {
-          if (!names[ch.user_id]) {
-            names[ch.user_id] = ch.name
-          }
+          charactersById[ch.id] = ch
         }
       }
 
       if (!active || serial !== requestSerial) return
 
-      const incoming = ids
-        .filter(id => names[id])
+      const incoming = (profiles || [])
+        .map(profile => {
+          const ch =
+            charactersById[profile.active_character_id]
+
+          if (!ch || ch.user_id !== profile.user_id) {
+            return null
+          }
+
+          return {
+            user_id: profile.user_id,
+            name: ch.name,
+            decoy: false,
+            leaving: false,
+          }
+        })
+        .filter(Boolean)
         .slice(0, MAX_MARKERS)
-        .map(id => ({
-          user_id: id,
-          name: names[id],
-          leaving: false,
-        }))
 
       const incomingIds = new Set(
         incoming.map(p => p.user_id)
@@ -465,7 +725,7 @@ export default function MaraudersPresence() {
       REFRESH_MS
     )
 
-    const onVisible = () => {
+    function onVisible() {
       if (document.visibilityState === 'visible') {
         void refresh()
       }
@@ -510,20 +770,20 @@ export default function MaraudersPresence() {
       aria-label="Personnages en ligne"
       role="group"
     >
-      {[...players, ...decoys].map(p =>
+      {[...players, ...decoys].map(player =>
         reducedMotion ? (
           <div
-            key={p.user_id}
+            key={player.user_id}
             className={`marauder-static ${
-              p.decoy ? 'marauder-decoy' : ''
+              player.decoy ? 'marauder-decoy' : ''
             }`}
           >
-            <span aria-hidden="true">♟</span> {p.name}
+            {player.name}
           </div>
         ) : (
           <FootprintWalker
-            key={p.user_id}
-            player={p}
+            key={player.user_id}
+            player={player}
           />
         )
       )}
@@ -542,22 +802,24 @@ export default function MaraudersPresence() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0;
           transform: translate(-50%, -50%);
           opacity: 1;
+          pointer-events: none;
           will-change: left, top;
-          transition-property: left, top, opacity;
-          transition-timing-function: linear, linear, ease;
+          transition: opacity 1.2s ease;
         }
 
-        .marauder-walker.marauder-leaving {
+        .marauder-leaving {
           opacity: 0;
         }
 
         .marauder-steps {
           width: 42px;
           height: 40px;
-          transition: transform 500ms ease-in-out;
+          pointer-events: auto;
+          cursor: help;
+          outline-offset: 3px;
+          transition: transform 0.5s ease;
           filter:
             drop-shadow(0 0 3px rgba(255,215,151,.9))
             drop-shadow(0 0 8px rgba(241,177,96,.4));
@@ -580,17 +842,72 @@ export default function MaraudersPresence() {
         }
 
         .marauder-footprints.is-walking
-        .marauder-print-left {
+        .marauder-print:first-child {
           animation:
             marauder-stamp-left
-            1.25s ease-in-out infinite alternate;
+            1.4s ease-in-out infinite alternate;
         }
 
-        .marauder-footprints.is-walking
-        .marauder-print-right {
+        .marauder-steps
+        .marauder-footprints.is-walking g:first-child
+        .marauder-print {
+          animation:
+            marauder-stamp-left
+            1.4s ease-in-out infinite alternate;
+        }
+
+        .marauder-steps
+        .marauder-footprints.is-walking g:last-child
+        .marauder-print {
           animation:
             marauder-stamp-right
-            1.25s ease-in-out infinite alternate;
+            1.4s ease-in-out infinite alternate;
+        }
+
+        .marauder-inspecting .marauder-steps {
+          filter:
+            drop-shadow(0 0 5px rgba(255,225,166,1))
+            drop-shadow(0 0 12px rgba(241,177,96,.65));
+        }
+
+        .marauder-label {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          max-width: 220px;
+          padding: 4px 7px;
+          border-radius: 5px;
+          background: rgba(10,8,6,.42);
+          pointer-events: none;
+          text-align: center;
+        }
+
+        .marauder-name {
+          color: #f4dfb4;
+          font: italic 14px/1.3 Georgia, serif;
+          letter-spacing: .035em;
+          white-space: nowrap;
+          text-shadow:
+            0 1px 4px #120b06,
+            0 0 9px #100c07;
+        }
+
+        .marauder-activity {
+          color: #f2dfc3;
+          font: italic 11px/1.45 Georgia, serif;
+          width: max-content;
+          max-width: 205px;
+          white-space: normal;
+          text-align: center;
+          animation: marauder-activity-appear .22s ease-out;
+        }
+
+        .marauder-inspecting .marauder-label {
+          background: rgba(15,12,10,.88);
+          border: 1px solid rgba(225,189,129,.28);
+          box-shadow: 0 3px 15px rgba(0,0,0,.35);
+          z-index: 5;
         }
 
         .marauder-decoy .marauder-steps {
@@ -607,24 +924,16 @@ export default function MaraudersPresence() {
 
         .marauder-decoy .marauder-name {
           color: #bdcddd;
-          background: rgba(10,17,26,.44);
         }
 
-        .marauder-static.marauder-decoy {
-          color: #a8bccb;
+        .marauder-decoy .marauder-activity {
+          color: #dae4ee;
         }
 
-        .marauder-name {
-          color: #f4dfb4;
-          font: italic 14px/1.3 Georgia, serif;
-          letter-spacing: .035em;
-          white-space: nowrap;
-          text-shadow:
-            0 1px 4px #120b06,
-            0 0 9px #100c07;
-          padding: 3px 7px;
-          border-radius: 4px;
-          background: rgba(10,8,6,.42);
+        .marauder-decoy.marauder-inspecting
+        .marauder-label {
+          border-color: rgba(156,188,213,.35);
+          background: rgba(10,17,26,.9);
         }
 
         .reduce-motion {
@@ -642,37 +951,46 @@ export default function MaraudersPresence() {
           text-shadow: 0 1px 4px #120b06;
         }
 
+        .marauder-static.marauder-decoy {
+          color: #a8bccb;
+        }
+
         @keyframes marauder-stamp-left {
-          0% {
+          from {
             opacity: .35;
             transform: translateY(3px) scale(.92);
           }
-
-          100% {
+          to {
             opacity: 1;
             transform: translateY(-3px) scale(1.06);
           }
         }
 
         @keyframes marauder-stamp-right {
-          0% {
+          from {
             opacity: 1;
             transform: translateY(-3px) scale(1.06);
           }
-
-          100% {
+          to {
             opacity: .35;
             transform: translateY(3px) scale(.92);
           }
         }
 
-        @media (max-width: 640px) {
-          .marauder-footprints {
-            width: 34px;
-            height: 32px;
+        @keyframes marauder-activity-appear {
+          from {
+            opacity: 0;
+            transform: translateY(-4px);
           }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
 
-          .marauder-steps {
+        @media (max-width: 640px) {
+          .marauder-steps,
+          .marauder-footprints {
             width: 34px;
             height: 32px;
           }
@@ -680,11 +998,21 @@ export default function MaraudersPresence() {
           .marauder-name {
             font-size: 11px;
           }
+
+          .marauder-activity {
+            font-size: 10px;
+            max-width: 155px;
+          }
+
+          .marauder-label {
+            max-width: 170px;
+          }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .marauder-walker,
-          .marauder-print {
+          .marauder-print,
+          .marauder-activity {
             animation: none !important;
             transition: none !important;
           }
