@@ -636,8 +636,8 @@ const isCollected = (id) => collectedSet.has(id)
       {/* ---- Modale ---- */}
       {viewing && (
         <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-md p-4">
-            <div className="flex items-center justify-between mb-3">
+<div className="w-full max-w-3xl max-h-[calc(100dvh-2rem)] min-h-0 flex flex-col overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-md p-4">            
+<div className="flex flex-wrap items-center justify-between gap-3 mb-3 shrink-0">
               <div className="flex items-center gap-3">
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: currentCatColor }} />
                 <h3 className="text-white text-lg font-semibold">{viewing.title}</h3>
@@ -654,7 +654,7 @@ const isCollected = (id) => collectedSet.has(id)
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0 overflow-y-auto overscroll-contain pr-1">
               <div className="relative aspect-[4/5] rounded-xl overflow-hidden ring-2" style={{ borderColor: currentCatColor }}>
                <Image src={srcForDisplay(viewing.image_url)} alt="" fill unoptimized className="object-cover" />
               </div>
