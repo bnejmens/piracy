@@ -5,32 +5,12 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { seedTree } from '../../categories'
 
 /* -------------------- Utils / taxonomie (identiques à /wiki & /wiki/create) -------------------- */
 function norm(s){return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
 function slugify(s){const n=norm(s);return n.replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'x'}
 function colorFromString(s){const base=['#0ea5e9','#f59e0b','#8b5cf6','#10b981','#ef4444','#22d3ee','#a3e635','#f472b6'];let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return base[h%base.length]}
-
-// seed toujours visible (même sans cartes)
-function seedTree(){
-  return [
-    { id:'cat-univers', slug:'univers', label:'Univers', color:'#0ea5e9', children:[
-      { id:'cat-univers-fauneetflore', slug:'faune-et-flore', label:'Faune et Flore', color:'#0ea5e9', children:[] },
-      { id:'cat-univers-navires', slug:'navires', label:'Navires', color:'#0ea5e9', children:[] },
-      { id:'cat-univers-historique', slug:'historique', label:'Historique', color:'#0ea5e9', children:[] },
-    ]},
-    { id:'cat-personnages', slug:'personnages', label:'Personnages', color:'#f59e0b', children:[
-      { id:'cat-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
-      { id:'cat-personnages-scenarii', slug:'scenarii', label:'Scenarii', color:'#f59e0b', children:[] },
-      { id:'cat-personnages-groupes', slug:'equipages-et-groupes', label:'Equipages et Groupes', color:'#f59e0b', children:[] },
-    ]},
-    { id:'cat-jouabilite', slug:'jouabilite', label:'Jouabilité', color:'#8b5cf6', children:[
-      { id:'cat-jouabilite-regles', slug:'regles-et-must-do', label:'Règles et Must Do', color:'#8b5cf6', children:[] },
-      { id:'cat-jouabilite-lieux', slug:'lieux', label:'Lieux', color:'#8b5cf6', children:[] },
-      { id:'cat-jouabilité-intrigues', slug:'intrigues', label:'Intrigues', color:'#8b5cf6', children:[] },
-    ]},
-  ]
-}
 
 function buildTreeFromCardsMerged(cards){
   const roots = seedTree()
@@ -130,15 +110,12 @@ export default function EditCardPage(){
   // Arbre (seed + cartes) — même logique que /wiki & /wiki/create
   const [tree,setTree]=useState([])
   const [catsLoading,setCatsLoading]=useState(true)
-  async function reloadTree(){
-    setCatsLoading(true)
-    const { data: cards } = await supabase
-      .from('cards')
-      .select('category, subcategory, sub_subcategory')
-      .limit(10000)
-    setTree(buildTreeFromCardsMerged(cards||[]))
-    setCatsLoading(false)
-  }
+  
+async function reloadTree() {
+  setCatsLoading(true)
+  setTree(seedTree())
+  setCatsLoading(false)
+}
   useEffect(()=>{ reloadTree() },[])
 
   // Sélections
@@ -155,7 +132,7 @@ export default function EditCardPage(){
   useEffect(()=>{
     if(catsLoading || loading || !roots.length) return
     // 1) L1
-    let l1Id = roots[0].id
+    let l1Id = pendingCats.c1 ? null : roots[0].id
     if(pendingCats.c1){
       const s1 = slugify(pendingCats.c1)
       const m = roots.find(r=>r.slug===s1 || norm(r.label)===norm(pendingCats.c1))
@@ -164,7 +141,9 @@ export default function EditCardPage(){
     setL1(l1Id)
     // 2) L2
     const n1 = findById(tree, l1Id)
-    let l2Id = n1?.children?.[0]?.id || null
+    let l2Id = pendingCats.c2
+  ? null
+  : (n1?.children?.[0]?.id || null)
     if(pendingCats.c2){
       const s2 = slugify(pendingCats.c2)
       const m2 = (n1?.children||[]).find(n=>n.slug===s2 || norm(n.label)===norm(pendingCats.c2))
@@ -194,6 +173,13 @@ export default function EditCardPage(){
     if(!id) return
     if(!canEdit){ alert("Vous n'avez pas les droits pour modifier cette carte."); return }
     const catNode=findById(tree,l1), subNode=l2?findById(tree,l2):null, sub2Node=l3?findById(tree,l3):null
+
+if (!catNode || !subNode) {
+  alert(
+    "Cette carte utilise une ancienne catégorie. Sélectionne une catégorie et une sous-catégorie valides avant d'enregistrer."
+  )
+  return
+}
     const upd = {
       title: (title||'').trim(),
       description: (description||'').trim(),

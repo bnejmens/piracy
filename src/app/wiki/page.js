@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
+import { seedTree } from './categories'
 
 /* -------------------- Utils -------------------- */
 function norm(s) {
@@ -144,25 +145,6 @@ function buildTreeFromCategoriesRows(rows) {
 }
 
 // seed toujours visible (même sans cartes)
-function seedTree(){
-  return [
-    { id:'cat-univers', slug:'univers', label:'Univers', color:'#0ea5e9', children:[
-      { id:'cat-univers-fauneetflore', slug:'faune-et-flore', label:'Faune et Flore', color:'#0ea5e9', children:[] },
-      { id:'cat-univers-navires', slug:'Lieux', label:'Lieux', color:'#0ea5e9', children:[] },
-      { id:'cat-univers-historique', slug:'historique', label:'Historique', color:'#0ea5e9', children:[] },
-    ]},
-    { id:'cat-personnages', slug:'personnages', label:'Personnages', color:'#f59e0b', children:[
-      { id:'cat-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
-      { id:'cat-personnages-scenarii', slug:'scenarii', label:'Scenarii', color:'#f59e0b', children:[] },
-      { id:'cat-personnages-groupes', slug:'Groupes', label:'Groupes', color:'#f59e0b', children:[] },
-    ]},
-    { id:'cat-jouabilite', slug:'jouabilite', label:'Jouabilité', color:'#8b5cf6', children:[
-      { id:'cat-jouabilite-regles', slug:'regles-et-must-do', label:'Règles et Must Do', color:'#8b5cf6', children:[] },
-      { id:'cat-jouabilite-ZoneJeu', slug:'ZoneJeu', label:'Lieux', color:'#8b5cf6', children:[] },
-      { id:'cat-jouabilité-intrigues', slug:'intrigues', label:'Intrigues', color:'#8b5cf6', children:[] },
-    ]},
-  ]
-}
 
 // --- construit l'arbre = seed (toujours visible) + catégories découvertes dans cards ---
 function buildTreeFromCardsMerged(cards) {
@@ -302,7 +284,7 @@ useEffect(() => {
       }
 
       // 👉 Arbre depuis seed + cartes (PAS de wiki_categories)
-      const built = buildTreeFromCardsMerged(cardsRows || [])
+      const built = seedTree()
       if (!ignore) setTree(built)
 
     } finally {
@@ -453,8 +435,8 @@ const isCollected = (id) => collectedSet.has(id)
         .from('cards')
         .select('id, owner_id, title, description, category, subcategory, sub_subcategory, rarity, image_url, created_at')
         .order('created_at', { ascending: false }).limit(5000)
-      setCards(cardsRows || [])
-      setTree(buildTreeFromCards(cardsRows || []))
+setCards(cardsRows || [])
+setTree(seedTree())
     } else {
       alert(error.message || 'Suppression impossible')
     }

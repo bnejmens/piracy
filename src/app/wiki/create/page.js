@@ -5,32 +5,12 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { seedTree } from '../categories'
 
 /* -------------------- Utils / taxonomie (identiques à /wiki) -------------------- */
 function norm(s){return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
 function slugify(s){const n=norm(s);return n.replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'x'}
 function colorFromString(s){const base=['#0ea5e9','#f59e0b','#8b5cf6','#10b981','#ef4444','#22d3ee','#a3e635','#f472b6'];let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return base[h%base.length]}
-
-// seed toujours visible (même sans cartes)
-function seedTree(){
-  return [
-    { id:'cat-univers', slug:'univers', label:'Univers', color:'#0ea5e9', children:[
-      { id:'cat-univers-fauneetflore', slug:'faune-et-flore', label:'Faune et Flore', color:'#0ea5e9', children:[] },
-      { id:'cat-univers-navires', slug:'navires', label:'Navires', color:'#0ea5e9', children:[] },
-      { id:'cat-univers-historique', slug:'historique', label:'Historique', color:'#0ea5e9', children:[] },
-    ]},
-    { id:'cat-personnages', slug:'personnages', label:'Personnages', color:'#f59e0b', children:[
-      { id:'cat-personnages-pnj', slug:'pnj', label:'PNJ', color:'#f59e0b', children:[] },
-      { id:'cat-personnages-scenarii', slug:'scenarii', label:'Scenarii', color:'#f59e0b', children:[] },
-      { id:'cat-personnages-groupes', slug:'equipages-et-groupes', label:'Equipages et Groupes', color:'#f59e0b', children:[] },
-    ]},
-    { id:'cat-jouabilite', slug:'jouabilite', label:'Jouabilité', color:'#8b5cf6', children:[
-      { id:'cat-jouabilite-regles', slug:'regles-et-must-do', label:'Règles et Must Do', color:'#8b5cf6', children:[] },
-      { id:'cat-jouabilite-lieux', slug:'lieux', label:'Lieux', color:'#8b5cf6', children:[] },
-      { id:'cat-jouabilité-intrigues', slug:'intrigues', label:'Intrigues', color:'#8b5cf6', children:[] },
-    ]},
-  ]
-}
 
 function buildTreeFromCardsMerged(cards){
   const roots = seedTree()
@@ -95,15 +75,12 @@ export default function CreateCardPage(){
   const [tree,setTree]=useState([])
   const [loadingCats,setLoadingCats]=useState(true)
 
-  async function reloadTree(){
-    setLoadingCats(true)
-    const { data: cards } = await supabase
-      .from('cards')
-      .select('category, subcategory, sub_subcategory')
-      .limit(10000)
-    setTree(buildTreeFromCardsMerged(cards||[]))
-    setLoadingCats(false)
-  }
+  
+async function reloadTree() {
+  setLoadingCats(true)
+  setTree(seedTree())
+  setLoadingCats(false)
+}
 
   useEffect(()=>{ reloadTree() },[])
 
@@ -130,47 +107,7 @@ export default function CreateCardPage(){
   const rarityDef=RARITY[rarity]||RARITY.commun
   const currentCatColor=l1Node?.color||'#60a5fa'
 
-  /* ---------- Création “cat/sub/sub2” = on crée une CARTE stub tout de suite ---------- */
-  const [newLabel,setNewLabel]=useState('')
-  const [newLevel,setNewLevel]=useState(null) // 'l1' | 'l2' | 'l3' | null
-
-  const createStubCard = async (level) => {
-    if(!userId){ alert('Session requise'); return }
-    const label=(newLabel||'').trim()
-    if(!label){ setNewLevel(null); return }
-
-    // Déterminer la cible (cat/sub/sub2) en texte
-    let cat = l1Node?.label || 'Divers'
-    let sub = l2Node?.label || ''
-    let sub2 = (l3 && findById(tree,l3)?.label) || ''
-
-    if(level==='l1'){ cat=label; sub=''; sub2='' }
-    if(level==='l2'){ if(!l1Node){ alert('Choisis d’abord une catégorie'); return } sub=label; sub2='' }
-    if(level==='l3'){ if(!l2Node){ alert('Choisis d’abord une sous-catégorie'); return } sub2=label }
-
-    const payload = {
-      owner_id: userId,
-      title: `📁 ${cat}${sub?` / ${sub}`:''}${sub2?` / ${sub2}`:''}`,
-      description: 'Entrée de catégorie (carte générique). Vous pouvez éditer ou ajouter de vraies cartes ensuite.',
-      category: cat, subcategory: sub || null, sub_subcategory: sub2 || null,
-      rarity: 'commun',
-      image_url: null,
-    }
-
-    const { error } = await supabase.from('cards').insert(payload)
-    if(error){ alert(error.message||'Échec création'); return }
-
-    setNewLabel(''); setNewLevel(null)
-    await reloadTree()
-
-    // Re-sélectionne la nouvelle branche
-    const s1 = slugify(cat), s2 = sub?slugify(sub):'', s3 = sub2?slugify(sub2):''
-    const l1Id = `cat-${s1}`
-    const l2Id = s2 ? `cat-${s1}-${s2}` : null
-    const l3Id = s3 ? `cat-${s1}-${s2}-${s3}` : ''
-    setL1(l1Id); if(l2Id) setL2(l2Id); setL3(l3Id)
-  }
-
+  
   /* ---------- Soumission carte normale ---------- */
   const submit = async () => {
     if(!userId){ alert('Session requise'); return }
@@ -198,7 +135,6 @@ export default function CreateCardPage(){
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-white/80 text-sm">Catégories</div>
-        <button onClick={()=>setNewLevel('l1')} className="text-xs px-2 py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/20 text-white">+ Nouvelle</button>
       </div>
       <div className="flex flex-wrap gap-2">
         {roots.map(c=>(
@@ -215,8 +151,6 @@ export default function CreateCardPage(){
 
       <div className="flex items-center justify-between mt-4">
         <div className="text-white/80 text-sm">Sous-catégories</div>
-        <button onClick={()=>l1 && setNewLevel('l2')} disabled={!l1}
-          className="text-xs px-2 py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/20 text-white disabled:opacity-50">+ Nouvelle</button>
       </div>
       <div className="flex flex-wrap gap-2">
         {l2List.map(s=>(
@@ -231,9 +165,7 @@ export default function CreateCardPage(){
         <>
           <div className="flex items-center justify-between mt-4">
             <div className="text-white/80 text-sm">Sous-sous-catégories (optionnel)</div>
-            <button onClick={()=>l2 && setNewLevel('l3')} disabled={!l2}
-              className="text-xs px-2 py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/20 text-white disabled:opacity-50">+ Nouvelle</button>
-          </div>
+                      </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={()=>setL3('')}
               className={`px-2.5 py-1.5 rounded-full border text-sm transition ${l3===''?'bg-white/15 border-white/30':'bg-white/5 border-white/15 hover:bg-white/10'}`}>
