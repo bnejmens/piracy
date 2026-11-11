@@ -262,6 +262,7 @@ function FootprintWalker({ player }) {
   const pausedRef = useRef(false)
   const positionRef = useRef(null)
   const previousActivityRef = useRef(null)
+  const pointerRef = useRef({ x: -1000, y: -1000 })
 
   const [hovered, setHovered] = useState(false)
   const [activity, setActivity] = useState('')
@@ -390,25 +391,83 @@ function FootprintWalker({ player }) {
     }
   }, [player.user_id])
 
-  function stopForInspection() {
-    if (pausedRef.current) return
+  
+function stopForInspection() {
+  if (pausedRef.current) return
 
-    pausedRef.current = true
+  pausedRef.current = true
 
-    const nextActivity = pickActivity(
-      previousActivityRef.current
+  const nextActivity = pickActivity(
+    previousActivityRef.current
+  )
+
+  previousActivityRef.current = nextActivity
+
+  setActivity(nextActivity)
+  setHovered(true)
+}
+
+function resumeWalking() {
+  if (!pausedRef.current) return
+
+  pausedRef.current = false
+  setHovered(false)
+}
+
+
+useEffect(() => {
+  function checkPointer(event) {
+    const walker = walkerRef.current
+    if (!walker) return
+
+    const steps = walker.querySelector('.marauder-steps')
+    if (!steps) return
+
+    const rect = steps.getBoundingClientRect()
+
+    const x = event.clientX
+    const y = event.clientY
+
+    // Petite zone de tolérance autour des pas.
+    const margin = 10
+
+    const nearby =
+      x >= rect.left - margin &&
+      x <= rect.right + margin &&
+      y >= rect.top - margin &&
+      y <= rect.bottom + margin
+
+    // Ne pas activer le survol lorsqu'un bouton
+    // ou un autre élément interactif est sous la souris.
+    const target = document.elementFromPoint(x, y)
+
+    const overControl = target?.closest(
+      'button, a, input, select, textarea, [role="button"]'
     )
 
-    previousActivityRef.current = nextActivity
+    const overAvatar = target?.closest(
+      'main .group.relative.rounded-full.overflow-hidden'
+    )
 
-    setActivity(nextActivity)
-    setHovered(true)
+    if (nearby && !overControl && !overAvatar) {
+      stopForInspection()
+    } else {
+      resumeWalking()
+    }
   }
 
-  function resumeWalking() {
-    pausedRef.current = false
-    setHovered(false)
+  function leaveWindow() {
+    resumeWalking()
   }
+
+  window.addEventListener('pointermove', checkPointer)
+  document.addEventListener('pointerleave', leaveWindow)
+
+  return () => {
+    window.removeEventListener('pointermove', checkPointer)
+    document.removeEventListener('pointerleave', leaveWindow)
+  }
+}, [])
 
   return (
     <div
@@ -423,10 +482,8 @@ function FootprintWalker({ player }) {
       <div
         className="marauder-steps"
         style={{ transform: `rotate(${heading}deg)` }}
-        onMouseEnter={stopForInspection}
-        onMouseLeave={resumeWalking}
-        onFocus={stopForInspection}
-        onBlur={resumeWalking}
+       onFocus={stopForInspection}
+onBlur={resumeWalking}
         tabIndex={0}
         role="button"
         aria-label={`${player.name}, consulter son activité`}
@@ -624,7 +681,7 @@ export default function MaraudersPresence() {
 
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('user_id, last_seen_at, active_character_id')
+        .select('user_id, last_seen_at')
         .gte('last_seen_at', since)
         .order('last_seen_at', { ascending: false })
         .limit(200)
@@ -639,57 +696,46 @@ export default function MaraudersPresence() {
         return
       }
 
-      const characterIds = [
-        ...new Set(
-          (profiles || [])
-            .map(p => p.active_character_id)
-            .filter(Boolean)
-        ),
-      ]
+      
+const ids = (profiles || [])
+  .map(p => p.user_id)
+  .filter(Boolean)
 
-      const charactersById = {}
+const names = {}
 
-      if (characterIds.length) {
-        const {
-          data: characters,
-          error: charsError,
-        } = await supabase
-          .from('characters')
-          .select('id, user_id, name')
-          .in('id', characterIds)
+if (ids.length) {
+  const { data: characters, error: charsError } =
+    await supabase
+      .from('characters')
+      .select('id, user_id, name, is_active')
+      .in('user_id', ids)
+      .eq('is_active', true)
 
-        if (charsError) {
-          console.warn(
-            '[Carte du Maraudeur] Personnages :',
-            charsError.message
-          )
-        }
+  if (charsError) {
+    console.warn(
+      '[Carte du Maraudeur] Personnages :',
+      charsError.message
+    )
+  }
 
-        for (const ch of characters || []) {
-          charactersById[ch.id] = ch
-        }
-      }
+  for (const ch of characters || []) {
+    if (!names[ch.user_id]) {
+      names[ch.user_id] = ch.name
+    }
+  }
+}
 
-      if (!active || serial !== requestSerial) return
+if (!active || serial !== requestSerial) return
 
-      const incoming = (profiles || [])
-        .map(profile => {
-          const ch =
-            charactersById[profile.active_character_id]
-
-          if (!ch || ch.user_id !== profile.user_id) {
-            return null
-          }
-
-          return {
-            user_id: profile.user_id,
-            name: ch.name,
-            decoy: false,
-            leaving: false,
-          }
-        })
-        .filter(Boolean)
-        .slice(0, MAX_MARKERS)
+const incoming = ids
+  .filter(id => names[id])
+  .slice(0, MAX_MARKERS)
+  .map(id => ({
+    user_id: id,
+    name: names[id],
+    decoy: false,
+    leaving: false,
+  }))
 
       const incomingIds = new Set(
         incoming.map(p => p.user_id)
