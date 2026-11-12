@@ -283,7 +283,32 @@ async function createTopic(e) {
 
   return (
     <main className="relative min-h-screen bg-[#100e17] text-[#f7e8d0]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(89,62,105,.25),transparent_55%),linear-gradient(135deg,#1b1524,#0d0d15)]" />
+      
+{/* Background général du monde RP */}
+<div
+  aria-hidden="true"
+  className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+>
+  <div
+    className="absolute -inset-5 bg-cover bg-center bg-no-repeat opacity-35 blur-[18px]"
+    style={{
+      backgroundImage: "url('/images/rp/rp-ambient-bg.png')",
+    }}
+  />
+</div>
+
+{/* Voile sombre pour conserver la lisibilité */}
+<div
+  aria-hidden="true"
+  className="pointer-events-none fixed inset-0 z-0 bg-[#100e17]/55"
+/>
+
+{/* Léger dégradé violet */}
+<div
+  aria-hidden="true"
+  className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(137,87,154,.10),transparent_75%)]"
+/>
+
 
       <header className="relative z-30 border-b border-amber-200/20 bg-[#17111f]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1650px] flex-wrap items-center gap-2 px-4 py-3 md:px-8">
