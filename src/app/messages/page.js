@@ -383,53 +383,59 @@ const isMine = (m) => {
     )
   }
 
-  const createConversation = async () => {
-    const title = newConvTitle.trim()
-    if (newConvTargets.length > 1 && !title) { alert('Ajoute un titre au groupe.'); return }
-    if (!newConvTargets.length) { alert('Sélectionne au moins un personnage.'); return }
 
-    if (!currentSpeakerId) { alert('Crée ou active un personnage avant de commencer une conversation.'); return }
-    try {
-      const { data: conv, error: e1 } = await supabase
-        .from('conversations')
-        .insert({ is_group: true, title: title || contacts.find(c => String(c.id) === String(newConvTargets[0]))?.name || 'Conversation', created_by: session.user.id })
-        .select('id, is_group, title, created_by')
-        .single()
-      if (e1) throw e1
+const createConversation = async () => {
+  const title = newConvTitle.trim()
 
-      const rows = []
-      rows.push({
-        conversation_id: conv.id,
-        user_id: session.user.id,
-        role: 'owner',
-        character_id: currentSpeakerId,
-      })
-      const includedCharacters = new Set([String(currentSpeakerId)])
-      for (const cid of newConvTargets) {
-        const c = contacts.find(x => x.is_character && String(x.id) === String(cid))
-        if (!c || includedCharacters.has(String(c.id))) continue
-        includedCharacters.add(String(c.id))
-        rows.push({
-          conversation_id: conv.id,
-          user_id: c.user_id,
-          role: 'member',
-          character_id: c.id,
-        })
-      }
-
-      const { error: e2 } = await supabase
-        .from('conversation_participants')
-        .insert(rows)
-      if (e2) throw e2
-
-      setNewConvOpen(false)
-      await loadConversations()
-      await openConversation(conv)
-    } catch (e) {
-      alert(e.message || String(e))
-    }
+  if (!newConvTargets.length) {
+    alert('Sélectionne au moins un personnage.')
+    return
   }
 
+  if (newConvTargets.length > 1 && !title) {
+    alert('Ajoute un titre à la conversation de groupe.')
+    return
+  }
+
+  if (!currentSpeakerId) {
+    alert('Sélectionne un personnage actif.')
+    return
+  }
+
+  try {
+    // La création et les invitations sont gérées
+    // ensemble par Supabase, avec les bons user_id
+    // et character_id.
+    const { data: conversationId, error } =
+      await supabase.rpc('create_message_conversation', {
+        p_sender_character_id: currentSpeakerId,
+        p_target_character_ids: newConvTargets,
+        p_title: title || null,
+      })
+
+    if (error) throw error
+
+    setNewConvOpen(false)
+    setNewConvTargets([])
+    setNewConvTitle('')
+
+    await loadConversations()
+
+    // Ouvrir immédiatement la conversation créée.
+    await openConversation({
+      id: conversationId,
+      title: title || 'Conversation',
+      is_group: true,
+      created_by: session.user.id,
+    })
+
+  } catch (e) {
+    console.error('Création conversation :', e)
+    alert(e?.message || 'Impossible de créer la conversation.')
+  }
+}
+
+ 
   /* ==================== MODALE CONTACT: CONVERSATIONS ==================== */
   const openContactConvs = async (contact) => {
     setContactModal({ open: true, contact, convs: [], loading: true })
