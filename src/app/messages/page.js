@@ -342,12 +342,30 @@ export default function MessagesPage() {
     return { label }
   }
 
-  const isMine = (m) => {
-    const msgChar = m.sender_character_id ? String(m.sender_character_id) : null
-    const curChar = currentSpeakerId ? String(currentSpeakerId) : null
-    if (msgChar && curChar) return msgChar === curChar
-    return m.sender_id === session?.user?.id
+  
+const isMine = (m) => {
+  // Identifiant du personnage actuellement sélectionné
+  const activeCharacterId = currentSpeakerId
+    ? String(currentSpeakerId)
+    : null
+
+  // Identifiant du personnage ayant envoyé le message
+  const messageCharacterId = m.sender_character_id
+    ? String(m.sender_character_id)
+    : null
+
+  // Les bulles sont attribuées aux personnages,
+  // indépendamment du compte utilisateur.
+  if (activeCharacterId && messageCharacterId) {
+    return activeCharacterId === messageCharacterId
   }
+
+  // Si l'identifiant du personnage est absent,
+  // ne pas attribuer automatiquement le message
+  // au personnage actuel.
+  return false
+}
+
 
   /* ==================== MODALES: NOUVELLE CONVERSATION ==================== */
   const openNewConv = () => {
@@ -524,7 +542,7 @@ export default function MessagesPage() {
           {screen === 'chat' && <div className="flex min-h-full flex-col justify-end gap-3 p-4">
             {!messages.length && <p className="py-8 text-center text-sm text-white/50">Début de la conversation</p>}
             {messages.map(m => {
-              const mine = m.sender_id === session?.user?.id
+              const mine = isMine(m)
               const sender = m.sender_character_id ? charsById.get(String(m.sender_character_id)) : contactsByUser.get(m.sender_id)
               return <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
                 {!mine && <Avatar name={sender?.name} src={sender?.avatar_url} size="h-8 w-8" />}
