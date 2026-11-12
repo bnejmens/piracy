@@ -39,6 +39,10 @@ export default function RPPage() {
   const [draftZoneId, setDraftZoneId] = useState('')
   const [draftLocationId, setDraftLocationId] = useState('')
   const [saving, setSaving] = useState(false)
+const [inviteCharacters, setInviteCharacters] = useState([])
+const [selectedInviteIds, setSelectedInviteIds] = useState([])
+const [inviteSearch, setInviteSearch] = useState('')
+const [inviteLoading, setInviteLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -142,6 +146,47 @@ export default function RPPage() {
   function openLocation(id) { setLocationId(id); setView('location'); setMenuOpen(null) }
   function openTopic(id) { router.push(`/rp/scene?topic=${encodeURIComponent(id)}`) }
 
+
+useEffect(() => {
+  if (!creating || !userId) return
+
+  let cancelled = false
+
+  async function loadInviteCharacters() {
+    setInviteLoading(true)
+
+    const { data, error: charactersError } = await supabase
+      .from('characters')
+      .select('id,name,avatar_url,user_id')
+      .neq('user_id', userId)
+      .order('name')
+
+    if (cancelled) return
+
+    if (charactersError) {
+      setError(charactersError.message)
+    } else {
+      setInviteCharacters(data || [])
+    }
+
+    setInviteLoading(false)
+  }
+
+  void loadInviteCharacters()
+
+  return () => {
+    cancelled = true
+  }
+}, [creating, userId])
+
+function toggleInvite(characterId) {
+  setSelectedInviteIds(current =>
+    current.includes(characterId)
+      ? current.filter(id => id !== characterId)
+      : [...current, characterId]
+  )
+}
+
   function openCreate(id = null) {
     setMenuOpen(null)
     const loc = id ? locationById.get(id) : selectedLocation
@@ -149,24 +194,50 @@ export default function RPPage() {
     setDraftZoneId(loc?.zone_id || '')
     setDraftTitle('')
     setError('')
+setSelectedInviteIds([])
+setInviteSearch('')
     setCreating(true)
   }
 
-  async function createTopic(e) {
-    e.preventDefault()
-    if (!userId || !draftTitle.trim() || !draftLocationId || saving) return
-    setSaving(true)
-    const { data, error: createError } = await supabase.from('rp_topics').insert({
-      title: draftTitle.trim(),
-      author_id: userId,
-      created_by: userId,
-      location_id: draftLocationId,
-    }).select('id').single()
-    setSaving(false)
-    if (createError) { setError(createError.message); return }
+async function createTopic(e) {
+  e.preventDefault()
+
+  if (
+    !userId ||
+    !draftTitle.trim() ||
+    !draftLocationId ||
+    saving
+  ) return
+
+  setSaving(true)
+  setError('')
+
+  try {
+    const { data: topicId, error: createError } =
+      await supabase.rpc('create_rp_with_invitations', {
+        p_title: draftTitle.trim(),
+        p_location_id: draftLocationId,
+        p_character_ids: selectedInviteIds,
+      })
+
+    if (createError) {
+      throw createError
+    }
+
     setCreating(false)
-    openTopic(data.id)
+    setSelectedInviteIds([])
+    setDraftTitle('')
+
+    openTopic(topicId)
+
+  } catch (err) {
+    setError(
+      err?.message || 'Impossible de créer le RP.'
+    )
+  } finally {
+    setSaving(false)
   }
+}
 
   function placeLabel(topic) {
     const place = locationById.get(topic.location_id)
@@ -349,7 +420,7 @@ export default function RPPage() {
 
       {creating && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => !saving && setCreating(false)}>
-          <form onSubmit={createTopic} onClick={e => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-amber-200/30 bg-[#241b2d] p-6 shadow-2xl">
+          <form onSubmit={createTopic} onClick={e => e.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-amber-200/30 bg-[#241b2d] p-6 shadow-2xl">
             <h2 className="font-serif text-2xl text-amber-100">Créer un nouveau RP</h2>
             <p className="mb-5 mt-2 text-sm text-white/60">Choisissez obligatoirement une zone et un lieu.</p>
             {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
@@ -365,6 +436,103 @@ export default function RPPage() {
             </select>
             <label htmlFor="rp-title" className="mt-4 block text-sm">Titre</label>
             <input id="rp-title" required maxLength={150} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} placeholder="Titre de votre scène…" className="mt-2 w-full rounded-lg border border-amber-200/25 bg-white/10 p-3 text-white outline-none focus:border-amber-300" />
+
+{/* Invitation des personnages */}
+<div className="mt-5 border-t border-amber-200/20 pt-5">
+
+  <div className="mb-3 flex items-center justify-between gap-3">
+    <label className="text-sm font-semibold text-amber-100">
+      Inviter des personnages
+    </label>
+
+    <span className="text-xs text-amber-200/65">
+      {selectedInviteIds.length} sélectionné(s)
+    </span>
+  </div>
+
+  <input
+    type="search"
+    value={inviteSearch}
+    onChange={e => setInviteSearch(e.target.value)}
+    placeholder="Rechercher un personnage…"
+    className="mb-3 w-full rounded-lg border border-amber-200/25 bg-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-300"
+  />
+
+  <div className="max-h-60 space-y-1 overflow-y-auto rounded-xl border border-amber-200/15 bg-black/20 p-2">
+
+    {inviteLoading && (
+      <p className="p-4 text-center text-sm text-white/50">
+        Chargement des personnages…
+      </p>
+    )}
+
+    {!inviteLoading &&
+      inviteCharacters
+        .filter(c =>
+          c.name.toLowerCase().includes(
+            inviteSearch.toLowerCase().trim()
+          )
+        )
+        .map(c => {
+          const checked = selectedInviteIds.includes(c.id)
+
+          return (
+            <label
+              key={c.id}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${
+                checked
+                  ? 'border-amber-300/50 bg-amber-300/10'
+                  : 'border-transparent hover:bg-white/10'
+              }`}
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-200/25 bg-[#483650]">
+
+                {c.avatar_url ? (
+                  <img
+                    src={c.avatar_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="font-serif text-lg">
+                    {c.name.charAt(0)}
+                  </span>
+                )}
+              </span>
+
+              <span className="min-w-0 flex-1 truncate text-sm text-amber-50">
+                {c.name}
+              </span>
+
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggleInvite(c.id)}
+                className="h-4 w-4 accent-amber-400"
+              />
+            </label>
+          )
+        })}
+
+    {!inviteLoading &&
+      inviteCharacters.filter(c =>
+        c.name.toLowerCase().includes(
+          inviteSearch.toLowerCase().trim()
+        )
+      ).length === 0 && (
+        <p className="p-4 text-center text-sm text-white/50">
+          Aucun personnage trouvé.
+        </p>
+      )}
+  </div>
+
+  <p className="mt-2 text-xs leading-relaxed text-white/50">
+    Les personnages sélectionnés recevront une invitation
+    à rejoindre ce RP. Tu peux également créer une scène
+    sans invitation.
+  </p>
+</div>
+
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-4 py-2 hover:bg-white/10">Annuler</button>
               <button type="submit" disabled={saving || !draftTitle.trim() || !draftLocationId} className="rounded-lg bg-amber-300 px-4 py-2 font-semibold text-[#24191c] disabled:opacity-40">{saving ? 'Création…' : 'Créer le RP'}</button>
