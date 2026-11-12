@@ -440,10 +440,20 @@ useEffect(() => {
                     style={{ left:`calc(50% + ${a.x}px)`, top:`calc(50% + ${a.y}px)`, width:iconSize, height:iconSize }}
                     aria-label={a.label}
                   >
-                    <div className="relative w-full h-full rounded-full border border-white/45 bg-white/6 backdrop-blur-sm p-2 transition">
+                    <div className="relative w-full h-full overflow-hidden rounded-full border border-white/45 bg-white/6 backdrop-blur-sm p-2 transition">
                       <span className={`pointer-events-none absolute inset-0 rounded-full ring-2 ring-transparent group-hover:${a.ring} transition`} />
                       <span className={`pointer-events-none absolute -inset-2 rounded-full opacity-0 group-hover:opacity-100 blur-xl ${a.glow} transition`} />
-                      <Image src={a.icon} alt="" fill sizes="140px" className="object-contain drop-shadow" />
+                      <Image
+  src={a.icon}
+  alt=""
+  fill
+  sizes="140px"
+  className={
+    a.key === 'randomvava'
+      ? 'rounded-full object-cover scale-[0.82] drop-shadow'
+      : 'object-contain drop-shadow'
+  }
+/>
                       {showNotif && (
                         <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>
                       )}
