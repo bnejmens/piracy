@@ -143,8 +143,23 @@ export default function AuthPage() {
       <div className="absolute inset-0 grid place-items-center p-4">
         <div className="w-full max-w-md rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl ring-1 ring-white/10 shadow-[0_20px_80px_rgba(0,0,0,.45)]">
           <div className="pointer-events-none h-1 rounded-t-2xl bg-cyan-300/60" />
-          <div className="p-6 sm:p-8 text-slate-100">
-            <div className="flex justify-center gap-2 mb-6">
+         
+<div className="p-6 sm:p-8 text-slate-100">
+
+  {/* TITRE DU FORUM */}
+  <div className="text-center mb-7">
+    <h1 className="text-3xl font-semibold tracking-[0.18em] text-amber-100">
+      ⭒ ALWAYS ⭒
+    </h1>
+
+    <p className="mt-3 text-sm italic text-slate-200/80">
+      After all this time?
+    </p>
+  </div>
+
+  {/* ONGLETS CONNEXION / INSCRIPTION */}
+  <div className="flex justify-center gap-2 mb-6">
+
               <button
                 onClick={() => setIsSignup(false)}
                 className={`rounded-full px-3 py-1.5 text-sm border ${!isSignup ? 'bg-white/20 border-white/40' : 'bg-white/10 border-white/20 hover:bg-white/15'}`}
