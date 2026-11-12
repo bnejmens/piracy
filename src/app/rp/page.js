@@ -33,7 +33,7 @@ export default function RPPage() {
   const [posts, setPosts] = useState([])
   const [view, setView] = useState('zones') // zones | location | mine | others
   const [locationId, setLocationId] = useState(null)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(null)
   const [creating, setCreating] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftZoneId, setDraftZoneId] = useState('')
@@ -59,14 +59,25 @@ export default function RPPage() {
     setPosts(postsR.data || [])
     setProfile(profileR.data || null)
 
-    if (profileR.data?.active_character_id) {
-      const charR = await supabase.from('characters')
-        .select('id,name,avatar_url').eq('id', profileR.data.active_character_id).maybeSingle()
-      if (charR.error) throw new Error(charR.error.message)
-      setCharacter(charR.data || null)
-    } else {
-      setCharacter(null)
-    }
+    // Le personnage affiché doit appartenir au compte connecté.
+    // Certaines interfaces enregistrent le choix avec is_active, d'autres
+    // conservent le pointeur dans profiles.active_character_id.
+    const { data: ownedCharacters, error: charsError } = await supabase
+      .from('characters')
+      .select('id,user_id,name,avatar_url,is_active')
+      .eq('user_id', uid)
+    if (charsError) throw new Error(charsError.message)
+
+    const owned = ownedCharacters || []
+    const pointer = owned.find(c => c.id === profileR.data?.active_character_id)
+    const flagged = owned.filter(c => c.is_active === true)
+    // Si un seul personnage est indiqué actif, c'est le choix effectif.
+    // Sinon, on utilise le pointeur du profil s'il est valide.
+    const current = flagged.length === 1
+      ? flagged[0]
+      : (pointer || flagged[0] || null)
+    setCharacter(current)
+
   }, [])
 
   useEffect(() => {
@@ -120,12 +131,13 @@ export default function RPPage() {
     return []
   }, [view, topics, myTopics, mineIds, locationId])
 
-  function goHome() { setView('zones'); setLocationId(null); setMenuOpen(false) }
-  function showList(next) { setView(next); setLocationId(null); setMenuOpen(false) }
-  function openLocation(id) { setLocationId(id); setView('location'); setMenuOpen(false) }
+  function goHome() { setView('zones'); setLocationId(null); setMenuOpen(null) }
+  function showList(next) { setView(next); setLocationId(null); setMenuOpen(null) }
+  function openLocation(id) { setLocationId(id); setView('location'); setMenuOpen(null) }
   function openTopic(id) { router.push(`/rp/scene?topic=${encodeURIComponent(id)}`) }
 
   function openCreate(id = null) {
+    setMenuOpen(null)
     const loc = id ? locationById.get(id) : selectedLocation
     setDraftLocationId(loc?.id || '')
     setDraftZoneId(loc?.zone_id || '')
@@ -179,27 +191,70 @@ export default function RPPage() {
 
       <header className="relative z-30 border-b border-amber-200/20 bg-[#17111f]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1650px] flex-wrap items-center gap-2 px-4 py-3 md:px-8">
-          <button onClick={goHome} className="mr-auto font-serif text-xl text-amber-100 hover:text-amber-300">Le Monde Magique</button>
+          <button onClick={goHome} className="mr-auto font-serif text-xl text-amber-100 hover:text-amber-300">
+            Le Monde Magique
+          </button>
 
           <div className="relative">
-            <button onClick={() => setMenuOpen(x => !x)} aria-expanded={menuOpen} className={navButton}>Mes RP ▾</button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
+            <button onClick={() => setMenuOpen(x => x === 'rp' ? null : 'rp')} aria-expanded={menuOpen === 'rp'} className={navButton}>
+              Mes RP ▾
+            </button>
+            {menuOpen === 'rp' && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
                 <button onClick={() => showList('mine')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Mes participations</button>
                 <button onClick={() => showList('others')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Autres aventures</button>
               </div>
             )}
           </div>
-          <button onClick={() => showList('others')} className={navButton}>Autres aventures</button>
-          <button onClick={() => openCreate()} className="rounded-lg border border-amber-300/55 bg-amber-300/15 px-3 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/25">+ Nouveau RP</button>
-          <a href="/wiki" target="_blank" rel="noopener noreferrer" className={navButton}>Wiki & chronologie ↗</a>
-          <Link href="/messages" className={navButton}>Messagerie</Link>
-          <Link href="/dashboard" className={navButton}>Tableau de bord</Link>
+
+          <button onClick={() => openCreate()} className="rounded-lg border border-amber-300/55 bg-amber-300/15 px-3 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/25">
+            + Nouveau RP
+          </button>
+
+          <div className="relative">
+            <button onClick={() => setMenuOpen(x => x === 'access' ? null : 'access')} aria-expanded={menuOpen === 'access'} className={navButton}>
+              Accès rapides ▾
+            </button>
+            {menuOpen === 'access' && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
+                <Link href="/messages" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Messagerie</Link>
+                <a href="/wiki" target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Wiki & chronologie ↗</a>
+                <Link href="/dashboard" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Tableau de bord</Link>
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <button onClick={() => setMenuOpen(x => x === 'character' ? null : 'character')} aria-expanded={menuOpen === 'character'}
+              className="flex items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1.5 pl-1.5 pr-3 text-sm text-amber-100 transition hover:bg-white/10">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-300/40 bg-[#40344b]">
+                {character?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={character.avatar_url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                ) : <span className="font-serif text-lg">{(character?.name || '?').charAt(0)}</span>}
+              </span>
+              <span className="max-w-[140px] truncate font-medium">{character?.name || 'Aucun personnage actif'}</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            {menuOpen === 'character' && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-amber-200/25 bg-[#271d31] p-4 shadow-2xl">
+                <div className="text-xs uppercase tracking-widest text-amber-200/60">Personnage actif</div>
+                <div className="mt-2 font-serif text-xl text-amber-100">{character?.name || 'Aucun personnage sélectionné'}</div>
+                <div className="mt-1 text-xs text-white/55">Compte : {profile?.pseudo || 'Joueur'}</div>
+                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-amber-200/15 pt-3 text-center">
+                  <div><div className="font-serif text-xl text-amber-100">{myTopics.length}</div><div className="text-xs text-white/55">Mes RP</div></div>
+                  <div><div className="font-serif text-xl text-amber-100">{topics.length}</div><div className="text-xs text-white/55">Tous les RP</div></div>
+                </div>
+                <button onClick={() => showList('mine')} className="mt-3 block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Mes participations</button>
+                <Link href="/profile" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Voir mon profil</Link>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="relative z-10 mx-auto max-w-[1580px] px-4 py-7 md:px-7">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_245px]">
+        <div className="w-full">
           <section className="min-w-0">
             {view !== 'zones' && (
               <button onClick={goHome} className="mb-5 text-sm text-amber-200 hover:text-amber-100">← Toutes les zones</button>
@@ -262,31 +317,6 @@ export default function RPPage() {
             )}
           </section>
 
-          <aside className="xl:sticky xl:top-6 xl:self-start">
-            <div className="rounded-2xl border border-amber-200/25 bg-[#221b2b]/85 p-5 text-center shadow-xl">
-              <div className="text-[11px] uppercase tracking-[.2em] text-amber-200/60">Votre personnage actif</div>
-              <div className="mx-auto mt-4 h-28 w-28 overflow-hidden rounded-full border-2 border-amber-300/45 bg-[#43364b] shadow-lg">
-                {character?.avatar_url || profile?.avatar_url ? (
-                  // Avatar utilisateur externe, sans configuration next/image supplémentaire.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={character?.avatar_url || profile?.avatar_url} alt="Avatar du personnage actif" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                ) : <div className="grid h-full w-full place-items-center font-serif text-4xl text-amber-100/65">{(character?.name || profile?.pseudo || '?')[0]}</div>}
-              </div>
-              <h2 className="mt-3 font-serif text-xl text-amber-100">{character?.name || profile?.pseudo || 'Aucun personnage actif'}</h2>
-              <p className="mt-1 text-xs text-white/55">{character ? 'Personnage sélectionné' : 'Sélectionnez un personnage depuis votre profil'}</p>
-              <div className="mt-5 grid grid-cols-2 gap-2 border-t border-amber-200/15 pt-4">
-                <div><div className="text-2xl font-serif text-amber-100">{myTopics.length}</div><div className="text-xs text-white/55">Mes RP</div></div>
-                <div><div className="text-2xl font-serif text-amber-100">{topics.length}</div><div className="text-xs text-white/55">Tous les RP</div></div>
-              </div>
-              <Link href="/profile" className="mt-4 block rounded-lg border border-amber-200/25 px-3 py-2 text-sm text-amber-100 hover:bg-white/10">Voir mon profil</Link>
-            </div>
-            <div className="mt-4 rounded-2xl border border-amber-200/15 bg-[#221b2b]/65 p-4">
-              <h3 className="font-serif text-lg text-amber-100">Accès rapides</h3>
-              <button onClick={() => showList('mine')} className="mt-3 block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Mes participations →</button>
-              <button onClick={() => showList('others')} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Autres aventures →</button>
-              <a href="/wiki" target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Consulter le wiki ↗</a>
-            </div>
-          </aside>
         </div>
       </div>
 
