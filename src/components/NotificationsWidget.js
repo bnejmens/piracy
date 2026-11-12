@@ -198,9 +198,19 @@ export default function NotificationsWidget() {
 
       setItems(data || [])
       activitiesCount = data?.length || 0
-    } catch (error) {
-      errors.push('Activités : ' + error.message)
-    }
+   } catch (error) {
+  // La vue d'activité n'existe pas encore dans cette base.
+  // Ne pas empêcher le fonctionnement des invitations RP.
+  if (
+    error.code === 'PGRST205' ||
+    error.code === '42P01' ||
+    error.message?.includes('v_activity_stream')
+  ) {
+    setItems([])
+  } else {
+    errors.push('Activités : ' + error.message)
+  }
+}
 
     try {
       const pending = await getPendingInvitations(session.user.id)
