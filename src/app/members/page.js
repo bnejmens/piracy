@@ -13,7 +13,7 @@ export default function MembersPage() {
 
   // Affiche des PERSONNAGES (pas seulement le profil actif)
   const [items, setItems] = useState([]); // [{ id, user_id, name, gender, avatar_url, bio, age, occupation, traits, relationships, ownerName }]
-  const [filter, setFilter] = useState("tous"); // 'tous' | 'féminin' | 'masculin'
+  const [search, setSearch] = useState("");
   const [modalChar, setModalChar] = useState(null);
   const [includeArchivedMine, setIncludeArchivedMine] = useState(false);
 
@@ -45,6 +45,7 @@ export default function MembersPage() {
  // Par défaut : tout le monde voit les non-archivés ; toi tu vois aussi TES archivés
  query = query.or(`is_archived.eq.false,user_id.eq.${session.user.id}`);
  const { data: chars, error: e1 } = await query;
+if (e1) throw e1;
 
         // 2) Profils -> nom joueur
         const { data: profs, error: e2 } = await supabase
@@ -68,45 +69,96 @@ export default function MembersPage() {
     })();
   }, [router]);
 
-  const filtered = useMemo(() => {
-    const f = filter === "tous" ? items : items.filter(m => m.gender === filter);
-    setPage(1);
-    return f;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, items]);
+ 
+const filtered = useMemo(() => {
+  const term = search.trim().toLocaleLowerCase("fr");
+
+  return items.filter(m => {
+    // Les personnages archivés ne s'affichent que
+    // s'ils m'appartiennent et que la case est cochée.
+    const canDisplay =
+      !m.is_archived ||
+      (includeArchivedMine && m.user_id === session?.user?.id);
+
+    if (!canDisplay) return false;
+
+    if (!term) return true;
+
+    return [m.name, m.ownerName]
+      .some(value =>
+        String(value || "")
+          .toLocaleLowerCase("fr")
+          .includes(term)
+      );
+  });
+}, [items, search, includeArchivedMine, session?.user?.id]);
+
+useEffect(() => {
+  setPage(1);
+}, [search, includeArchivedMine]);
+
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const avatarNode = (m, size = 136) => (
-    <div
-      key={m.id}
-      onClick={() => setModalChar(m)}
-      title={`${m.name} — ${m.ownerName}`}
-      style={{ width: size, height: size }}
-      className="group cursor-pointer rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_10px_40px_rgba(0,0,0,.35)] hover:ring-amber-300/50 transition"
-    >
+ 
+const avatarNode = (m) => (
+  <button
+    key={m.id}
+    type="button"
+    onClick={() => setModalChar(m)}
+    title={`Voir la fiche de ${m.name}`}
+    className="group flex w-full min-w-0 flex-col items-center gap-2 rounded-2xl px-2 py-3 text-center transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-300"
+  >
+    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border border-white/20 bg-white/10 shadow-[0_10px_35px_rgba(0,0,0,.3)] ring-2 ring-white/20 transition duration-300 group-hover:-translate-y-1 group-hover:ring-amber-300/70 group-hover:shadow-[0_10px_35px_rgba(255,190,90,.2)] sm:h-[136px] sm:w-[136px]">
       {m.avatar_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={m.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        <img
+          src={m.avatar_url}
+          alt=""
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+        />
       ) : (
-        <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-3xl">
+        <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-700 to-slate-900 font-serif text-3xl text-white">
           {m.name?.[0]?.toUpperCase() || "?"}
         </div>
       )}
     </div>
-  );
+
+    <span className="w-full truncate font-serif text-base font-semibold text-white drop-shadow-md">
+      {m.name}
+    </span>
+
+    <span className="w-full truncate text-xs text-white/75">
+      Joueur : {m.ownerName}
+    </span>
+
+    {m.is_archived && (
+      <span className="rounded-full border border-amber-200/30 bg-black/35 px-2 py-0.5 text-[10px] text-amber-100">
+        Archivé
+      </span>
+    )}
+  </button>
+);
 
   if (loading) return <p className="p-8 text-white">Chargement…</p>;
   if (error)   return <p className="p-8 text-red-400">Erreur : {error}</p>;
 
   return (
-    <main className="fixed inset-0 overflow-hidden">
+    <main className="fixed inset-0 overflow-y-auto overscroll-contain">
       {/* BACKGROUND */}
       <div className="absolute inset-0 -z-20">
         <Image src="/images/members-bg.webp" alt="" fill priority className="object-cover" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
+
+
+{/* Halo chaleureux près de la lampe du décor */}
+<div
+  aria-hidden="true"
+  className="members-lamp-glow pointer-events-none fixed left-[23%] top-[37%] z-0 hidden h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,185,91,.24)_0%,rgba(255,139,55,.10)_36%,transparent_72%)] blur-xl md:block"
+/>
+
 
       {/* Retour */}
       <button
@@ -117,40 +169,52 @@ export default function MembersPage() {
       </button>
 
       {/* Carte centrale */}
-      <div className="absolute inset-0 grid place-items-center p-4">
-        <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x2 ring-1 ring-white/30 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
-          {/* Header + filtres */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <h1 className="text-xl font-semibold">Personnages</h1>
-            <div className="inline-flex items-center gap-2">
-              <FilterBtn active={filter === "tous"} onClick={() => setFilter("tous")}>Tous</FilterBtn>
-              <FilterBtn active={filter === "féminin"} onClick={() => setFilter("féminin")}>
-                Féminin
-              </FilterBtn>
-              <FilterBtn active={filter === "masculin"} onClick={() => setFilter("masculin")}>
-                Masculin
-              </FilterBtn>
-    <label className="ml-3 flex items-center gap-2 text-sm opacity-90">
+      <div className="relative flex min-h-screen items-start justify-center px-3 pb-10 pt-24 sm:px-6 sm:pb-12">
+        <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x1 ring-1 ring-white/30 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
+         
+{/* En-tête et recherche */}
+<div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  <div>
+    <h1 className="font-serif text-2xl font-semibold text-white">
+      Personnages
+    </h1>
+    <p className="mt-1 text-sm text-white/75">
+      {filtered.length} personnage{filtered.length > 1 ? "s" : ""}
+    </p>
+  </div>
+
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <input
+      type="search"
+      value={search}
+      onChange={e => setSearch(e.target.value)}
+      placeholder="Rechercher un personnage ou un joueur…"
+      className="w-full rounded-xl border border-white/30 bg-black/20 px-4 py-2.5 text-sm text-white placeholder-white/65 outline-none backdrop-blur-md focus:border-amber-300 sm:w-72"
+    />
+
+    <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white/90">
       <input
         type="checkbox"
-       checked={includeArchivedMine}
-        onChange={(e)=>setIncludeArchivedMine(e.target.checked)}
+        checked={includeArchivedMine}
+        onChange={e => setIncludeArchivedMine(e.target.checked)}
+        className="h-4 w-4 accent-amber-400"
       />
-      Inclure mes archivés
+      Mes archivés
     </label>
-            </div>
-          </div>
+  </div>
+</div>
 
-          {/* Grille */}
-          <div className="grid grid-cols-4 grid-rows-4 gap-6 place-items-center">
-            {pageItems.map(m => avatarNode(m))}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - pageItems.length) }).map((_, i) => (
-              <div
-                key={`empty-${i}`}
-                className="rounded-full w-[136px] h-[136px] border border-white/10 ring-2 ring-white/10 bg-white/5 opacity-30"
-              />
-            ))}
-          </div>
+{/* Grille responsive des personnages */}
+<div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+  {pageItems.map(m => avatarNode(m))}
+</div>
+
+{filtered.length === 0 && (
+  <div className="rounded-xl border border-white/20 bg-black/15 px-5 py-12 text-center text-white/80">
+    Aucun personnage trouvé.
+  </div>
+)}
+
 
           {/* Pagination */}
           {filtered.length > PAGE_SIZE && (

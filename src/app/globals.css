@@ -61,3 +61,36 @@ body {
     opacity: 1;
   }
 }
+
+/* Lumière animée de la page Membres */
+@keyframes members-lamp-flicker {
+  0%, 100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  30% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+
+  65% {
+    opacity: 0.65;
+    transform: translate(-50%, -50%) scale(0.97);
+  }
+
+  85% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+}
+
+.members-lamp-glow {
+  animation: members-lamp-flicker 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .members-lamp-glow {
+    animation: none;
+  }
+}
