@@ -63,10 +63,10 @@ export default function AuthPage() {
 
           <div className="p-6 sm:p-8 text-slate-100">
             <h1 className="text-2xl font-semibold tracking-wide mb-2">
-                ⭒   CRIMSON CURSE   ⭒
+                ⭒   ALWAYS   ⭒
             </h1>
             <p className="text-slate-200/80 mb-6">
-              Puissent les courants te venir en aide.
+              After all this time?
             </p>
 
             {errorMsg && (
