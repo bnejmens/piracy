@@ -45,7 +45,13 @@ export default function RPPage() {
   const reload = useCallback(async (uid) => {
     const [zonesR, locationsR, topicsR, postsR, profileR] = await Promise.all([
       supabase.from('rp_zones').select('id,name,slug,description,image_url,display_order').eq('is_active', true).order('display_order'),
-      supabase.from('rp_locations').select('id,zone_id,name,slug,description,display_order').eq('is_active', true).order('display_order'),
+      supabase
+  .from('rp_locations')
+  .select(
+    'id,zone_id,name,slug,description,image_url,display_order'
+  )
+  .eq('is_active', true)
+  .order('display_order'),
       supabase.from('rp_topics').select('id,title,author_id,created_by,created_at,location_id').order('created_at', { ascending: false }).limit(1000),
       supabase.from('rp_posts').select('topic_id,author_user_id').limit(10000),
       supabase.from('profiles').select('pseudo,avatar_url,active_character_id').eq('user_id', uid).maybeSingle(),
@@ -253,6 +259,27 @@ export default function RPPage() {
         </div>
       </header>
 
+{/* Background de la sous-zone sélectionnée */}
+{view === 'location' && selectedLocation?.image_url && (
+  <div
+    className="pointer-events-none absolute inset-x-0 top-[60px] bottom-0 z-0 overflow-hidden"
+    aria-hidden="true"
+  >
+    <div
+      className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: `url("${selectedLocation.image_url}")`,
+      }}
+    />
+
+    {/* Dégradé pour conserver une bonne lisibilité */}
+    <div className="absolute inset-0 bg-gradient-to-b from-[#110d19]/35 via-[#110d19]/70 to-[#100e17]/95" />
+
+    {/* Léger voile supplémentaire */}
+    <div className="absolute inset-0 bg-[#100e17]/15" />
+  </div>
+)}
+
       <div className="relative z-10 mx-auto max-w-[1580px] px-4 py-7 md:px-7">
         <div className="w-full">
           <section className="min-w-0">
@@ -311,7 +338,7 @@ export default function RPPage() {
                 {view === 'location' && <button onClick={() => openCreate(locationId)} className="mb-5 rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#24191c] hover:bg-amber-200">+ Créer un RP ici</button>}
                 <div className="space-y-3">
                   {visibleTopics.map(topicCard)}
-                  {visibleTopics.length === 0 && <p className="rounded-xl border border-amber-200/15 bg-white/5 p-7 text-center text-white/60">Aucun RP dans cette rubrique pour le moment.</p>}
+                  {visibleTopics.length === 0 && <p className="rounded-xl border border-amber-200/15 bg-[#120f1c]/65 backdrop-blur-md p-7 text-center text-white/60">Aucun RP dans cette rubrique pour le moment.</p>}
                 </div>
               </>
             )}
