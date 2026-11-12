@@ -296,7 +296,7 @@ async function createTopic(e) {
       backgroundImage: "url('/images/rp/rp-ambient-bg.png')",
       filter: 'blur(8px)',
       transform: 'scale(1.05)',
-      opacity: 0.85,
+      opacity: 0.55,
     }}
   />
 </div>
