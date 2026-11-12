@@ -63,23 +63,27 @@ const [inviteLoading, setInviteLoading] = useState(false)
     const failed = [zonesR, locationsR, topicsR, postsR, profileR].find(r => r.error)
     if (failed) throw new Error(failed.error.message)
 
-    setZones(zonesR.data || [])
+    
 setZones(zonesR.data || [])
+setLocations(locationsR.data || [])
 
-// Ouvrir directement une zone depuis le menu du lecteur RP
-const requestedZoneId = new URLSearchParams(
+// Ouvrir directement une sous-zone depuis le lecteur RP
+const requestedLocationId = new URLSearchParams(
   window.location.search
-).get('zone')
+).get('location')
 
 if (
-  requestedZoneId &&
-  (zonesR.data || []).some(zone => zone.id === requestedZoneId)
+  requestedLocationId &&
+  (locationsR.data || []).some(
+    location => location.id === requestedLocationId
+  )
 ) {
-  setSelectedZone(requestedZoneId)
-  setSelectedLocation(null)
-  setView('zone')
+  setLocationId(requestedLocationId)
+  setView('location')
+} else {
+  setLocationId(null)
+  setView('zones')
 }
-    setLocations(locationsR.data || [])
     setTopics(topicsR.data || [])
     setPosts(postsR.data || [])
     setProfile(profileR.data || null)

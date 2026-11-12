@@ -158,6 +158,7 @@ export default function RPPage() {
   const [posts, setPosts] = useState([])
 const [sceneMenuOpen, setSceneMenuOpen] = useState(false)
 const [zonesMenuOpen, setZonesMenuOpen] = useState(false)
+const [expandedZoneId, setExpandedZoneId] = useState(null)
 const [sceneSearch, setSceneSearch] = useState('')
 const [mobilePane, setMobilePane] = useState('read')
 const [places, setPlaces] = useState([])
@@ -616,31 +617,74 @@ const loadTopics = async () => {
   >
     Zones RP ▾
   </button>
+  
+{zonesMenuOpen && (
+  <div className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1rem)] max-h-[75vh] overflow-y-auto rounded-xl border border-amber-200/25 bg-[#241b30] p-2 shadow-2xl sm:left-0 sm:right-auto">
 
-  {zonesMenuOpen && (
-    <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-amber-200/25 bg-[#241b30] p-2 shadow-2xl sm:left-0 sm:right-auto">
+    {/* Retour à l'accueil des quatre zones */}
+    <button
+      type="button"
+      onClick={() => {
+        setZonesMenuOpen(false)
+        router.push('/rp')
+      }}
+      className="w-full rounded-lg border-b border-amber-200/15 px-3 py-3 text-left text-sm font-medium text-amber-200 hover:bg-white/10"
+    >
+      ← Toutes les zones
+    </button>
 
-      <button
-        type="button"
-        onClick={() => router.push('/rp')}
-        className="w-full rounded-lg border-b border-amber-200/15 px-3 py-3 text-left text-sm font-medium text-amber-200 hover:bg-white/10"
-      >
-        ← Toutes les zones
-      </button>
+    {/* Les quatre zones et leurs sous-zones */}
+    {zones.map(zone => {
+      const zonePlaces = places.filter(
+        place => place.zone_id === zone.id
+      )
 
-      {zones.map(zone => (
-        <button
+      const isExpanded = expandedZoneId === zone.id
+
+      return (
+        <div
           key={zone.id}
-          type="button"
-          onClick={() => router.push(`/rp?zone=${encodeURIComponent(zone.id)}`)}
-          className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-amber-50 transition hover:bg-white/10"
+          className="border-t border-amber-200/10"
         >
-          {zone.name}
-        </button>
-      ))}
-    </div>
-  )}
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedZoneId(isExpanded ? null : zone.id)
+            }
+            aria-expanded={isExpanded}
+            className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-amber-100 hover:bg-white/10"
+          >
+            <span>{zone.name}</span>
+            <span>{isExpanded ? '⌃' : '⌄'}</span>
+          </button>
+
+          {isExpanded && (
+            <div className="mb-2 ml-3 border-l border-amber-300/25 pl-2">
+              {zonePlaces.map(place => (
+                <button
+                  key={place.id}
+                  type="button"
+                  onClick={() => {
+                    setZonesMenuOpen(false)
+                    router.push(
+                      `/rp?location=${encodeURIComponent(place.id)}`
+                    )
+                  }}
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm text-amber-50/80 hover:bg-amber-200/10 hover:text-amber-100"
+                >
+                  <span>{place.name}</span>
+                  <span className="text-amber-300/60">→</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    })}
+  </div>
+)}
 </div>
+
 
 
         <button onClick={() => router.push('/messages')} className="rounded-lg px-3 py-2 hover:bg-white/10">
