@@ -621,12 +621,14 @@ export default function NotificationsWidget() {
                       </p>
                     )}
 
-                  {lastSeenAt && (
-                    <p className="border-t border-white/10 pt-3 text-xs text-white/40">
-                      Dernière lecture du flux d'activité :{' '}
-                      {new Date(lastSeenAt).toLocaleString('fr-FR')}
-                    </p>
-                  )}
+                 
+{lastSeenAt && (
+  <p className="border-t border-white/10 pt-3 text-xs text-white/40">
+    Dernière lecture du flux d&apos;activité :{' '}
+    {new Date(lastSeenAt).toLocaleString('fr-FR')}
+  </p>
+)}
+
                 </>
               )}
             </div>

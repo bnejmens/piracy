@@ -7,14 +7,14 @@ export default function VerificationEmailPage() {
         <div className="text-5xl mb-6">✉️</div>
 
         <h1 className="text-2xl font-bold mb-4">
-          Une dernière étape avant l'aventure !
+          Une dernière étape avant l&apos;aventure !
         </h1>
 
         <p className="text-slate-200 mb-6 leading-relaxed">
           Ton inscription a bien été enregistrée.
           <br /><br />
-          Un <strong>email de confirmation</strong> t'a été envoyé
-          à l'adresse renseignée lors de ton inscription.
+          Un <strong>email de confirmation</strong> t&apos;a été envoyé
+          à l&apos;adresse renseignée lors de ton inscription.
           <br /><br />
           Consulte ta boîte mail et clique sur le lien reçu
           pour <strong>activer ton compte</strong>.
