@@ -156,6 +156,12 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+const [sceneMenuOpen, setSceneMenuOpen] = useState(false)
+const [sceneSearch, setSceneSearch] = useState('')
+const [mobilePane, setMobilePane] = useState('read')
+const [places, setPlaces] = useState([])
+const [zones, setZones] = useState([])
+const [participantsIndex, setParticipantsIndex] = useState({})
 
   // Nuancier
   const [showPalette, setShowPalette] = useState(false)
@@ -284,10 +290,11 @@ async function openPosterCard(authorId, authorCharacterId) {
 
   /* ---------- DATA ---------- */
 
+
 const loadTopics = async () => {
   const { data, error } = await supabase
     .from('rp_topics')
-    .select('id, title, created_at, author_id')
+    .select('id,title,created_at,updated_at,author_id,created_by,location_id')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -296,20 +303,74 @@ const loadTopics = async () => {
     return
   }
 
-  setTopics(data || [])
+  const list = data || []
+  setTopics(list)
 
-  if (!activeTopic && (data?.length || 0) > 0) {
+  const [zonesResult, placesResult] = await Promise.all([
+    supabase.from('rp_zones').select('id,name'),
+    supabase.from('rp_locations').select('id,zone_id,name,image_url'),
+  ])
+
+  if (!zonesResult.error) setZones(zonesResult.data || [])
+  if (!placesResult.error) setPlaces(placesResult.data || [])
+
+  if (list.length) {
+    const { data: entries, error: postsError } = await supabase
+      .from('rp_posts')
+      .select('topic_id,author_character_id')
+      .in('topic_id', list.map(t => t.id))
+      .limit(10000)
+
+    if (!postsError && entries) {
+      const characterIds = [
+        ...new Set(entries.map(p => p.author_character_id).filter(Boolean))
+      ]
+
+      const { data: characters } = characterIds.length
+        ? await supabase
+            .from('characters')
+            .select('id,name,avatar_url')
+            .in('id', characterIds)
+        : { data: [] }
+
+      const byId = new Map(
+        (characters || []).map(c => [c.id, c])
+      )
+
+      const index = {}
+
+      for (const post of entries) {
+        const character = byId.get(post.author_character_id)
+        if (!character) continue
+
+        if (!index[post.topic_id]) {
+          index[post.topic_id] = new Map()
+        }
+
+        index[post.topic_id].set(character.id, character)
+      }
+
+      setParticipantsIndex(
+        Object.fromEntries(
+          Object.entries(index).map(([id, map]) => [
+            id,
+            [...map.values()]
+          ])
+        )
+      )
+    }
+
     const requested = new URLSearchParams(
       window.location.search
     ).get('topic')
 
-    const first =
-      data.find(t => String(t.id) === requested) || data[0]
+    const first = list.find(t => t.id === requested) || list[0]
 
     setActiveTopic(first)
     await loadPosts(first.id)
   }
 }
+
 
   const loadPosts = async (topicId) => {
     const { data, error } = await supabase
@@ -413,7 +474,7 @@ const loadTopics = async () => {
       .from('rp_topics')
       .update({ title: next.trim() })
       .eq('id', t.id)
-      .select('id, title, created_at, author_id')
+      .select('id,title,created_at,updated_at,author_id,created_by,location_id')
       .single()
     if (error) { alert(error.message); return }
     setTopics(ts => ts.map(x => x.id === t.id ? data : x))
@@ -446,117 +507,296 @@ const loadTopics = async () => {
     requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(pos, pos) })
   }
 
+// ---------- NAVIGATION DES SCÈNES ----------
+
+  const locationById = new Map(
+    places.map(l => [l.id, l])
+  )
+
+  const zoneById = new Map(
+    zones.map(z => [z.id, z])
+  )
+
+  const placeLabel = topic => {
+    const location = locationById.get(topic?.location_id)
+    const zone = zoneById.get(location?.zone_id)
+
+    return (
+      [zone?.name, location?.name]
+        .filter(Boolean)
+        .join(' · ') ||
+      'Ancien RP · lieu non renseigné'
+    )
+  }
+
+  const activeLocation = locationById.get(
+    activeTopic?.location_id
+  )
+
+  const filteredScenes = topics.filter(topic => {
+    const searchable = [
+      topic.title,
+      placeLabel(topic),
+      ...(participantsIndex[topic.id] || [])
+        .map(c => c.name),
+    ]
+      .join(' ')
+      .toLocaleLowerCase('fr')
+
+    return searchable.includes(
+      sceneSearch.toLocaleLowerCase('fr').trim()
+    )
+  })
+
+  const chooseScene = async topic => {
+    setSceneMenuOpen(false)
+    setActiveTopic(topic)
+    setMobilePane('read')
+
+    window.history.replaceState(
+      null,
+      '',
+      `/rp/scene?topic=${encodeURIComponent(topic.id)}`
+    )
+
+    await loadPosts(topic.id)
+  }
+
   /* ---------- RENDER ---------- */
   return (
-    <main className="fixed inset-0 overflow-hidden">
-      {/* BG */}
-      <div className="absolute inset-0 -z-20">
-        <Image src="/images/rp-bg.webp" alt="" fill priority className="object-cover" />
-      </div>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/20 via-slate-900/15 to-slate-950/35" />
+    
+<main className="fixed inset-0 flex flex-col overflow-hidden bg-[#110e19] text-[#f4e7d2]">
 
-      {/* ← Tableau de bord (aligné à côté d’Ambiance en bas-gauche) */}
-<button
-  onClick={() => router.push('/dashboard')}
-  className={`
-    fixed z-50
-    bottom-6
-    left-[105px]   /* ~24px (left-7) + ~58px (diamètre Ambiance) + ~8px gap */
-    sm:left-[98px]
-    md:left-[116px]
-    lg:left-[122px]
-    xl:left-[136px]
-    2xl:left-[150px]
-    rounded-full border border-white/25 bg-white/15 backdrop-blur-md
-    px-3 py-1.5 text-white/90 text-md hover:bg-white/20 focus:outline-none
-  `}
-  title="Retour au dashboard"
->
-  ← Tableau de bord
-</button>
+  {/* Ambiance commune à l'accueil RP */}
+  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(114,81,126,.3),transparent_58%),linear-gradient(135deg,#1e1728,#100e17_70%)]" />
 
-      {/* GRID — responsive split pane */}
-      <div
-        className={`
-          rp-grid relative z-10 h-full min-h-0
-          grid gap-4 xl:gap-6
-          p-4 xl:p-6
-          grid-cols-1
-          lg:grid-cols-[360px_minmax(0,1fr)]
-          lg:[grid-auto-rows:minmax(0,1fr)]
-          xl:grid-cols-[380px_380px_minmax(0,1fr)]
-          2xl:grid-cols-[420px_420px_minmax(0,1fr)]
-        `}
+  {activeLocation?.image_url && (
+    <div
+      className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-20"
+      style={{
+        backgroundImage: `url("${activeLocation.image_url}")`
+      }}
+    />
+  )}
+
+  {/* Barre de navigation */}
+  <header className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 px-3 py-3 shadow-lg backdrop-blur-xl sm:px-6">
+
+    <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2">
+
+      <button
+        onClick={() => router.push('/rp')}
+        className="mr-auto font-serif text-xl text-amber-100 hover:text-amber-300"
       >
-        {/* -------- SUJETS -------- */}
-        <section
-          className={`isolate relative rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-1 lg:col-start-1 lg:row-start-1 xl:col-start-1 xl:row-start-1 xl:order-1`}
-          style={frost(GLASS.left)} >
-          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between bg-black/20 backdrop-blur-sm">
-            <span>Sujets en cours</span>
-            <button onClick={createTopic}
-                    className="rounded-lg bg-amber-300 text-slate-900 text-xs font-medium px-2.5 py-1 hover:bg-amber-200">
-              + Nouveau sujet
+        Le Monde Magique
+      </button>
+
+      <button
+        onClick={() => setSceneMenuOpen(v => !v)}
+        aria-expanded={sceneMenuOpen}
+        className="rounded-lg border border-amber-300/35 bg-amber-200/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-200/20"
+      >
+        Tous les RP ▾
+      </button>
+
+      <nav className="flex flex-wrap gap-1 text-sm">
+
+        <button onClick={() => router.push('/rp')} className="rounded-lg px-3 py-2 hover:bg-white/10">
+          Zones RP
+        </button>
+
+        <button onClick={() => router.push('/messages')} className="rounded-lg px-3 py-2 hover:bg-white/10">
+          Messagerie
+        </button>
+
+        <button onClick={() => router.push('/profile')} className="rounded-lg px-3 py-2 hover:bg-white/10">
+          Profil
+        </button>
+
+        <a href="/wiki" target="_blank" rel="noopener noreferrer" className="rounded-lg px-3 py-2 hover:bg-white/10">
+          Wiki ↗
+        </a>
+
+        <button onClick={() => router.push('/dashboard')} className="rounded-lg px-3 py-2 hover:bg-white/10">
+          Tableau de bord
+        </button>
+
+      </nav>
+    </div>
+
+    {/* Menu déroulant des scènes */}
+    {sceneMenuOpen && (
+      <div className="absolute left-2 right-2 top-full z-50 mt-2 max-h-[75vh] overflow-hidden rounded-2xl border border-amber-200/25 bg-[#241b30] shadow-2xl sm:left-auto sm:right-6 sm:w-[520px]">
+
+        <div className="border-b border-amber-200/15 p-3">
+
+          <div className="mb-2 flex items-center justify-between">
+            <strong className="font-serif text-lg text-amber-100">
+              Explorer les RP
+            </strong>
+
+            <button onClick={() => setSceneMenuOpen(false)} className="rounded-lg px-2 py-1 hover:bg-white/10">
+              Fermer ×
             </button>
-          </header>
-
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
-            {visibleTopics.map(t => {
-              const isMineTopic = !!t.author_id && (t.author_id === session?.user?.id)
-              return (
-                <div key={t.id} className="relative">
-                  {/* carte sujet */}
-                  <button
-                    onClick={async () => { setActiveTopic(t); await loadPosts(t.id) }}
-                    className={`w-full text-left rounded-lg px-3 py-2 border transition
-                           ${activeTopic?.id===t.id ? 'bg-white/12 border-white/30' : 'bg-white/6 border-white/12 hover:bg-white/10'}`}
-                  >
-                    <div className="text-white/90 text-sm truncate mb-2">{t.title}</div>
-                    <TopicParticipants topicId={t.id} />
-                  </button>
-
-                  {/* actions owner sujet */}
-                  {isMineTopic && (
-                    <div className="absolute right-2 top-2 flex gap-2">
-                      <button
-                        onClick={() => renameTopic(t)}
-                        className="rounded-md border border-white/20 bg-white/10 text-white text-xs px-2 py-1 hover:bg-white/15"
-                        title="Éditer le sujet"
-                      >
-                        Éditer
-                      </button>
-                      <button
-                        onClick={() => removeTopic(t)}
-                        className="rounded-md bg-rose-500/20 border border-rose-300/40 text-rose-100 text-xs px-2 py-1 hover:bg-rose-500/30"
-                        title="Supprimer le sujet"
-                      >
-                        Suppr.
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            {!visibleTopics.length && <div className="text-white/60 text-sm">Aucun sujet.</div>}
           </div>
 
-          <footer className="px-3 py-2 border-t border-white/10 flex items-center justify-between text-white/80 text-sm">
-            <button disabled={topicsPage<=1}
-                    onClick={()=>setTopicsPage(p=>Math.max(1,p-1))}
-                    className="px-2 py-1 rounded border border-white/15 bg-white/10 disabled:opacity-50">Préc.</button>
-            <span>Page {topicsPage} / {pageCount}</span>
-            <button disabled={topicsPage>=pageCount}
-                    onClick={()=>setTopicsPage(p=>Math.min(pageCount,p+1))}
-                    className="px-2 py-1 rounded border border-white/15 bg-white/10 disabled:opacity-50">Suiv.</button>
-          </footer>
-        </section>
+          <input
+            value={sceneSearch}
+            onChange={e => setSceneSearch(e.target.value)}
+            placeholder="Titre, lieu ou personnage…"
+            className="w-full rounded-lg border border-amber-200/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-amber-300"
+          />
+        </div>
+
+        <div className="max-h-[55vh] space-y-2 overflow-y-auto p-3">
+
+          {filteredScenes.map(topic => (
+            <div
+              key={topic.id}
+              className={`rounded-xl border p-3 ${
+                topic.id === activeTopic?.id
+                  ? 'border-amber-300/50 bg-amber-300/10'
+                  : 'border-white/10 bg-white/5'
+              }`}
+            >
+
+              <button
+                onClick={() => chooseScene(topic)}
+                className="w-full text-left"
+              >
+                <div className="font-serif text-base text-amber-50">
+                  {topic.title}
+                </div>
+
+                <div className="mt-1 text-xs text-amber-200/75">
+                  {placeLabel(topic)}
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {(participantsIndex[topic.id] || []).map(character => (
+                    <span
+                      key={character.id}
+                      className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs text-white/80"
+                    >
+                      {character.avatar_url ? (
+                        <img
+                          src={character.avatar_url}
+                          alt=""
+                          className="h-5 w-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-white/15">
+                          {character.name[0]}
+                        </span>
+                      )}
+
+                      {character.name}
+                    </span>
+                  ))}
+
+                  {!(participantsIndex[topic.id] || []).length && (
+                    <span className="text-xs text-white/45">
+                      Aucun post publié
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              {(topic.author_id === session?.user?.id ||
+                topic.created_by === session?.user?.id) && (
+                <div className="mt-2 flex justify-end gap-2 border-t border-white/10 pt-2">
+                  <button
+                    onClick={() => renameTopic(topic)}
+                    className="rounded px-2 py-1 text-xs hover:bg-white/10"
+                  >
+                    Renommer
+                  </button>
+
+                  <button
+                    onClick={() => removeTopic(topic)}
+                    className="rounded px-2 py-1 text-xs text-rose-200 hover:bg-rose-400/10"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {!filteredScenes.length && (
+            <p className="p-4 text-sm text-white/60">
+              Aucun RP trouvé.
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-amber-200/15 p-3 text-right">
+          <button
+            onClick={() => router.push('/rp')}
+            className="rounded-lg bg-amber-300 px-3 py-2 text-sm font-semibold text-[#231b22]"
+          >
+            + Nouveau RP dans une zone
+          </button>
+        </div>
+      </div>
+    )}
+  </header>
+
+  {/* Titre et localisation */}
+  <div className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-amber-200/10 bg-[#15111d]/70 px-4 py-3 lg:px-6">
+    <div className="min-w-0">
+
+      <h1 className="truncate font-serif text-lg text-amber-100 sm:text-2xl">
+        {activeTopic?.title || 'Lecture RP'}
+      </h1>
+
+      <p className="truncate text-xs text-amber-200/65">
+        {placeLabel(activeTopic)}
+      </p>
+    </div>
+
+    {/* Navigation téléphone */}
+    <div className="flex shrink-0 gap-1 lg:hidden">
+
+      <button
+        onClick={() => setMobilePane('read')}
+        className={`rounded-lg px-3 py-2 text-sm ${
+          mobilePane === 'read'
+            ? 'bg-amber-300 text-[#231b22]'
+            : 'bg-white/10'
+        }`}
+      >
+        Lire
+      </button>
+
+      <button
+        onClick={() => setMobilePane('write')}
+        className={`rounded-lg px-3 py-2 text-sm ${
+          mobilePane === 'write'
+            ? 'bg-amber-300 text-[#231b22]'
+            : 'bg-white/10'
+        }`}
+      >
+        Écrire
+      </button>
+    </div>
+  </div>
+
+  {/* Deux colonnes sur ordinateur, un panneau sur téléphone */}
+  <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(320px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
+
 
         {/* -------- ÉDITEUR -------- */}
         <section
-          className={`rp-editor isolate relative rounded-2xl border border-white/15 overflow-hidden flex flex-col min-h-0 order-3 lg:col-start-2 lg:row-start-2 lg:min-h-[32vh] lg:order-3 xl:col-start-2 xl:row-start-1 xl:order-2`}
-          style={frost(GLASS.editor)}
+          className={`rp-editor isolate relative rounded-2xl border border-amber-200/20 overflow-hidden flex-col min-h-0 ${
+  mobilePane === 'write' ? 'flex' : 'hidden'
+} lg:flex`}
+style={{
+  background: 'rgba(28,20,39,0.91)',
+  backdropFilter: 'blur(14px)',
+}}
         >
-          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 backdrop-blur-sm">
+          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-[#32263f]/80 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Sélectionne un sujet pour écrire'}
           </header>
 
@@ -588,6 +828,7 @@ const loadTopics = async () => {
       onUL={() => insertAroundSelection('[ul]','[/ul]','[li]…[/li]')}
       onOL={() => insertAroundSelection('[ol]','[/ol]','[li]…[/li]')}
       onCenter={() => insertAroundSelection('[center]','[/center]')}
+      onLeft={() => insertAroundSelection('[left]','[/left]')}
       onRight={() => insertAroundSelection('[right]','[/right]')}
       onH2={() => insertAroundSelection('[h2]','[/h2]')}
       onHR={() => insertAroundSelection('[hr]','')}
@@ -608,6 +849,30 @@ onYouTube={() => {
     ].filter(Boolean).join(' ')
     insertAroundSelection(`[youtube${opts ? ' ' + opts : ''}]`, `[/youtube]`, url)
   }}
+
+onVimeo={() => {
+  const url = prompt(
+    'Adresse Vimeo (vimeo.com/12345 ou player.vimeo.com/video/12345) ?'
+  )?.trim()
+
+  if (!url) return
+
+  const match = url.match(
+    /vimeo\.com\/(?:video\/)?(\d+)/i
+  )
+
+  if (!match) {
+    alert('Adresse Vimeo invalide.')
+    return
+  }
+
+  insertAroundSelection(
+    '[vimeo]',
+    '[/vimeo]',
+    `https://player.vimeo.com/video/${match[1]}`
+  )
+}}
+
     />
   </div>
 
@@ -653,13 +918,19 @@ onYouTube={() => {
             </div>
           </div>
         </section>
+        
+{/* -------- POSTS -------- */}
+<section
+  className={`rp-posts isolate relative rounded-2xl border border-amber-200/20 overflow-hidden flex-col min-w-0 min-h-0 ${
+    mobilePane === 'read' ? 'flex' : 'hidden'
+  } lg:flex`}
+  style={{
+    background: 'rgba(30,23,40,0.90)',
+    backdropFilter: 'blur(14px)',
+  }}
+>
 
-        {/* -------- POSTS -------- */}
-        <section
-          className={`rp-posts isolate relative rounded-2xl border border-white/15 overflow-hidden flex flex-col min-w-0 min-h-0 order-2 lg:col-start-2 lg:row-start-1 lg:min-h-[62vh] lg:order-2 xl:col-start-3 xl:row-start-1 xl:order-3`}
-          style={frost(GLASS.right)}
-        >
-          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 backdrop-blur-sm">
+          <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 bg-[#32263f]/80 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Posts'}
           </header>
 
@@ -722,7 +993,7 @@ onYouTube={() => {
                     </div>
                   ) : (
                     <div
-                      className="rp-body prose max-w-none prose-slate prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
+                      className="rp-body prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
                       dangerouslySetInnerHTML={{ __html: p.content_html }}
                     />
                   )}
@@ -765,99 +1036,39 @@ onYouTube={() => {
       )}
 
       {/* 🔧 Ajustements ciblés tablette paysage (1024–1279px) */}
+
+
 <style jsx global>{`
-  @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
-    .rp-grid {
-      padding: 16px !important;
-      gap: 12px !important; /* un poil moins de gap pour gagner de la place */
-      grid-template-columns: 360px minmax(0, 1fr) !important;
-      grid-auto-rows: minmax(0, 1fr) !important;
-    }
-
-    /* Assure l'ordre et évite tout chevauchement visuel */
-    .rp-posts { min-height: 60vh !important; z-index: 10; }
-    .rp-editor { min-height: 36vh !important; z-index: 20; } /* éditeur au-dessus au cas où */
-    .rp-button { left: 16px !important; bottom: 16px !important; }
-    .rp-posts .prose { font-size: 0.95rem; }
-
-    /* Lisibilité tablette : garder le noir PAR DÉFAUT
-       mais NE PAS écraser les couleurs inline (ex: [color=#...]) */
-    .rp-posts .rp-body { color: #0f172a; }
-
-    /* Forcer le noir UNIQUEMENT si l’élément n’a pas déjà de couleur inline */
-    .rp-posts .rp-body :not([style*="color"]) { color: #0f172a !important; }
-
-    /* Liens / citations / code – idem, sans écraser les couleurs inline */
-    .rp-posts .rp-body a:not([style*="color"]) { color: #a16207 !important; }
-    .rp-posts .rp-body blockquote:not([style*="color"]) { color: #0f172a !important; }
-    .rp-posts .rp-body code:not([style*="color"]),
-    .rp-posts .rp-body pre:not([style*="color"]) { color: #0f172a !important; }
-
-/* Iframes responsives & jolis */
-.rp-posts .video-embed {
-   position: relative;
-   display: block;          /* wrapper bloc par défaut */
-   max-width: 100%;         /* jamais dépasser la colonne */
-   margin: 8px 0;
- }
-.rp-posts .video-embed[data-align="center"] { margin-left: auto !important; margin-right: auto !important; }
-.rp-posts .video-embed[data-align="right"]  { margin-left: auto !important; }
- .rp-posts .video-embed > iframe {
-   display: block;
-   border: 0;
-   border-radius: 12px;
-   width: 100%;             /* par défaut : remplir le wrapper */
- }
- /* Aspect ratio par défaut UNIQUEMENT si aucune hauteur forcée */
- .rp-posts .video-embed:not([data-fixed="true"]) > iframe:not([style*="height"]) {
-   aspect-ratio: 16 / 9;
- }
-
-
-    /* Séparateurs / images */
-    .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
-    .rp-posts .rp-body img { background: transparent !important; }
+  .rp-posts .rp-body {
+    color: #f3e8d7;
+    line-height: 1.85;
+    overflow-wrap: anywhere;
   }
-`}</style>
 
-<style jsx global>{`
-  /* Base : texte noir par défaut */
-  .rp-posts .rp-body { color: #0f172a; }
+  .rp-posts .rp-body a {
+    color: #f4c978;
+    text-decoration: underline;
+  }
 
-  /* Ne force pas si l’élément a déjà une couleur inline (préserve [color=#...]) */
-  .rp-posts .rp-body :not([style*="color"]) { color: #0f172a !important; }
+  .rp-posts .rp-body blockquote {
+    border-left: 3px solid #d6ae70;
+    padding-left: 1rem;
+    color: #e2d3c5;
+  }
 
-  /* Variantes usuelles, sans écraser les couleurs inline des joueurs */
-  .rp-posts .rp-body a:not([style*="color"]) { color: #0f172a !important; text-decoration: underline; }
-  .rp-posts .rp-body blockquote:not([style*="color"]) { color: #0f172a !important; }
-  .rp-posts .rp-body code:not([style*="color"]),
-  .rp-posts .rp-body pre:not([style*="color"]) { color: #0f172a !important; }
-
-  /* Séparateurs / images */
-  .rp-posts .rp-body hr { border-color: rgba(0,0,0,0.15) !important; }
-  .rp-posts .rp-body img { background: transparent !important; }
-
-/* Iframes responsives & alignements — GLOBAL */
+  .rp-posts .rp-body img,
   .rp-posts .video-embed {
-    position: relative;
-    display: block;
     max-width: 100%;
-    margin: 8px 0;
   }
-  .rp-posts .video-embed[data-align="center"] { margin-left: auto; margin-right: auto; }
-  .rp-posts .video-embed[data-align="right"]  { margin-left: auto; }
-  .rp-posts .video-embed > iframe {
+
+  .rp-posts .video-embed iframe {
     display: block;
-    border: 0;
-    border-radius: 12px;
     width: 100%;
-  }
-  /* Aspect ratio auto seulement si aucune hauteur n'est imposée */
-  .rp-posts .video-embed:not([data-fixed="true"]) > iframe:not([style*="height"]) {
     aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: 10px;
   }
 `}</style>
-
 
     </main>
   )
@@ -1015,9 +1226,25 @@ function PostAsBadge({ characterId }) {
 }
 
 function EditorToolbar({
-  onBold, onItalic, onUnderline, onStrike,
-  onQuote, onCode, onUL, onOL, onCenter, onRight, onH2, onHR, onSize,
-  onLink, onImage, onPickColor, onYouTube
+  onBold,
+  onItalic,
+  onUnderline,
+  onStrike,
+  onQuote,
+  onCode,
+  onUL,
+  onOL,
+  onCenter,
+  onLeft,
+  onRight,
+  onH2,
+  onHR,
+  onSize,
+  onLink,
+  onImage,
+  onPickColor,
+  onYouTube,
+  onVimeo,
 }) {
   const Btn = ({ children, onClick, title }) => (
     <button type="button" title={title} onClick={onClick}
@@ -1049,6 +1276,10 @@ function EditorToolbar({
       <Btn onClick={onImage}>Img</Btn>
       <Btn onClick={onYouTube} title="Insérer une vidéo YouTube">YT</Btn>
       <Btn onClick={onPickColor}>Couleur</Btn>
+<Btn onClick={onLeft}>←</Btn>
+<Btn onClick={onVimeo} title="Insérer une vidéo Vimeo">
+  Vimeo
+</Btn>
     </div>
   )
 }
