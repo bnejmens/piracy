@@ -64,6 +64,21 @@ const [inviteLoading, setInviteLoading] = useState(false)
     if (failed) throw new Error(failed.error.message)
 
     setZones(zonesR.data || [])
+setZones(zonesR.data || [])
+
+// Ouvrir directement une zone depuis le menu du lecteur RP
+const requestedZoneId = new URLSearchParams(
+  window.location.search
+).get('zone')
+
+if (
+  requestedZoneId &&
+  (zonesR.data || []).some(zone => zone.id === requestedZoneId)
+) {
+  setSelectedZone(requestedZoneId)
+  setSelectedLocation(null)
+  setView('zone')
+}
     setLocations(locationsR.data || [])
     setTopics(topicsR.data || [])
     setPosts(postsR.data || [])

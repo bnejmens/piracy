@@ -157,6 +157,7 @@ export default function RPPage() {
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
 const [sceneMenuOpen, setSceneMenuOpen] = useState(false)
+const [zonesMenuOpen, setZonesMenuOpen] = useState(false)
 const [sceneSearch, setSceneSearch] = useState('')
 const [mobilePane, setMobilePane] = useState('read')
 const [places, setPlaces] = useState([])
@@ -238,23 +239,21 @@ async function openPosterCard(authorId, authorCharacterId) {
   }, [raw])
 
   // Source de vérité = me.active_character_id ; fallback = premier perso actif
-  useEffect(() => {
-    if (!myChars.length) { setPostAsCharId(null); return }
-    const fromProfile = me?.active_character_id
-      ? myChars.find(c => String(c.id) === String(me.active_character_id))
-      : null
-    setPostAsCharId(fromProfile?.id || myChars[0].id)
-  }, [myChars, me?.active_character_id])
+  // Utiliser automatiquement le personnage actif du compte
+useEffect(() => {
+  if (!myChars.length) {
+    setPostAsCharId(null)
+    return
+  }
 
-  // garde un perso valide sélectionné
-  useEffect(() => {
-    if (myChars.length === 0) { setPostAsCharId(null); return; }
-    if (!postAsCharId || !myChars.find(c => String(c.id) === String(postAsCharId))) {
-      const preferred = me?.active_character_id && myChars.find(c => String(c.id) === String(me.active_character_id));
-      setPostAsCharId(preferred?.id || myChars[0].id);
-    }
-  }, [myChars, me?.active_character_id])
+  const currentCharacter = myChars.find(
+    c => String(c.id) === String(me?.active_character_id)
+  )
 
+  setPostAsCharId(
+    currentCharacter?.id || myChars[0].id
+  )
+}, [myChars, me?.active_character_id])
   // Boot
   useEffect(() => {
     const run = async () => {
@@ -592,7 +591,10 @@ const loadTopics = async () => {
       </button>
 
       <button
-        onClick={() => setSceneMenuOpen(v => !v)}
+        onClick={() => {
+  setSceneMenuOpen(v => !v)
+  setZonesMenuOpen(false)
+}}
         aria-expanded={sceneMenuOpen}
         className="rounded-lg border border-amber-300/35 bg-amber-200/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-200/20"
       >
@@ -601,9 +603,45 @@ const loadTopics = async () => {
 
       <nav className="flex flex-wrap gap-1 text-sm">
 
-        <button onClick={() => router.push('/rp')} className="rounded-lg px-3 py-2 hover:bg-white/10">
-          Zones RP
+       
+<div className="relative">
+  <button
+    type="button"
+    onClick={() => {
+      setZonesMenuOpen(v => !v)
+      setSceneMenuOpen(false)
+    }}
+    aria-expanded={zonesMenuOpen}
+    className="rounded-lg px-3 py-2 text-amber-50 hover:bg-white/10"
+  >
+    Zones RP ▾
+  </button>
+
+  {zonesMenuOpen && (
+    <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-amber-200/25 bg-[#241b30] p-2 shadow-2xl sm:left-0 sm:right-auto">
+
+      <button
+        type="button"
+        onClick={() => router.push('/rp')}
+        className="w-full rounded-lg border-b border-amber-200/15 px-3 py-3 text-left text-sm font-medium text-amber-200 hover:bg-white/10"
+      >
+        ← Toutes les zones
+      </button>
+
+      {zones.map(zone => (
+        <button
+          key={zone.id}
+          type="button"
+          onClick={() => router.push(`/rp?zone=${encodeURIComponent(zone.id)}`)}
+          className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-amber-50 transition hover:bg-white/10"
+        >
+          {zone.name}
         </button>
+      ))}
+    </div>
+  )}
+</div>
+
 
         <button onClick={() => router.push('/messages')} className="rounded-lg px-3 py-2 hover:bg-white/10">
           Messagerie
@@ -801,21 +839,7 @@ style={{
           </header>
 
           <div className="p-4 space-y-3 overflow-y-auto min-h-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-white/80 text-sm">Poster en tant que</span>
-              <select
-                value={postAsCharId || ''}
-                onChange={e => setPostAsCharId(e.target.value || null)}
-                className="text-sm rounded-md bg-white/10 border border-white/20 text-white px-2 py-1"
-              >
-                {myChars.map(ch => (
-                  <option key={ch.id} value={ch.id} className="text-slate-900">{ch.name}</option>
-                ))}
-              </select>
-
-              {postAsCharId && <PostAsBadge characterId={postAsCharId} />}
-            </div>
-
+           
             <div className="relative z-20 rounded-lg border border-white/10 bg-white/10 backdrop-blur-md">
   <div className="p-2">
     <EditorToolbar
@@ -1013,21 +1037,26 @@ onVimeo={() => {
 )}
 
       {/* -------- MODALE PRÉVISUALISATION -------- */}
+            {/* -------- MODALE PRÉVISUALISATION -------- */}
       {isPreviewOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-gray-300 p-4 bg-white/90 backdrop-blur-sm flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-gray-800 font-semibold">Prévisualisation</h3>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-[#1c1427]/95 text-[#f4e7d2] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-amber-200/10 px-5 py-4">
+              <h3 className="font-serif text-xl text-amber-100">
+                Prévisualisation
+              </h3>
+
               <button
                 onClick={() => setPreviewOpen(false)}
-                className="rounded-md bg-gray-100 border border-gray-300 px-3 py-1.5 text-gray-800 hover:bg-gray-200 transition-colors"
+                className="rounded-md border border-amber-200/20 bg-white/10 px-3 py-1.5 text-amber-50 hover:bg-white/15 transition-colors"
               >
                 Fermer
               </button>
             </div>
-            <div className="overflow-y-auto flex-1">
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               <div
-                className="prose max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-hr:border-gray-300 prose-a:text-blue-700"
+                className="rp-preview prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-hr:border-white/20"
                 dangerouslySetInnerHTML={{ __html: htmlPreview }}
               />
             </div>
@@ -1054,6 +1083,29 @@ onVimeo={() => {
     border-left: 3px solid #d6ae70;
     padding-left: 1rem;
     color: #e2d3c5;
+  }
+
+  .rp-preview {
+    color: #f4e7d2;
+    line-height: 1.85;
+    overflow-wrap: anywhere;
+  }
+
+  .rp-preview a {
+    color: #f4c978;
+    text-decoration: underline;
+  }
+
+  .rp-preview blockquote {
+    border-left: 3px solid #d6ae70;
+    padding-left: 1rem;
+    color: #e2d3c5;
+  }
+
+  .rp-preview img,
+  .rp-preview iframe {
+    max-width: 100%;
+    border-radius: 10px;
   }
 
   .rp-posts .rp-body img,
