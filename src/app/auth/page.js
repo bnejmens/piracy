@@ -2,7 +2,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -151,20 +150,16 @@ export default function AuthPage() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      {/* BACKGROUND */}
-      <div className="absolute inset-0 -z-20">
-        <Image
-          src="/images/crimson-bg.png"
-          alt=""
-          fill
-          priority
-          className="object-cover"
-        />
-      </div>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
+      {/* Fond direct, identique à la page d'accueil */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url("/images/crimson-bg.png")' }}
+      />
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
 
       {/* Carte */}
-      <div className="absolute inset-0 grid place-items-center p-4">
+      <div className="absolute inset-0 z-20 grid place-items-center p-4">
         <div className="w-full max-w-md rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl ring-1 ring-white/10 shadow-[0_20px_80px_rgba(0,0,0,.45)]">
           <div className="pointer-events-none h-1 rounded-t-2xl bg-cyan-300/60" />
          

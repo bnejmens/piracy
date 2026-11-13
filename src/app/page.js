@@ -1,16 +1,39 @@
 // src/app/auth/page.js
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 
 export default function AuthPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    const checkSession = async () => {
+      let alreadyConnected = false
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error
+        if (active && session) {
+          alreadyConnected = true
+          router.replace('/dashboard')
+        }
+      } catch (error) {
+        console.error('Session restore error:', error)
+      } finally {
+        if (active && !alreadyConnected) setCheckingSession(false)
+      }
+    }
+
+    checkSession()
+    return () => { active = false }
+  }, [router])
 
   const upsertProfile = async (user) => {
     await supabase
@@ -41,22 +64,19 @@ export default function AuthPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden">
-     {/* BACKGROUND */}
-<div className="absolute inset-0 -z-10">
-  <Image
-    src="/images/crimson-bg.webp"
-    alt=""
-    fill
-    priority
-    className="object-cover"
-  />
-</div>
-
-      {/* GRADIENT/VOILE POUR LE CONTRASTE */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
+      {/* Fond servi directement par le navigateur, sans optimisation Next.js */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url("/images/crimson-bg.png")' }}
+      />
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
 
       {/* CONTENU AU PREMIER PLAN */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
+      <div className="relative z-20 flex min-h-screen items-center justify-center p-4">
+        {checkingSession ? (
+          <p className="text-sm text-slate-100">Vérification de la connexion…</p>
+        ) : (
         <div className="w-full max-w-md rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_20px_80px_rgba(0,0,0,0.5)] ring-1 ring-white/10">
           {/* Lueur haute */}
           <div className="pointer-events-none h-1 rounded-t-2xl bg-cyan-300/60" />
@@ -109,6 +129,7 @@ export default function AuthPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </main>
   )
