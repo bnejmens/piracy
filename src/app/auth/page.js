@@ -1,7 +1,7 @@
 // src/app/auth/page.js
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
@@ -24,6 +24,30 @@ export default function AuthPage() {
   // UI
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Restaure la session existante après fermeture/réouverture du navigateur.
+  useEffect(() => {
+    let active = true;
+
+    const restoreSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (active && session) {
+          router.replace('/dashboard');
+          return;
+        }
+      } catch (error) {
+        console.error('Session restore error:', error);
+      } finally {
+        if (active) setCheckingSession(false);
+      }
+    };
+
+    restoreSession();
+    return () => { active = false; };
+  }, [router]);
 
   // -------- helpers --------
   const resolveEmailFromIdentifier = async (input) => {
@@ -174,6 +198,10 @@ export default function AuthPage() {
               </button>
             </div>
 
+            {checkingSession ? (
+              <p className="text-center text-sm text-slate-200/80">Vérification de la connexion…</p>
+            ) : (
+              <>
             {errorMsg && (
               <p className="mb-4 rounded-md bg-red-500/20 border border-red-500/40 px-3 py-2 text-red-100">
                 {errorMsg}
@@ -246,6 +274,8 @@ export default function AuthPage() {
                 >
                   S’inscrire
                 </button>
+              </>
+            )}
               </>
             )}
           </div>
