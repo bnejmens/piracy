@@ -1,124 +1,336 @@
+
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
-const clamp01 = (x) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
-const AudioCtx = createContext(null)
-export const useAudio = () => useContext(AudioCtx)
+import moodistSounds from './moodistSounds.json'
+
+const AudioContext = createContext(null)
+
+export const useAudio = () => useContext(AudioContext)
+
+const SOUNDS = moodistSounds.map(sound => ({
+  ...sound,
+  icon: '🎵',
+}))
+
+const STORAGE_KEY = 'ambient:mixer:v1'
+
+const clamp = value =>
+  Math.min(1, Math.max(0, Number(value) || 0))
+
+function initialMix() {
+  return Object.fromEntries(
+    SOUNDS.map((sound, index) => [
+      sound.src,
+      {
+        active: index === 0,
+        volume: 0.4,
+      },
+    ])
+  )
+}
 
 export default function AudioProvider({ children }) {
-  const audioRef = useRef(null)
-  const [enabled, setEnabled] = useState(false)
-  const [trackSrc, setTrackSrc] = useState('/audio/ambient.mp3')
-  const [volume, setVolume] = useState(0.4)
+  const audioRefs = useRef({})
+
+  const [mix, setMix] = useState(initialMix)
+  const [masterVolume, setMasterVolume] = useState(0.65)
+  const [playing, setPlaying] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState('')
 
-  // Ta bibliothèque globale (ajoute/enlève des pistes ici)
-  const tracks = useMemo(() => ([
-    { src: '/audio/litoral.mp3', label: 'Littoral' },
-    { src: '/audio/fireplace.mp3', label: '	cheminée' },
-    { src: '/audio/rain.mp3',  label: 'Pluie' },
-    { src: '/audio/nature.mp3',  label: 'Nature' },
-    { src: '/audio/ocean.mp3',  label: 'Ocean' },
-    { src: '/audio/inwater.mp3',  label: 'Inwater' },
-    { src: '/audio/reef.mp3',  label: 'Reef' },
-    { src: '/audio/tavern.mp3',  label: 'Tavern' },
-  ]), [])
-
-  const storageKey = 'ambient:global'
-
-  // Charger préférence
+  // Restaurer les réglages, sans lancer automatiquement le son.
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || '{}')
-      if (saved.trackSrc) setTrackSrc(saved.trackSrc)
-      if (typeof saved.enabled === 'boolean') setEnabled(saved.enabled)
-      if (typeof saved.volume === 'number') setVolume(Math.max(0, Math.min(1, saved.volume)))
-    } catch {}
-  }, [])
+      const saved = JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || 'null'
+      )
 
-  // Sauver préférence
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ enabled, trackSrc, volume }))
-  }, [enabled, trackSrc, volume])
+      if (saved?.mix) {
+        const defaults = initialMix()
+        const restored = {}
 
-  // Appliquer volume/mute en continu
-  useEffect(() => {
-    const el = audioRef.current
-    if (!el) return
-    el.volume = volume
-    el.muted = !enabled
-  }, [enabled, volume])
+        for (const sound of SOUNDS) {
+          const old = saved.mix[sound.src]
+          restored[sound.src] = {
+            active:
+              typeof old?.active === 'boolean'
+                ? old.active
+                : defaults[sound.src].active,
+            volume:
+              typeof old?.volume === 'number'
+                ? clamp(old.volume)
+                : defaults[sound.src].volume,
+          }
+        }
 
-  const fade = (el, from, to, ms = 250) => new Promise((resolve) => {
-  const v0 = clamp01(from);
-  const v1 = clamp01(to);
-  el.volume = v0;
+        setMix(restored)
 
-  const start = performance.now();
-  const step = (t) => {
-    const p = Math.min(1, (t - start) / ms);
-    const v = v0 + (v1 - v0) * p;
-    el.volume = clamp01(v);
-    if (p < 1) requestAnimationFrame(step);
-    else resolve();
-  };
-  requestAnimationFrame(step);
-});
-
-
-  const toggle = async () => {
-    const el = audioRef.current
-    if (!el) return
-    try {
-      if (enabled) {
-        await fade(el, el.volume, 0, 180)
-        el.pause()
-        setEnabled(false)
+        if (typeof saved.masterVolume === 'number') {
+          setMasterVolume(clamp(saved.masterVolume))
+        }
       } else {
-        el.currentTime = 0
-        el.volume = 0
-        el.muted = false
-        await el.play() // geste utilisateur
-        await fade(el, 0, volume, 220)
-        setEnabled(true)
+        // Importer les anciennes préférences du lecteur simple.
+        const legacy = JSON.parse(
+          localStorage.getItem('ambient:global') || 'null'
+        )
+
+        if (legacy) {
+          const next = initialMix()
+
+          for (const sound of SOUNDS) {
+            next[sound.src].active =
+              sound.src === legacy.trackSrc
+          }
+
+          if (!SOUNDS.some(s => s.src === legacy.trackSrc)) {
+            next[SOUNDS[0].src].active = true
+          }
+
+          setMix(next)
+
+          if (typeof legacy.volume === 'number') {
+            setMasterVolume(clamp(legacy.volume))
+          }
+        }
       }
     } catch (e) {
-      console.warn('Playback issue:', e)
+      console.warn('Préférences audio :', e)
     }
-  }
 
-  const setTrack = async (src) => {
-    const el = audioRef.current
-    setTrackSrc(src)
-    if (!el) return
-    if (enabled) {
-      try {
-        await fade(el, el.volume, 0, 180)
-        el.src = src
-        await el.play()
-        await fade(el, 0, volume, 220)
-      } catch (e) {
-        console.warn('Switch track issue:', e)
+    setReady(true)
+  }, [])
+
+  // Sauvegarder uniquement les réglages.
+  useEffect(() => {
+    if (!ready) return
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ mix, masterVolume })
+      )
+    } catch (e) {
+      console.warn('Sauvegarde audio :', e)
+    }
+  }, [mix, masterVolume, ready])
+
+  // Appliquer les volumes sans recharger les fichiers audio.
+  useEffect(() => {
+    for (const sound of SOUNDS) {
+      const audio = audioRefs.current[sound.src]
+      if (!audio) continue
+
+      const settings = mix[sound.src]
+
+      audio.volume = clamp(
+        (settings?.volume ?? 0) * masterVolume
+      )
+
+      if (!playing || !settings?.active) {
+        audio.pause()
       }
-    } else {
-      el.src = src
-      el.load()
+    }
+  }, [mix, masterVolume, playing])
+
+  const start = () => {
+    setError('')
+
+    const activeSounds = SOUNDS.filter(
+      sound => mix[sound.src]?.active
+    )
+
+    if (!activeSounds.length) {
+      setError('Active au moins une ambiance.')
+      return
+    }
+
+    // Tous les play() partent directement du clic utilisateur.
+    const attempts = activeSounds.map(sound => {
+      const audio = audioRefs.current[sound.src]
+
+      if (!audio) return Promise.resolve(false)
+
+      audio.volume = clamp(
+        mix[sound.src].volume * masterVolume
+      )
+
+      try {
+        return Promise.resolve(audio.play())
+          .then(() => true)
+          .catch(e => {
+            console.warn('Lecture audio :', sound.src, e)
+            return false
+          })
+      } catch (e) {
+        console.warn('Lecture audio :', sound.src, e)
+        return Promise.resolve(false)
+      }
+    })
+
+    setPlaying(true)
+
+    Promise.all(attempts).then(results => {
+      if (!results.some(Boolean)) {
+        setPlaying(false)
+        setError(
+          'Lecture impossible. Vérifie les fichiers audio ou réessaie.'
+        )
+      }
+    })
+  }
+
+  const stop = () => {
+    Object.values(audioRefs.current).forEach(audio => {
+      audio?.pause()
+    })
+
+    setPlaying(false)
+    setError('')
+  }
+
+  const toggle = () => {
+    if (playing) stop()
+    else start()
+  }
+
+  const toggleSound = src => {
+    const current = mix[src]
+    if (!current) return
+
+    const nextActive = !current.active
+
+    // Si le mixeur joue déjà, lancer la nouvelle piste
+    // directement depuis le clic, sans interrompre les autres.
+    if (nextActive && playing) {
+      const audio = audioRefs.current[src]
+
+      if (audio) {
+        audio.volume = clamp(
+          current.volume * masterVolume
+        )
+
+        audio.play().catch(e => {
+          console.warn('Démarrage de piste :', e)
+          setError(`Impossible de lire cette ambiance.`)
+        })
+      }
+    }
+
+    if (!nextActive) {
+      audioRefs.current[src]?.pause()
+    }
+
+    setMix(previous => ({
+      ...previous,
+      [src]: {
+        ...previous[src],
+        active: nextActive,
+      },
+    }))
+  }
+
+  const setSoundVolume = (src, value) => {
+    const v = clamp(value)
+
+    setMix(previous => ({
+      ...previous,
+      [src]: {
+        ...previous[src],
+        volume: v,
+      },
+    }))
+
+    const audio = audioRefs.current[src]
+    if (audio) {
+      audio.volume = clamp(v * masterVolume)
     }
   }
 
-  const value = {
-    enabled, toggle,
-    trackSrc, setTrack,
-    volume, setVolume,
-    isOpen, setIsOpen,
-    tracks,
+  // Compatibilité avec les composants utilisant l'ancien lecteur.
+  const trackSrc =
+    SOUNDS.find(sound => mix[sound.src]?.active)?.src ||
+    SOUNDS[0].src
+
+  const setTrack = src => {
+    if (!SOUNDS.some(sound => sound.src === src)) return
+
+    const previous = Object.keys(audioRefs.current)
+    for (const key of previous) {
+      if (key !== src) audioRefs.current[key]?.pause()
+    }
+
+    setMix(current =>
+      Object.fromEntries(
+        SOUNDS.map(sound => [
+          sound.src,
+          {
+            ...current[sound.src],
+            active: sound.src === src,
+          },
+        ])
+      )
+    )
+
+    if (playing) {
+      audioRefs.current[src]?.play().catch(e => {
+        console.warn('Changement de piste :', e)
+      })
+    }
   }
+
+  const value = useMemo(() => ({
+    enabled: playing,
+    playing,
+    toggle,
+    start,
+    stop,
+    tracks: SOUNDS,
+    sounds: SOUNDS,
+    mix,
+    toggleSound,
+    setSoundVolume,
+    volume: masterVolume,
+    setVolume: setMasterVolume,
+    trackSrc,
+    setTrack,
+    isOpen,
+    setIsOpen,
+    error,
+  }), [playing, mix, masterVolume, trackSrc, isOpen, error])
 
   return (
-    <AudioCtx.Provider value={value}>
+    <AudioContext.Provider value={value}>
       {children}
-      <audio ref={audioRef} src={trackSrc} loop playsInline preload="auto" />
-    </AudioCtx.Provider>
+
+      {/* Lecteurs permanents : ne pas déplacer dans SoundModal */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed h-0 w-0 overflow-hidden"
+      >
+        {SOUNDS.map(sound => (
+          <audio
+            key={sound.src}
+            ref={el => {
+              if (el) audioRefs.current[sound.src] = el
+              else delete audioRefs.current[sound.src]
+            }}
+            src={sound.src}
+            loop
+            playsInline
+            preload="none"
+          />
+        ))}
+      </div>
+    </AudioContext.Provider>
   )
 }
