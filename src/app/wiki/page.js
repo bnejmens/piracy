@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
 import { seedTree } from './categories'
+import { getCardPaths, pathLabel, pathMatches } from './categoryPaths'
 
 /* -------------------- Utils -------------------- */
 function norm(s) {
@@ -267,7 +268,7 @@ useEffect(() => {
 
       const { data: cardsRows, error: cardsErr } = await supabase
         .from('cards')
-        .select('id, owner_id, title, description, category, subcategory, sub_subcategory, rarity, image_url, created_at')
+        .select('id, owner_id, title, description, category, subcategory, sub_subcategory, category_paths, rarity, image_url, created_at')
         .order('created_at', { ascending: false })
         .limit(5000)
       if (cardsErr) console.error(cardsErr)
@@ -316,16 +317,9 @@ const filteredAll = useMemo(() => {
 
   // ---- 1. Filtrer selon la navigation ----
   let list = (cards || []).filter((c) => {
-    if (l1 && !matchNode(c.category, l1Node)) return false
-    if (l2) {
-      const node = l2Node || (l1Node?.children || []).find(x => x.id === l2)
-      if (!matchNode(c.subcategory, node)) return false
-    }
-    if (l3) {
-      const node = (l2Node?.children || []).find(x => x.id === l3)
-      if (!matchNode(c.sub_subcategory, node)) return false
-    }
-    return true
+    const node2 = l2 ? (l2Node || (l1Node?.children || []).find(x => x.id === l2)) : null
+    const node3 = l3 ? (l2Node?.children || []).find(x => x.id === l3) : null
+    return getCardPaths(c).some(p => pathMatches(p, l1 ? l1Node : null, node2, node3))
   })
 
   // ---- 2. Helpers pour détecter les "fausses cartes" (dossiers/placeholder) ----
@@ -433,7 +427,7 @@ const isCollected = (id) => collectedSet.has(id)
       setViewing(null)
       const { data: cardsRows } = await supabase
         .from('cards')
-        .select('id, owner_id, title, description, category, subcategory, sub_subcategory, rarity, image_url, created_at')
+        .select('id, owner_id, title, description, category, subcategory, sub_subcategory, category_paths, rarity, image_url, created_at')
         .order('created_at', { ascending: false }).limit(5000)
 setCards(cardsRows || [])
 setTree(seedTree())
@@ -681,9 +675,10 @@ setTree(seedTree())
                <Image src={srcForDisplay(viewing.image_url)} alt="" fill unoptimized className="object-cover" />
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-2"><span className="text-white/70 text-sm">Catégorie :</span><span className="text-white/90 text-sm">{viewing.category || '—'}</span></div>
-                <div className="flex items-center gap-2"><span className="text-white/70 text-sm">Sous-catégorie :</span><span className="text-white/90 text-sm">{viewing.subcategory || '—'}</span></div>
-                <div className="flex items-center gap-2"><span className="text-white/70 text-sm">Niveau 3 :</span><span className="text-white/90 text-sm">{viewing.sub_subcategory || '—'}</span></div>
+                <div className="space-y-1">
+                  <div className="text-white/70 text-sm">Classements :</div>
+                  {getCardPaths(viewing).map(p => <div key={pathLabel(p)} className="text-white/90 text-sm">{pathLabel(p)}</div>)}
+                </div>
 
                 <div className="pt-2 text-white/90 whitespace-pre-wrap text-sm leading-relaxed">
                   {viewing.description || '—'}

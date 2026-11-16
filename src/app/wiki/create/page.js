@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { seedTree } from '../categories'
+import { makeCategoryPath, pathKey, pathLabel } from '../categoryPaths'
 
 /* -------------------- Utils / taxonomie (identiques à /wiki) -------------------- */
 function norm(s){return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
@@ -93,6 +94,7 @@ async function reloadTree() {
   const l2Node=useMemo(()=>findById(tree,l2),[tree,l2])
   const l3List=l2Node?.children||[]
   const [l3,setL3]=useState('')
+  const [selectedPaths,setSelectedPaths]=useState([])
 
   useEffect(()=>{ if(!loadingCats && roots?.length && !l1) setL1(roots[0].id) },[loadingCats,roots,l1])
   useEffect(()=>{ setL2(l1Node?.children?.[0]?.id||null); setL3('') },[l1])
@@ -108,20 +110,30 @@ async function reloadTree() {
   const currentCatColor=l1Node?.color||'#60a5fa'
 
   
+  const currentPath = makeCategoryPath(findById(tree,l1), findById(tree,l2), l3 ? findById(tree,l3) : null)
+  const addCurrentPath = () => {
+    if (!currentPath) return
+    setSelectedPaths(prev => prev.some(p => pathKey(p) === pathKey(currentPath)) ? prev : [...prev, currentPath])
+  }
+
   /* ---------- Soumission carte normale ---------- */
   const submit = async () => {
     if(!userId){ alert('Session requise'); return }
     const catNode=findById(tree,l1), subNode=l2?findById(tree,l2):null, sub2Node=l3?findById(tree,l3):null
 
+    const paths = selectedPaths.length ? selectedPaths : (currentPath ? [currentPath] : [])
+    if (!paths.length) { alert('Choisis au moins une catégorie et une sous-catégorie.'); return }
+    const primary = paths[0]
     const safeTitle = (title||'').trim() || `Nouvelle carte`
     const safeDesc  = (description||'').trim() || `Carte créée par l’utilisateur.`
     const payload = {
       owner_id: userId,
       title: safeTitle,
       description: safeDesc,
-      category: catNode?.label || 'Divers',
-      subcategory: subNode?.label || null,
-      sub_subcategory: sub2Node?.label || null,
+      category: primary.category,
+      subcategory: primary.subcategory,
+      sub_subcategory: primary.sub_subcategory,
+      category_paths: paths,
       rarity,
       image_url: (imageUrl||'').trim() || null,
     }
@@ -132,6 +144,7 @@ async function reloadTree() {
 
   /* ---------- UI ---------- */
   const CategoryPills = () => (
+    <>
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-white/80 text-sm">Catégories</div>
@@ -180,7 +193,23 @@ async function reloadTree() {
           </div>
         </>
       )}
-    </div>
+      </div>
+      <div className="rounded-lg border border-white/15 bg-white/5 p-3 space-y-2">
+        <div className="text-sm text-white/80">Classements de cette carte</div>
+        <p className="text-xs text-white/60">Choisis un emplacement ci-dessus, puis ajoute-le. Répète pour classer la même carte dans plusieurs catégories.</p>
+        <button type="button" onClick={addCurrentPath} disabled={!currentPath}
+          className="rounded-lg bg-cyan-300/90 px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-cyan-200 disabled:opacity-50">
+          + Ajouter cet emplacement
+        </button>
+        {selectedPaths.length > 0 && <div className="space-y-1.5">
+          {selectedPaths.map(p => <div key={pathKey(p)} className="flex items-center justify-between gap-2 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-sm text-white/90">
+            <span>{pathLabel(p)}</span>
+            <button type="button" onClick={() => setSelectedPaths(prev => prev.filter(x => pathKey(x) !== pathKey(p)))} className="text-red-200 hover:text-red-100">Retirer</button>
+          </div>)}
+        </div>}
+        {!selectedPaths.length && <p className="text-xs text-white/60">Sans ajout manuel, l'emplacement actuellement sélectionné sera utilisé à la création.</p>}
+      </div>
+    </>
   )
 
   return (

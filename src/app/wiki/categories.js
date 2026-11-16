@@ -1,6 +1,17 @@
 
+// Vocabulaire unique du niveau 3, disponible dans chaque sous-catégorie.
+// Ajouter une entrée ici la rend sélectionnable dans tout le Wiki.
+export const LEVEL_3_OPTIONS = [
+  { slug: 'londres', label: 'Londres' },
+  { slug: 'ministere', label: 'Ministère' },
+  { slug: 'godric-s', label: "Godric's" },
+  { slug: 'poudlard', label: 'Poudlard' },
+  { slug: 'faune', label: 'Faune' },
+  { slug: 'flore', label: 'Flore' },
+]
+
 export function seedTree() {
-  return [
+  const roots = [
     {
       id: 'cat-univers',
       slug: 'univers',
@@ -34,4 +45,19 @@ export function seedTree() {
       ],
     },
   ]
+  // Un seul référentiel pour toutes les branches, mais des identifiants
+  // propres à chaque chemin pour préserver la navigation et le filtrage.
+  return roots.map(root => ({
+    ...root,
+    children: root.children.map(sub => ({
+      ...sub,
+      children: LEVEL_3_OPTIONS.map(option => ({
+        id: `${sub.id}-${option.slug}`,
+        slug: option.slug,
+        label: option.label,
+        color: root.color,
+        children: [],
+      })),
+    })),
+  }))
 }

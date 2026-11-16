@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { seedTree } from '../../categories'
+import { getCardPaths, makeCategoryPath, pathKey, pathLabel } from '../../categoryPaths'
 
 /* -------------------- Utils / taxonomie (identiques à /wiki & /wiki/create) -------------------- */
 function norm(s){return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
@@ -84,6 +85,7 @@ export default function EditCardPage(){
   const [rarity,setRarity]=useState('commun')
   const [imageUrl,setImageUrl]=useState('')
 
+  const [selectedPaths,setSelectedPaths]=useState([])
   const [pendingCats,setPendingCats]=useState({c1:null,c2:null,c3:null}) // libellés de la carte pour présélection
 
   const [loading,setLoading]=useState(true)
@@ -92,7 +94,7 @@ export default function EditCardPage(){
     setLoading(true)
     const { data, error } = await supabase
       .from('cards')
-      .select('id, owner_id, title, description, category, subcategory, sub_subcategory, rarity, image_url')
+      .select('id, owner_id, title, description, category, subcategory, sub_subcategory, category_paths, rarity, image_url')
       .eq('id', id)
       .maybeSingle()
     if (!ignore){
@@ -102,7 +104,9 @@ export default function EditCardPage(){
       setDescription(data.description||'')
       setRarity(data.rarity||'commun')
       setImageUrl(data.image_url||'')
-      setPendingCats({ c1: data.category||null, c2: data.subcategory||null, c3: data.sub_subcategory||null })
+      const paths = getCardPaths(data)
+      setSelectedPaths(paths)
+      setPendingCats({ c1: paths[0]?.category || null, c2: paths[0]?.subcategory || null, c3: paths[0]?.sub_subcategory || null })
       setLoading(false)
     }
   })(); return ()=>{ignore=true}},[id, router])
@@ -168,24 +172,26 @@ async function reloadTree() {
   const rarityDef = RARITY[rarity] || RARITY.commun
   const showLevel3 = (l3List?.length || 0) > 0
 
+  const currentPath = makeCategoryPath(findById(tree,l1), findById(tree,l2), l3 ? findById(tree,l3) : null)
+  const addCurrentPath = () => {
+    if (!currentPath || !canEdit) return
+    setSelectedPaths(prev => prev.some(p => pathKey(p) === pathKey(currentPath)) ? prev : [...prev, currentPath])
+  }
+
   // Sauvegarde (texte only — pas de *_id)
   const save = async () => {
     if(!id) return
     if(!canEdit){ alert("Vous n'avez pas les droits pour modifier cette carte."); return }
-    const catNode=findById(tree,l1), subNode=l2?findById(tree,l2):null, sub2Node=l3?findById(tree,l3):null
-
-if (!catNode || !subNode) {
-  alert(
-    "Cette carte utilise une ancienne catégorie. Sélectionne une catégorie et une sous-catégorie valides avant d'enregistrer."
-  )
-  return
-}
+    const paths = selectedPaths
+    if (!paths.length) { alert('Ajoute au moins un emplacement pour enregistrer cette carte.'); return }
+    const primary = paths[0]
     const upd = {
       title: (title||'').trim(),
       description: (description||'').trim(),
-      category: catNode?.label || 'Divers',
-      subcategory: subNode?.label || null,
-      sub_subcategory: sub2Node?.label || null,
+      category: primary.category,
+      subcategory: primary.subcategory,
+      sub_subcategory: primary.sub_subcategory,
+      category_paths: paths,
       rarity,
       image_url: (imageUrl||'').trim() || null,
     }
@@ -197,6 +203,7 @@ if (!catNode || !subNode) {
 
   /* -------------------- UI -------------------- */
   const CategoryPills = () => (
+    <>
     <div className="space-y-3">
       <div className="text-white/80 text-sm">Catégories</div>
       <div className="flex flex-wrap gap-2">
@@ -239,7 +246,20 @@ if (!catNode || !subNode) {
           </div>
         </>
       )}
-    </div>
+      </div>
+      <div className="rounded-lg border border-white/15 bg-white/5 p-3 space-y-2">
+        <div className="text-sm text-white/80">Classements de cette carte</div>
+        <p className="text-xs text-white/60">Choisis un emplacement ci-dessus, puis clique sur Ajouter. Tu peux en sélectionner plusieurs.</p>
+        <button type="button" disabled={!currentPath || !canEdit} onClick={addCurrentPath}
+          className="rounded-lg bg-cyan-300/90 px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-cyan-200 disabled:opacity-50">
+          + Ajouter cet emplacement
+        </button>
+        {selectedPaths.map(p => <div key={pathKey(p)} className="flex items-center justify-between gap-2 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-sm text-white/90">
+          <span>{pathLabel(p)}</span>
+          <button type="button" disabled={!canEdit} onClick={() => setSelectedPaths(prev => prev.filter(x => pathKey(x) !== pathKey(p)))} className="text-red-200 hover:text-red-100 disabled:opacity-50">Retirer</button>
+        </div>)}
+      </div>
+    </>
   )
 
   if(loading) return <div className="p-6 text-slate-200">Chargement…</div>
