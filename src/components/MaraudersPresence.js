@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -9,7 +8,12 @@ const REFRESH_MS = 30000
 const MAX_MARKERS = 18
 const DECOY_COUNT = 6
 
-// 36 personnages fictifs
+const SAFE_X_MIN = 8
+const SAFE_X_MAX = 92
+const SAFE_Y_MIN = 13
+const SAFE_Y_MAX = 87
+const DEFAULT_AVOID_ZONES = [{ cx: 50, cy: 55, r: 19 }]
+
 const DECOY_NAMES = [
   'Kaur Nutti',
   'Fronk Leboeuf',
@@ -49,9 +53,7 @@ const DECOY_NAMES = [
   'Prudence Featherbottom',
 ]
 
-// 120 activités : magie, quotidien et interactions sociales
 const ACTIVITIES = [
-  // Poudlard
   'Se rend à son cours de potions en traînant les pieds.',
   'Dévore une Chocogrenouille en espérant trouver une carte rare.',
   'Se contemple amoureusement dans un miroir.',
@@ -82,8 +84,6 @@ const ACTIVITIES = [
   'Essaie de rejoindre Pré-au-Lard sans se faire remarquer.',
   "S'arrête pour observer les mouvements du lac Noir.",
   'Élabore un plan très compliqué pour éviter ses devoirs.',
-
-  // Habitudes ordinaires
   'Se brosse les dents avec application.',
   'Prend une douche beaucoup trop longue.',
   'Se coiffe devant un miroir.',
@@ -124,8 +124,6 @@ const ACTIVITIES = [
   'Fait semblant de comprendre une conversation.',
   'Raconte une blague à laquelle personne ne rit.',
   'Se prend les pieds dans son propre pantalon.',
-
-  // Romance et sentiments
   'Échange des regards insistants avec quelqu’un.',
   'Tente une approche romantique particulièrement maladroite.',
   'Embrasse quelqu’un à l’abri des regards.',
@@ -136,8 +134,6 @@ const ACTIVITIES = [
   'Écrit un petit mot doux à quelqu’un.',
   'Observe discrètement une personne qui lui plaît.',
   'Tente de rendre quelqu’un jaloux.',
-
-  // Amitié
   'Raconte sa journée à un ami.',
   'Éclate de rire au milieu d’une conversation.',
   'Console quelqu’un qui semble avoir du chagrin.',
@@ -148,8 +144,6 @@ const ACTIVITIES = [
   'Organise une petite fête en secret.',
   'Se lance dans une discussion interminable.',
   'Retrouve une vieille connaissance.',
-
-  // Disputes
   'Se dispute pour une histoire sans importance.',
   'Lance un regard noir à quelqu’un.',
   'Refuse obstinément de reconnaître ses torts.',
@@ -160,8 +154,6 @@ const ACTIVITIES = [
   'Essaie de calmer deux personnes sur le point de se battre.',
   'Prépare une réplique cinglante avec beaucoup trop de retard.',
   'Tourne les talons au beau milieu d’une conversation.',
-
-  // Ragots et manigances
   'Échange des ragots avec un camarade.',
   'Chuchote quelque chose à l’oreille de quelqu’un.',
   'Espionne discrètement une conversation.',
@@ -172,8 +164,6 @@ const ACTIVITIES = [
   'Prépare une mauvaise blague avec un complice.',
   'Fait semblant de ne pas reconnaître quelqu’un.',
   'Écoute derrière une porte.',
-
-  // Situations décalées
   'Tente de séduire quelqu’un qui ne remarque même pas sa présence.',
   'Se retrouve involontairement à tenir la chandelle.',
   'Ment effrontément sur ses exploits au Quidditch.',
@@ -186,15 +176,93 @@ const ACTIVITIES = [
   'Débat très sérieusement de la plus belle personne de Poudlard.',
 ]
 
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v))
+}
+
 function random(min, max) {
   return min + Math.random() * (max - min)
 }
 
-function randomPoint() {
-  return {
-    x: random(8, 92),
-    y: random(13, 87),
+function distance(a, b) {
+  return Math.hypot((b.x || 0) - (a.x || 0), (b.y || 0) - (a.y || 0))
+}
+
+function distancePointToSegment(point, a, b) {
+  const abx = b.x - a.x
+  const aby = b.y - a.y
+  const ab2 = abx * abx + aby * aby
+
+  if (!ab2) return distance(point, a)
+
+  const t = clamp(
+    ((point.x - a.x) * abx + (point.y - a.y) * aby) / ab2,
+    0,
+    1
+  )
+
+  const proj = {
+    x: a.x + abx * t,
+    y: a.y + aby * t,
   }
+
+  return distance(point, proj)
+}
+
+function pointInsideZone(point, zone, margin = 0) {
+  return distance(point, { x: zone.cx, y: zone.cy }) < zone.r + margin
+}
+
+function segmentHitsZone(from, to, zone, margin = 0) {
+  return distancePointToSegment({ x: zone.cx, y: zone.cy }, from, to) < zone.r + margin
+}
+
+function randomPoint(zones = []) {
+  for (let i = 0; i < 80; i++) {
+    const candidate = {
+      x: random(SAFE_X_MIN, SAFE_X_MAX),
+      y: random(SAFE_Y_MIN, SAFE_Y_MAX),
+    }
+
+    if (!zones.some(zone => pointInsideZone(candidate, zone, 4))) {
+      return candidate
+    }
+  }
+
+  return {
+    x: random(SAFE_X_MIN, SAFE_X_MAX),
+    y: random(SAFE_Y_MIN, SAFE_Y_MAX),
+  }
+}
+
+function buildRoute(from, to, zones = []) {
+  const hit = zones.find(zone => segmentHitsZone(from, to, zone, 3))
+
+  if (!hit) return [to]
+
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const len = Math.hypot(dx, dy) || 1
+
+  const options = [
+    { x: -dy / len, y: dx / len },
+    { x: dy / len, y: -dx / len },
+  ]
+    .map(perp => ({
+      x: clamp(hit.cx + perp.x * (hit.r + 13), SAFE_X_MIN, SAFE_X_MAX),
+      y: clamp(hit.cy + perp.y * (hit.r + 13), SAFE_Y_MIN, SAFE_Y_MAX),
+    }))
+    .filter(point => !zones.some(zone => pointInsideZone(point, zone, 2)))
+
+  if (!options.length) return [to]
+
+  options.sort((a, b) => {
+    const aScore = distance(from, a) + distance(a, to)
+    const bScore = distance(from, b) + distance(b, to)
+    return aScore - bScore
+  })
+
+  return [options[0], to]
 }
 
 function pickDecoys() {
@@ -217,7 +285,6 @@ function pickActivity(previous) {
   if (ACTIVITIES.length === 1) return ACTIVITIES[0]
 
   let next
-
   do {
     next = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)]
   } while (next === previous)
@@ -228,12 +295,10 @@ function pickActivity(previous) {
 function ShoePrint() {
   return (
     <g className="marauder-print">
-      <path d="M-6.4 -7.3 C-9 -3.7 -8.9 1 -7.4 4.1 C-5.7 7.9 -5 12.4 -1 13.2 C3.7 13.9 6.7 10.7 7 6.6 C7.3 2.9 8.8 -1.8 6.1 -6.7 C3.9 -10.6 -3.5 -11.7 -6.4 -7.3 Z" />
-      <ellipse cx="-0.1" cy="12" rx="4.9" ry="3.4" />
-      <circle cx="-6.1" cy="-13.3" r="2.7" />
-      <circle cx="-1.4" cy="-15.4" r="3.1" />
-      <circle cx="3.8" cy="-14.2" r="2.7" />
-      <circle cx="8.2" cy="-11.2" r="2.1" />
+      <path d="M-2.4 -15.2 C-6.9 -14.3 -9.4 -10.2 -9.8 -4.3 C-10.2 1.6 -9.1 8.7 -6.1 12.9 C-3.8 16 1.1 17 4.9 15 C8.7 13 10.1 8.4 9.9 3.2 C9.6 -1.2 8.3 -7.2 5.8 -11.1 C3.9 -14 1 -15.9 -2.4 -15.2 Z" />
+      <ellipse cx="0.7" cy="13.2" rx="4.7" ry="3" />
+      <path d="M-3.4 -8.8 C-1.1 -7.4 1.8 -7 4.3 -8.5" fill="none" className="marauder-lace" />
+      <path d="M-4.4 -4.2 C-2.2 -2.8 1 -2.6 3.7 -3.8" fill="none" className="marauder-lace" />
     </g>
   )
 }
@@ -257,25 +322,22 @@ function Footprints({ walking }) {
   )
 }
 
-function FootprintWalker({ player }) {
+function FootprintWalker({ player, blockedZones = DEFAULT_AVOID_ZONES }) {
   const walkerRef = useRef(null)
   const pausedRef = useRef(false)
   const positionRef = useRef(null)
   const previousActivityRef = useRef(null)
-  const pointerRef = useRef({ x: -1000, y: -1000 })
 
   const [hovered, setHovered] = useState(false)
   const [activity, setActivity] = useState('')
   const [heading, setHeading] = useState(0)
   const [walking, setWalking] = useState(false)
 
-  // Animation calculée image par image.
-  // Le survol fige réellement la position.
   useEffect(() => {
     let frame
     let lastTime = 0
 
-    const start = randomPoint()
+    const start = randomPoint(blockedZones)
     positionRef.current = start
 
     if (walkerRef.current) {
@@ -283,88 +345,55 @@ function FootprintWalker({ player }) {
       walkerRef.current.style.top = `${start.y}%`
     }
 
-    let destination = null
-    let travelDuration = 24000
+    let route = []
+    let legIndex = 0
+    let leg = null
+    let legDuration = 24000
     let elapsed = 0
-
-    // Petite pause avant le premier déplacement.
     let pauseRemaining = random(800, 2200)
+
+    function startLeg(from, to) {
+      leg = { from: { ...from }, to: { ...to } }
+      elapsed = 0
+
+      const legDistance = distance(from, to)
+      legDuration = Math.max(9000, Math.min(26000, legDistance * 440))
+
+      setHeading(Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI + 90)
+      setWalking(true)
+    }
 
     function chooseDestination() {
       const current = positionRef.current
       if (!current) return
 
-      let next = randomPoint()
+      let next = randomPoint(blockedZones)
 
-      // On recherche de préférence une destination éloignée.
-      for (
-        let i = 0;
-        i < 30 &&
-        Math.hypot(next.x - current.x, next.y - current.y) < 32;
-        i++
-      ) {
-        next = randomPoint()
+      for (let i = 0; i < 35 && distance(next, current) < 28; i++) {
+        next = randomPoint(blockedZones)
       }
 
-      destination = {
-        from: { ...current },
-        to: next,
-      }
-
-      elapsed = 0
-
-      const distance = Math.hypot(
-        next.x - current.x,
-        next.y - current.y
-      )
-
-      travelDuration = Math.max(
-        18000,
-        Math.min(42000, distance * 510)
-      )
-
-      setHeading(
-        Math.atan2(
-          next.y - current.y,
-          next.x - current.x
-        ) * 180 / Math.PI + 90
-      )
-
-      setWalking(true)
+      route = buildRoute(current, next, blockedZones)
+      legIndex = 0
+      startLeg(current, route[0])
     }
 
     function animate(time) {
       if (!lastTime) lastTime = time
 
-      // Limite les grands sauts après un onglet inactif.
       const delta = Math.min(time - lastTime, 60)
       lastTime = time
 
       if (!pausedRef.current) {
-        if (!destination) {
+        if (!leg) {
           pauseRemaining -= delta
-
-          if (pauseRemaining <= 0) {
-            chooseDestination()
-          }
+          if (pauseRemaining <= 0) chooseDestination()
         } else {
-          elapsed = Math.min(
-            elapsed + delta,
-            travelDuration
-          )
+          elapsed = Math.min(elapsed + delta, legDuration)
+          const progress = elapsed / legDuration
 
-          const progress = elapsed / travelDuration
-
-          // Mouvement linéaire et continu.
-          const x =
-            destination.from.x +
-            (destination.to.x - destination.from.x) *
-              progress
-
-          const y =
-            destination.from.y +
-            (destination.to.y - destination.from.y) *
-              progress
+          const x = leg.from.x + (leg.to.x - leg.from.x) * progress
+          const y = leg.from.y + (leg.to.y - leg.from.y) * progress
 
           positionRef.current = { x, y }
 
@@ -374,9 +403,15 @@ function FootprintWalker({ player }) {
           }
 
           if (progress >= 1) {
-            destination = null
-            pauseRemaining = random(1800, 6200)
-            setWalking(false)
+            if (legIndex < route.length - 1) {
+              legIndex += 1
+              startLeg(positionRef.current, route[legIndex])
+            } else {
+              leg = null
+              route = []
+              pauseRemaining = random(1800, 6200)
+              setWalking(false)
+            }
           }
         }
       }
@@ -389,85 +424,67 @@ function FootprintWalker({ player }) {
     return () => {
       window.cancelAnimationFrame(frame)
     }
-  }, [player.user_id])
+  }, [player.user_id, blockedZones])
 
-  
-function stopForInspection() {
-  if (pausedRef.current) return
+  function stopForInspection() {
+    if (pausedRef.current) return
+    pausedRef.current = true
 
-  pausedRef.current = true
+    const nextActivity = pickActivity(previousActivityRef.current)
+    previousActivityRef.current = nextActivity
 
-  const nextActivity = pickActivity(
-    previousActivityRef.current
-  )
+    setActivity(nextActivity)
+    setHovered(true)
+  }
 
-  previousActivityRef.current = nextActivity
+  function resumeWalking() {
+    if (!pausedRef.current) return
+    pausedRef.current = false
+    setHovered(false)
+  }
 
-  setActivity(nextActivity)
-  setHovered(true)
-}
+  useEffect(() => {
+    function checkPointer(event) {
+      const walker = walkerRef.current
+      if (!walker) return
 
-function resumeWalking() {
-  if (!pausedRef.current) return
+      const steps = walker.querySelector('.marauder-steps')
+      if (!steps) return
 
-  pausedRef.current = false
-  setHovered(false)
-}
+      const rect = steps.getBoundingClientRect()
+      const x = event.clientX
+      const y = event.clientY
+      const margin = 10
 
+      const nearby =
+        x >= rect.left - margin &&
+        x <= rect.right + margin &&
+        y >= rect.top - margin &&
+        y <= rect.bottom + margin
 
-useEffect(() => {
-  function checkPointer(event) {
-    const walker = walkerRef.current
-    if (!walker) return
+      const target = document.elementFromPoint(x, y)
+      const overControl = target?.closest('button, a, input, select, textarea, [role="button"]')
+      const overAvatar = target?.closest('main .group.relative.rounded-full.overflow-hidden')
 
-    const steps = walker.querySelector('.marauder-steps')
-    if (!steps) return
+      if (nearby && !overControl && !overAvatar) {
+        stopForInspection()
+      } else {
+        resumeWalking()
+      }
+    }
 
-    const rect = steps.getBoundingClientRect()
-
-    const x = event.clientX
-    const y = event.clientY
-
-    // Petite zone de tolérance autour des pas.
-    const margin = 10
-
-    const nearby =
-      x >= rect.left - margin &&
-      x <= rect.right + margin &&
-      y >= rect.top - margin &&
-      y <= rect.bottom + margin
-
-    // Ne pas activer le survol lorsqu'un bouton
-    // ou un autre élément interactif est sous la souris.
-    const target = document.elementFromPoint(x, y)
-
-    const overControl = target?.closest(
-      'button, a, input, select, textarea, [role="button"]'
-    )
-
-    const overAvatar = target?.closest(
-      'main .group.relative.rounded-full.overflow-hidden'
-    )
-
-    if (nearby && !overControl && !overAvatar) {
-      stopForInspection()
-    } else {
+    function leaveWindow() {
       resumeWalking()
     }
-  }
 
-  function leaveWindow() {
-    resumeWalking()
-  }
+    window.addEventListener('pointermove', checkPointer)
+    document.addEventListener('pointerleave', leaveWindow)
 
-  window.addEventListener('pointermove', checkPointer)
-  document.addEventListener('pointerleave', leaveWindow)
-
-  return () => {
-    window.removeEventListener('pointermove', checkPointer)
-    document.removeEventListener('pointerleave', leaveWindow)
-  }
-}, [])
+    return () => {
+      window.removeEventListener('pointermove', checkPointer)
+      document.removeEventListener('pointerleave', leaveWindow)
+    }
+  }, [])
 
   return (
     <div
@@ -482,8 +499,8 @@ useEffect(() => {
       <div
         className="marauder-steps"
         style={{ transform: `rotate(${heading}deg)` }}
-       onFocus={stopForInspection}
-onBlur={resumeWalking}
+        onFocus={stopForInspection}
+        onBlur={resumeWalking}
         tabIndex={0}
         role="button"
         aria-label={`${player.name}, consulter son activité`}
@@ -492,15 +509,8 @@ onBlur={resumeWalking}
       </div>
 
       <div className="marauder-label">
-        <span className="marauder-name">
-          {player.name}
-        </span>
-
-        {hovered && (
-          <span className="marauder-activity">
-            {activity}
-          </span>
-        )}
+        <span className="marauder-name">{player.name}</span>
+        {hovered && <span className="marauder-activity">{activity}</span>}
       </div>
     </div>
   )
@@ -510,33 +520,24 @@ export default function MaraudersPresence() {
   const [players, setPlayers] = useState([])
   const [decoys, setDecoys] = useState([])
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [maskImage, setMaskImage] = useState(null)
+  const [blockedZones, setBlockedZones] = useState(DEFAULT_AVOID_ZONES)
 
   const layerRef = useRef(null)
-  const [maskImage, setMaskImage] = useState(null)
 
-  // Les noms sont retirés au hasard à chaque chargement.
   useEffect(() => {
     setDecoys(pickDecoys())
   }, [])
 
-  // Préférences d'accessibilité.
   useEffect(() => {
-    const mq = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    )
-
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => setReducedMotion(mq.matches)
 
     update()
     mq.addEventListener?.('change', update)
-
-    return () => {
-      mq.removeEventListener?.('change', update)
-    }
+    return () => mq.removeEventListener?.('change', update)
   }, [])
 
-  // Masque les empreintes et les noms lorsqu'ils passent
-  // derrière l'avatar central et les boutons de navigation.
   useEffect(() => {
     let frame = 0
     let observer
@@ -547,7 +548,6 @@ export default function MaraudersPresence() {
       if (!layer) return
 
       const region = layer.getBoundingClientRect()
-
       if (!region.width || !region.height) return
 
       const navNames = new Set([
@@ -556,81 +556,65 @@ export default function MaraudersPresence() {
         'Lore',
         'Membres',
         'Profil',
+        'Random Vava',
+        'OffRecords',
       ])
 
-      const buttons = Array.from(
-        document.querySelectorAll(
-          'main button[aria-label]'
-        )
-      ).filter(el =>
+      const buttons = Array.from(document.querySelectorAll('main button[aria-label]')).filter(el =>
         navNames.has(el.getAttribute('aria-label'))
       )
 
-      const avatar = document.querySelector(
-        'main .group.relative.rounded-full.overflow-hidden'
-      )
-
-      const targets = [
-        ...buttons,
-        ...(avatar ? [avatar] : []),
-      ]
+      const avatar = document.querySelector('main .group.relative.rounded-full.overflow-hidden')
+      const targets = [...buttons, ...(avatar ? [avatar] : [])]
 
       if (!targets.length) {
         setMaskImage(null)
+        setBlockedZones(DEFAULT_AVOID_ZONES)
         return
       }
 
-      const circles = targets.map(el => {
-        const rect = el.getBoundingClientRect()
+      const circles = targets
+        .map(el => {
+          const rect = el.getBoundingClientRect()
+          const isAvatar = avatar && el === avatar
+          const padding = isAvatar ? 28 : 16
 
-        const cx =
-          rect.left - region.left + rect.width / 2
+          const cx = rect.left - region.left + rect.width / 2
+          const cy = rect.top - region.top + rect.height / 2
+          const radius = Math.max(rect.width, rect.height) / 2 + padding
 
-        const cy =
-          rect.top - region.top + rect.height / 2
+          return {
+            svg: `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="black" />`,
+            isAvatar,
+            rect,
+          }
+        })
 
-        const radius =
-          Math.max(rect.width, rect.height) / 2 + 16
+      const avatarCircle = circles.find(c => c.isAvatar)
 
-        return `
-          <circle
-            cx="${cx}"
-            cy="${cy}"
-            r="${radius}"
-            fill="black"
-          />
-        `
-      }).join('')
+      if (avatarCircle) {
+        const rect = avatarCircle.rect
+        const cx = ((rect.left - region.left + rect.width / 2) / region.width) * 100
+        const cy = ((rect.top - region.top + rect.height / 2) / region.height) * 100
+        const r = (Math.max(rect.width, rect.height) / 2 + 40) / Math.min(region.width, region.height) * 100
+        setBlockedZones([{ cx, cy, r: clamp(r, 14, 24) }])
+      } else {
+        setBlockedZones(DEFAULT_AVOID_ZONES)
+      }
 
       const svg = `
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="${region.width}"
-          height="${region.height}"
-          viewBox="0 0 ${region.width} ${region.height}"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="${region.width}" height="${region.height}" viewBox="0 0 ${region.width} ${region.height}">
           <defs>
             <mask id="holes" maskUnits="userSpaceOnUse">
-              <rect
-                width="100%"
-                height="100%"
-                fill="white"
-              />
-              ${circles}
+              <rect width="100%" height="100%" fill="white" />
+              ${circles.map(c => c.svg).join('')}
             </mask>
           </defs>
-          <rect
-            width="100%"
-            height="100%"
-            fill="white"
-            mask="url(#holes)"
-          />
+          <rect width="100%" height="100%" fill="white" mask="url(#holes)" />
         </svg>
       `
 
-      setMaskImage(
-        `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
-      )
+      setMaskImage(`url("data:image/svg+xml,${encodeURIComponent(svg)}")`)
     }
 
     function scheduleMask() {
@@ -639,18 +623,12 @@ export default function MaraudersPresence() {
     }
 
     scheduleMask()
-
     window.addEventListener('resize', scheduleMask)
 
     const main = document.querySelector('main')
-
     if (main) {
       observer = new MutationObserver(scheduleMask)
-
-      observer.observe(main, {
-        childList: true,
-        subtree: true,
-      })
+      observer.observe(main, { childList: true, subtree: true })
 
       resizeObserver = new ResizeObserver(scheduleMask)
       resizeObserver.observe(main)
@@ -664,7 +642,6 @@ export default function MaraudersPresence() {
     }
   }, [])
 
-  // Présence des joueurs réels via Supabase.
   useEffect(() => {
     let active = true
     let requestSerial = 0
@@ -674,10 +651,7 @@ export default function MaraudersPresence() {
       if (document.visibilityState !== 'visible') return
 
       const serial = ++requestSerial
-
-      const since = new Date(
-        Date.now() - ONLINE_WINDOW_MS
-      ).toISOString()
+      const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString()
 
       const { data: profiles, error } = await supabase
         .from('profiles')
@@ -688,76 +662,55 @@ export default function MaraudersPresence() {
 
       if (error || !active || serial !== requestSerial) {
         if (error) {
-          console.warn(
-            '[Carte du Maraudeur] Présences :',
-            error.message
-          )
+          console.warn('[Carte du Maraudeur] Présences :', error.message)
         }
         return
       }
 
-      
-const ids = (profiles || [])
-  .map(p => p.user_id)
-  .filter(Boolean)
+      const ids = (profiles || []).map(p => p.user_id).filter(Boolean)
+      const names = {}
 
-const names = {}
+      if (ids.length) {
+        const { data: characters, error: charsError } = await supabase
+          .from('characters')
+          .select('id, user_id, name, is_active')
+          .in('user_id', ids)
+          .eq('is_active', true)
 
-if (ids.length) {
-  const { data: characters, error: charsError } =
-    await supabase
-      .from('characters')
-      .select('id, user_id, name, is_active')
-      .in('user_id', ids)
-      .eq('is_active', true)
+        if (charsError) {
+          console.warn('[Carte du Maraudeur] Personnages :', charsError.message)
+        }
 
-  if (charsError) {
-    console.warn(
-      '[Carte du Maraudeur] Personnages :',
-      charsError.message
-    )
-  }
+        for (const ch of characters || []) {
+          if (!names[ch.user_id]) names[ch.user_id] = ch.name
+        }
+      }
 
-  for (const ch of characters || []) {
-    if (!names[ch.user_id]) {
-      names[ch.user_id] = ch.name
-    }
-  }
-}
+      if (!active || serial !== requestSerial) return
 
-if (!active || serial !== requestSerial) return
+      const incoming = ids
+        .filter(id => names[id])
+        .slice(0, MAX_MARKERS)
+        .map(id => ({
+          user_id: id,
+          name: names[id],
+          decoy: false,
+          leaving: false,
+        }))
 
-const incoming = ids
-  .filter(id => names[id])
-  .slice(0, MAX_MARKERS)
-  .map(id => ({
-    user_id: id,
-    name: names[id],
-    decoy: false,
-    leaving: false,
-  }))
-
-      const incomingIds = new Set(
-        incoming.map(p => p.user_id)
-      )
+      const incomingIds = new Set(incoming.map(p => p.user_id))
 
       setPlayers(old => [
         ...incoming,
         ...old
           .filter(p => !incomingIds.has(p.user_id))
-          .map(p => ({
-            ...p,
-            leaving: true,
-          })),
+          .map(p => ({ ...p, leaving: true })),
       ])
 
       const timer = window.setTimeout(() => {
         timers.delete(timer)
-
         if (active) {
-          setPlayers(old =>
-            old.filter(p => !p.leaving)
-          )
+          setPlayers(old => old.filter(p => !p.leaving))
         }
       }, 1300)
 
@@ -766,43 +719,26 @@ const incoming = ids
 
     void refresh()
 
-    const interval = window.setInterval(
-      () => void refresh(),
-      REFRESH_MS
-    )
+    const interval = window.setInterval(() => void refresh(), REFRESH_MS)
 
     function onVisible() {
-      if (document.visibilityState === 'visible') {
-        void refresh()
-      }
+      if (document.visibilityState === 'visible') void refresh()
     }
 
-    document.addEventListener(
-      'visibilitychange',
-      onVisible
-    )
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
       active = false
       window.clearInterval(interval)
-
-      document.removeEventListener(
-        'visibilitychange',
-        onVisible
-      )
-
-      for (const timer of timers) {
-        window.clearTimeout(timer)
-      }
+      document.removeEventListener('visibilitychange', onVisible)
+      for (const timer of timers) window.clearTimeout(timer)
     }
   }, [])
 
   return (
     <div
       ref={layerRef}
-      className={`marauder-layer ${
-        reducedMotion ? 'reduce-motion' : ''
-      }`}
+      className={`marauder-layer ${reducedMotion ? 'reduce-motion' : ''}`}
       style={
         maskImage
           ? {
@@ -818,18 +754,14 @@ const incoming = ids
     >
       {[...players, ...decoys].map(player =>
         reducedMotion ? (
-          <div
-            key={player.user_id}
-            className={`marauder-static ${
-              player.decoy ? 'marauder-decoy' : ''
-            }`}
-          >
+          <div key={player.user_id} className={`marauder-static ${player.decoy ? 'marauder-decoy' : ''}`}>
             {player.name}
           </div>
         ) : (
           <FootprintWalker
             key={player.user_id}
             player={player}
+            blockedZones={blockedZones}
           />
         )
       )}
@@ -867,8 +799,8 @@ const incoming = ids
           outline-offset: 3px;
           transition: transform 0.5s ease;
           filter:
-            drop-shadow(0 0 3px rgba(255,215,151,.9))
-            drop-shadow(0 0 8px rgba(241,177,96,.4));
+            drop-shadow(0 0 3px rgba(255,215,151,.95))
+            drop-shadow(0 0 8px rgba(241,177,96,.42));
         }
 
         .marauder-footprints {
@@ -879,35 +811,28 @@ const incoming = ids
         }
 
         .marauder-print {
-          fill: #f3dbac;
-          stroke: #78512d;
-          stroke-width: .45;
-          opacity: .95;
+          fill: #f1d195;
+          stroke: #6f4b24;
+          stroke-width: .7;
+          opacity: .97;
           transform-box: fill-box;
           transform-origin: center;
         }
 
-        .marauder-footprints.is-walking
-        .marauder-print:first-child {
-          animation:
-            marauder-stamp-left
-            1.4s ease-in-out infinite alternate;
+        .marauder-lace {
+          stroke: rgba(98,64,30,.92);
+          stroke-width: .85;
+          stroke-linecap: round;
+          opacity: .85;
         }
 
-        .marauder-steps
-        .marauder-footprints.is-walking g:first-child
-        .marauder-print {
-          animation:
-            marauder-stamp-left
-            1.4s ease-in-out infinite alternate;
+        .marauder-footprints.is-walking .marauder-print:first-child,
+        .marauder-steps .marauder-footprints.is-walking g:first-child .marauder-print {
+          animation: marauder-stamp-left 1.35s ease-in-out infinite alternate;
         }
 
-        .marauder-steps
-        .marauder-footprints.is-walking g:last-child
-        .marauder-print {
-          animation:
-            marauder-stamp-right
-            1.4s ease-in-out infinite alternate;
+        .marauder-steps .marauder-footprints.is-walking g:last-child .marauder-print {
+          animation: marauder-stamp-right 1.35s ease-in-out infinite alternate;
         }
 
         .marauder-inspecting .marauder-steps {
@@ -934,9 +859,7 @@ const incoming = ids
           font: italic 14px/1.3 Georgia, serif;
           letter-spacing: .035em;
           white-space: nowrap;
-          text-shadow:
-            0 1px 4px #120b06,
-            0 0 9px #100c07;
+          text-shadow: 0 1px 4px #120b06, 0 0 9px #100c07;
         }
 
         .marauder-activity {
@@ -957,29 +880,30 @@ const incoming = ids
         }
 
         .marauder-decoy .marauder-steps {
-          filter:
-            drop-shadow(0 0 3px rgba(121,174,206,.65))
-            drop-shadow(0 0 8px rgba(102,153,188,.25));
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,.42));
         }
 
         .marauder-decoy .marauder-print {
-          fill: #a8bccb;
-          stroke: #40566c;
-          opacity: .78;
+          fill: #1b1a18;
+          stroke: #000;
+          opacity: .98;
+        }
+
+        .marauder-decoy .marauder-lace {
+          stroke: rgba(12,12,12,.9);
         }
 
         .marauder-decoy .marauder-name {
-          color: #bdcddd;
+          color: #d5d0c2;
         }
 
         .marauder-decoy .marauder-activity {
-          color: #dae4ee;
+          color: #e2ddd0;
         }
 
-        .marauder-decoy.marauder-inspecting
-        .marauder-label {
-          border-color: rgba(156,188,213,.35);
-          background: rgba(10,17,26,.9);
+        .marauder-decoy.marauder-inspecting .marauder-label {
+          border-color: rgba(240,240,240,.14);
+          background: rgba(14,13,12,.92);
         }
 
         .reduce-motion {
@@ -998,40 +922,22 @@ const incoming = ids
         }
 
         .marauder-static.marauder-decoy {
-          color: #a8bccb;
+          color: #d0cbbf;
         }
 
         @keyframes marauder-stamp-left {
-          from {
-            opacity: .35;
-            transform: translateY(3px) scale(.92);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(-3px) scale(1.06);
-          }
+          from { opacity: .45; transform: translateY(3px) scale(.93); }
+          to { opacity: 1; transform: translateY(-3px) scale(1.05); }
         }
 
         @keyframes marauder-stamp-right {
-          from {
-            opacity: 1;
-            transform: translateY(-3px) scale(1.06);
-          }
-          to {
-            opacity: .35;
-            transform: translateY(3px) scale(.92);
-          }
+          from { opacity: 1; transform: translateY(-3px) scale(1.05); }
+          to { opacity: .45; transform: translateY(3px) scale(.93); }
         }
 
         @keyframes marauder-activity-appear {
-          from {
-            opacity: 0;
-            transform: translateY(-4px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
         @media (max-width: 640px) {

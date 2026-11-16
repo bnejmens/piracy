@@ -207,7 +207,7 @@ async function reloadTree() {
             <button type="button" onClick={() => setSelectedPaths(prev => prev.filter(x => pathKey(x) !== pathKey(p)))} className="text-red-200 hover:text-red-100">Retirer</button>
           </div>)}
         </div>}
-        {!selectedPaths.length && <p className="text-xs text-white/60">Sans ajout manuel, l'emplacement actuellement sélectionné sera utilisé à la création.</p>}
+        {!selectedPaths.length && <p className="text-xs text-white/60">Sans ajout manuel, l&apos;emplacement actuellement sélectionné sera utilisé à la création.</p>}
       </div>
     </>
   )
