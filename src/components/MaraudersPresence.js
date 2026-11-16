@@ -322,7 +322,7 @@ function Footprints({ walking }) {
   )
 }
 
-function FootprintWalker({ player, blockedZones = DEFAULT_AVOID_ZONES }) {
+function FootprintWalker({ player, blockedZonesRef }) {
   const walkerRef = useRef(null)
   const pausedRef = useRef(false)
   const positionRef = useRef(null)
@@ -337,7 +337,7 @@ function FootprintWalker({ player, blockedZones = DEFAULT_AVOID_ZONES }) {
     let frame
     let lastTime = 0
 
-    const start = randomPoint(blockedZones)
+    const start = randomPoint(blockedZonesRef.current)
     positionRef.current = start
 
     if (walkerRef.current) {
@@ -367,13 +367,13 @@ function FootprintWalker({ player, blockedZones = DEFAULT_AVOID_ZONES }) {
       const current = positionRef.current
       if (!current) return
 
-      let next = randomPoint(blockedZones)
+      let next = randomPoint(blockedZonesRef.current)
 
       for (let i = 0; i < 35 && distance(next, current) < 28; i++) {
-        next = randomPoint(blockedZones)
+        next = randomPoint(blockedZonesRef.current)
       }
 
-      route = buildRoute(current, next, blockedZones)
+      route = buildRoute(current, next, blockedZonesRef.current)
       legIndex = 0
       startLeg(current, route[0])
     }
@@ -424,7 +424,7 @@ function FootprintWalker({ player, blockedZones = DEFAULT_AVOID_ZONES }) {
     return () => {
       window.cancelAnimationFrame(frame)
     }
-  }, [player.user_id, blockedZones])
+  }, [player.user_id, blockedZonesRef])
 
   function stopForInspection() {
     if (pausedRef.current) return
@@ -463,7 +463,9 @@ function FootprintWalker({ player, blockedZones = DEFAULT_AVOID_ZONES }) {
         y <= rect.bottom + margin
 
       const target = document.elementFromPoint(x, y)
-      const overControl = target?.closest('button, a, input, select, textarea, [role="button"]')
+      const closestControl = target?.closest('button, a, input, select, textarea, [role="button"]')
+      // Le survol des empreintes elles-mêmes est autorisé : elles ont role=button.
+      const overControl = !!closestControl && closestControl !== steps
       const overAvatar = target?.closest('main .group.relative.rounded-full.overflow-hidden')
 
       if (nearby && !overControl && !overAvatar) {
@@ -521,7 +523,8 @@ export default function MaraudersPresence() {
   const [decoys, setDecoys] = useState([])
   const [reducedMotion, setReducedMotion] = useState(false)
   const [maskImage, setMaskImage] = useState(null)
-  const [blockedZones, setBlockedZones] = useState(DEFAULT_AVOID_ZONES)
+  // Ref stable : le recalcul du masque ne doit jamais relancer les marcheurs.
+  const blockedZonesRef = useRef(DEFAULT_AVOID_ZONES)
 
   const layerRef = useRef(null)
 
@@ -569,7 +572,7 @@ export default function MaraudersPresence() {
 
       if (!targets.length) {
         setMaskImage(null)
-        setBlockedZones(DEFAULT_AVOID_ZONES)
+        blockedZonesRef.current = DEFAULT_AVOID_ZONES
         return
       }
 
@@ -597,9 +600,9 @@ export default function MaraudersPresence() {
         const cx = ((rect.left - region.left + rect.width / 2) / region.width) * 100
         const cy = ((rect.top - region.top + rect.height / 2) / region.height) * 100
         const r = (Math.max(rect.width, rect.height) / 2 + 40) / Math.min(region.width, region.height) * 100
-        setBlockedZones([{ cx, cy, r: clamp(r, 14, 24) }])
+        blockedZonesRef.current = [{ cx, cy, r: clamp(r, 14, 24) }]
       } else {
-        setBlockedZones(DEFAULT_AVOID_ZONES)
+        blockedZonesRef.current = DEFAULT_AVOID_ZONES
       }
 
       const svg = `
@@ -761,7 +764,7 @@ export default function MaraudersPresence() {
           <FootprintWalker
             key={player.user_id}
             player={player}
-            blockedZones={blockedZones}
+            blockedZonesRef={blockedZonesRef}
           />
         )
       )}
