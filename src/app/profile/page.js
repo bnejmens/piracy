@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import SiteTopbar from "@/components/SiteTopbar";
+import { optimizeAvatar } from "@/lib/optimizeAvatar";
 import { supabase } from "@/lib/supabaseClient";
 
 /**
@@ -670,19 +671,23 @@ function AvatarUploader({
       const localURL = URL.createObjectURL(file);
       setPreview(localURL);
 
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      // ➜ on range dans /<user>/<char>/<prefix>/
-      const path = `${userId}/${charId}/${prefix}/${Date.now()}.${ext}`;
+      // Réduire la taille avant l'envoi : le navigateur génère un WebP optimisé.
+      const optimized = await optimizeAvatar(file, { maxDimension: 512, quality: 0.82 });
+      // Chaque upload crée un chemin unique : un cache long ne masque jamais un nouvel avatar.
+      const path = `${userId}/${charId}/${prefix}/${Date.now()}-${crypto.randomUUID()}.${optimized.extension}`;
 
       const { error: upErr } = await supabase
         .storage.from(AVATAR_BUCKET)
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, optimized.file, {
+          upsert: false,
+          contentType: optimized.file.type,
+          cacheControl: "31536000",
+        });
       if (upErr) throw upErr;
 
       const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-      const raw = pub?.publicUrl;
-      const url = raw ? `${raw}?v=${Date.now()}` : ""; // anti-cache CDN
-      if (url) onUploaded?.(url);
+      const url = pub?.publicUrl || "";
+      if (url) await onUploaded?.(url);
     } catch (e) {
       setError(e?.message || "Erreur d'upload");
     } finally {

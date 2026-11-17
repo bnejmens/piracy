@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import SiteTopbar from "@/components/SiteTopbar"
 import { supabase } from "@/lib/supabaseClient"
+import { optimizeAvatar } from "@/lib/optimizeAvatar"
 
 const BUCKET = "avatars"
 
@@ -108,12 +109,16 @@ export default function RandomVavaPage() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const safe = file.name.replace(/\s+/g, "_").replace(/[^\w.\-]/g, "")
-        const path = `${slug}/${Date.now()}-${i}-${safe}`
+        const optimized = await optimizeAvatar(file, { maxDimension: 800, quality: 0.83 })
+        const path = `${slug}/${Date.now()}-${i}-${crypto.randomUUID()}.${optimized.extension}`
 
         const { error: upErr } = await supabase
           .storage.from(BUCKET)
-          .upload(path, file, { cacheControl: "3600", upsert: false })
+          .upload(path, optimized.file, {
+            contentType: optimized.file.type,
+            cacheControl: "31536000",
+            upsert: false,
+          })
         if (upErr) throw upErr
 
         const url = publicUrl(path)
