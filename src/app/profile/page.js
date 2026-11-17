@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import Link from "next/link";
+import SiteTopbar from "@/components/SiteTopbar";
 import { supabase } from "@/lib/supabaseClient";
 
 /**
@@ -269,10 +269,9 @@ const canEdit = !!me?.id && ownsCurrentChar
 
   return (
     <main className="min-h-svh bg-[url('/images/profil-bg.webp')] bg-cover bg-center p-4">
-      {/* Topbar */}
-      <div className="max-w-7xl mx-auto flex items-center gap-3 mb-4">
-        <Link href="/dashboard" className="rounded-xl bg-white/10 border border-white/20 px-3 py-2 text-white hover:bg-white/15">← Dashboard</Link>
-        <div className="ml-auto" />
+      {/* Barre de navigation commune */}
+      <div className="-mx-4 -mt-4 mb-6">
+        <SiteTopbar title="Mon profil" />
       </div>
 
       {/* GRID: [Avatar] | [Identité large] | [Traits+Relations] */}
@@ -394,10 +393,9 @@ const canEdit = !!me?.id && ownsCurrentChar
           {/* TRAITS */}
           <div className="rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
             <h2 className="text-white/90 text-lg font-semibold mb-3">Traits de personnalité</h2>
-            <p className="mb-4 text-sm text-white/65">Palette adoucie et plus uniforme pour une lecture plus confortable sur fond sombre.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-4">
-                <Bipolar leftLabel="Introverti" rightLabel="Extraverti" leftColor="#5b9bff" rightColor="#f6d24a" value={form.traits.intro_extro} onChange={(v)=>onTrait("intro_extro", v)} />
+                <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={form.traits.intro_extro} onChange={(v)=>onTrait("intro_extro", v)} />
                 <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={form.traits.egoiste_altruiste} onChange={(v)=>onTrait("egoiste_altruiste", v)} />
                 <Bipolar leftLabel="Prudent" rightLabel="Téméraire" value={form.traits.prudent_temer} onChange={(v)=>onTrait("prudent_temer", v)} />
                 <Bipolar leftLabel="Réfléchi" rightLabel="Impulsif" value={form.traits.reflechi_impulsif} onChange={(v)=>onTrait("reflechi_impulsif", v)} />
@@ -629,7 +627,7 @@ function RelationAdder({ characters, types, onAdd, busy, msg }) {
   );
 }
 
-function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#b9a27b", rightColor="#e6d4a7" }) {
+function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#8c6ab8", rightColor="#e6d4a7" }) {
   const pct = (value / 10) * 100; // 0..100 → droite
   const gradient = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${pct}%, ${rightColor} ${pct}%, ${rightColor} 100%)`;
   return (
