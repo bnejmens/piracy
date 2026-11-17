@@ -146,12 +146,12 @@ const avatarNode = (m) => (
   if (error)   return <p className="p-8 text-red-400">Erreur : {error}</p>;
 
   return (
-    <main className="fixed inset-0 overflow-y-auto overscroll-contain">
-      {/* BACKGROUND */}
-      <div className="absolute inset-0 -z-20">
-        <Image src="/images/members-bg.webp" alt="" fill priority className="object-cover" />
+    <main className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-[#100e17]">
+      {/* Décor fixe couvrant toujours tout le viewport, indépendamment du scroll */}
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+        <Image src="/images/members-bg.webp" alt="" fill priority sizes="100vw" className="object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
       </div>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
 
 {/* Halo chaleureux près de la lampe du décor */}
@@ -165,7 +165,7 @@ const avatarNode = (m) => (
       <SiteTopbar title="Membres" />
 
       {/* Carte centrale */}
-      <div className="relative flex min-h-screen items-start justify-center px-3 pb-10 pt-8 sm:px-6 sm:pb-12">
+      <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto overscroll-contain px-3 pb-6 pt-5 sm:px-6 sm:pb-8 sm:pt-6">
         <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x1 ring-1 ring-white/30 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
          
 {/* En-tête et recherche */}
