@@ -295,7 +295,7 @@ const canEdit = !!me?.id && ownsCurrentChar
                 userId={me.id}
                 charId={charId}
                 prefix="companions"
-                label="Upload companion"
+                label="Upload compagnon"
                 onUploaded={async (url) => {
                   onChange("companion_avatar_url", url);
                   setImgBust(Date.now());
@@ -424,7 +424,7 @@ const canEdit = !!me?.id && ownsCurrentChar
               busy={relBusy}
               msg={relMsg}
             />
-            <ul className="divide-y divide-white/10 max-h-[40svh] overflow-y-auto">
+            <ul className="max-h-[240px] min-h-0 divide-y divide-white/10 overflow-y-auto overscroll-contain pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(230,212,167,0.5)_transparent]">
               {relations.map((rel) => (
                 <li key={rel.id} className="py-2 flex items-center gap-3">
                   <MiniAvatar src={rel.other?.avatar_url} />
@@ -575,7 +575,7 @@ function CreateCharacterInline({ userId, setMyChars, setCharId }) {
 
   return (
     <div className="mt-4 w-full rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
-      <p className="text-sm mb-2 text-white/90 font-medium">Créer un nouveau personnage</p>
+      <p className="mb-3 whitespace-nowrap text-xs font-semibold text-white/90 sm:text-[11px] lg:text-xs">Nouveau personnage</p>
       <div className="flex flex-col gap-2 w-full">
   <input
     type="text"
@@ -698,7 +698,7 @@ function AvatarUploader({
           <img src={preview} alt="preview" className="w-full h-full object-cover" />
         </div>
       )}
-      <label className="cursor-pointer rounded-lg bg-white/12 border border-white/20 px-3 py-2 text-white hover:bg-white/18">
+      <label className="inline-flex max-w-full items-center justify-center whitespace-nowrap rounded-lg border border-white/20 bg-white/12 px-2.5 py-2 text-[11px] font-medium text-white hover:bg-white/18 sm:text-xs">
         {busy ? "Envoi…" : label}
         <input type="file" accept="image/*" className="hidden" onChange={onPick} />
       </label>
