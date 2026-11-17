@@ -936,43 +936,6 @@ const loadTopics = async () => {
     </div>
   </div>
 
-  {/* Accès direct aux sous-zones depuis la lecture d'une scène RP. */}
-  <nav
-    aria-label="Accès aux sous-zones RP"
-    className="relative z-10 flex shrink-0 items-center gap-3 border-b border-amber-200/10 bg-[#17111f]/85 px-4 py-2 lg:px-6"
-  >
-    <button
-      type="button"
-      onClick={() => router.push('/rp')}
-      className="shrink-0 rounded-md border border-amber-200/25 bg-amber-200/10 px-3 py-1.5 text-xs font-medium text-amber-200 transition hover:bg-amber-200/20"
-    >
-      ← Toutes les zones
-    </button>
-
-    <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
-      <div className="flex w-max items-center gap-2 pb-1">
-        {zones.flatMap(zone =>
-          places.filter(place => place.zone_id === zone.id).map(place => (
-            <button
-              key={place.id}
-              type="button"
-              onClick={() => router.push(`/rp?location=${encodeURIComponent(place.id)}`)}
-              title={`${zone.name} · ${place.name}`}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition ${
-                activeLocation?.id === place.id
-                  ? 'border-amber-300/70 bg-amber-200/20 text-amber-100'
-                  : 'border-white/15 bg-white/5 text-white/80 hover:border-amber-300/45 hover:bg-white/10'
-              }`}
-            >
-              <span className="mr-1 text-amber-200/60">{zone.name} ·</span>
-              {place.name}
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  </nav>
-
   {/* Deux colonnes sur ordinateur, un panneau sur téléphone */}
   <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(320px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
 

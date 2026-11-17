@@ -20,6 +20,53 @@ const TAGLINES = {
   'ministere-magie': 'Institutions, justice et pouvoir',
 }
 
+// Descriptions affichées dans les scènes RP, adaptées aux sous-zones actuelles.
+// Les noms, IDs, slugs et images restent gérés par Supabase.
+const LOCATION_DESCRIPTIONS = {
+  'ailes principales': 'Salles de cours, couloirs et passages des ailes principales de Poudlard.',
+  'maisons et dortoirs': 'Salles communes et dortoirs des différentes maisons de Poudlard.',
+  'quartiers sorciers': 'Boutiques, ruelles et quartiers fréquentés par les sorciers de Londres.',
+  'administration': 'Bureaux et services administratifs du Ministère de la Magie.',
+}
+
+function normalizePlaceName(value) {
+  return (value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+}
+
+function locationDescription(location) {
+  if (!location) return ''
+  return LOCATION_DESCRIPTIONS[normalizePlaceName(location.name)] || location.description || ''
+}
+
+// Empile au maximum quatre portraits, sans augmenter la hauteur des cartes.
+function ParticipantAvatars({ ids, profiles }) {
+  const participants = [...ids].slice(0, 4)
+  if (!participants.length) return null
+
+  return (
+    <span className="inline-flex shrink-0 items-center -space-x-1.5" aria-label="Portraits des participants">
+      {participants.map(id => {
+        const profile = profiles[id]
+        const label = profile?.name || 'Participant'
+        return (
+          <span
+            key={id}
+            title={label}
+            className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-[#211b29] bg-[#5b456b] text-[10px] font-semibold text-amber-50"
+          >
+            {profile?.avatar ? (
+              <Image src={profile.avatar} alt={label} width={28} height={28} unoptimized className="h-full w-full object-cover" />
+            ) : (
+              <span>{label.slice(0, 1).toUpperCase()}</span>
+            )}
+          </span>
+        )
+      })}
+      {ids.size > 4 && <span className="pl-2 text-[10px] text-amber-100/70">+{ids.size - 4}</span>}
+    </span>
+  )
+}
+
 const navButton = 'rounded-lg px-3 py-2 text-sm text-amber-50/90 transition hover:bg-white/10'
 
 export default function RPPage() {
@@ -31,6 +78,7 @@ export default function RPPage() {
   const [locations, setLocations] = useState([])
   const [topics, setTopics] = useState([])
   const [posts, setPosts] = useState([])
+  const [participantProfiles, setParticipantProfiles] = useState({})
   const [view, setView] = useState('zones') // zones | location | mine | others
   const [locationId, setLocationId] = useState(null)
   const [menuOpen, setMenuOpen] = useState(null)
@@ -57,7 +105,7 @@ const [inviteLoading, setInviteLoading] = useState(false)
   .eq('is_active', true)
   .order('display_order'),
       supabase.from('rp_topics').select('id,title,author_id,created_by,created_at,location_id').order('created_at', { ascending: false }).limit(1000),
-      supabase.from('rp_posts').select('topic_id,author_user_id').limit(10000),
+      supabase.from('rp_posts').select('topic_id,author_user_id,author_character_id').limit(10000),
       supabase.from('profiles').select('pseudo,avatar_url,active_character_id').eq('user_id', uid).maybeSingle(),
     ])
     const failed = [zonesR, locationsR, topicsR, postsR, profileR].find(r => r.error)
@@ -66,6 +114,47 @@ const [inviteLoading, setInviteLoading] = useState(false)
     
 setZones(zonesR.data || [])
 setLocations(locationsR.data || [])
+
+// Utiliser en priorité l'avatar du personnage qui a participé au RP.
+// Compléter par le portrait du profil pour le créateur sans post.
+const allPosts = postsR.data || []
+const allTopics = topicsR.data || []
+const userIds = [...new Set([
+  ...allPosts.map(p => p.author_user_id),
+  ...allTopics.map(t => t.author_id || t.created_by),
+].filter(Boolean))]
+const characterIds = [...new Set(allPosts.map(p => p.author_character_id).filter(Boolean))]
+const portraits = {}
+
+if (userIds.length) {
+  const { data: accounts, error: accountsError } = await supabase
+    .from('profiles')
+    .select('user_id,pseudo,avatar_url')
+    .in('user_id', userIds)
+  if (!accountsError) {
+    for (const p of accounts || []) {
+      portraits[p.user_id] = { name: p.pseudo || 'Joueur', avatar: p.avatar_url || null }
+    }
+  }
+}
+
+if (characterIds.length) {
+  const { data: authors, error: authorsError } = await supabase
+    .from('characters')
+    .select('id,user_id,name,avatar_url')
+    .in('id', characterIds)
+  if (!authorsError) {
+    for (const c of authors || []) {
+      if (c.user_id) {
+        portraits[c.user_id] = {
+          name: c.name || portraits[c.user_id]?.name || 'Personnage',
+          avatar: c.avatar_url || portraits[c.user_id]?.avatar || null,
+        }
+      }
+    }
+  }
+}
+setParticipantProfiles(portraits)
 
 // Ouvrir directement une sous-zone depuis le lecteur RP
 const requestedLocationId = new URLSearchParams(
@@ -160,10 +249,45 @@ if (
     return []
   }, [view, topics, myTopics, mineIds, locationId])
 
-  function goHome() { setView('zones'); setLocationId(null); setMenuOpen(null) }
-  function showList(next) { setView(next); setLocationId(null); setMenuOpen(null) }
-  function openLocation(id) { setLocationId(id); setView('location'); setMenuOpen(null) }
+  // Chaque sous-zone dispose de sa propre URL partageable. La navigation interne
+  // met aussi l'adresse à jour pour que F5 et les favoris ouvrent le bon lieu.
+  function updateLocationUrl(id = null) {
+    const url = new URL(window.location.href)
+    if (id) url.searchParams.set('location', id)
+    else url.searchParams.delete('location')
+    window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }
+
+  function goHome() {
+    updateLocationUrl()
+    setView('zones'); setLocationId(null); setMenuOpen(null)
+  }
+  function showList(next) {
+    updateLocationUrl()
+    setView(next); setLocationId(null); setMenuOpen(null)
+  }
+  function openLocation(id) {
+    updateLocationUrl(id)
+    setLocationId(id); setView('location'); setMenuOpen(null)
+  }
   function openTopic(id) { router.push(`/rp/scene?topic=${encodeURIComponent(id)}`) }
+
+  // Rétablit la bonne sous-zone avec les boutons Précédent / Suivant.
+  useEffect(() => {
+    const onPopState = () => {
+      const requested = new URLSearchParams(window.location.search).get('location')
+      if (requested && locations.some(place => place.id === requested)) {
+        setLocationId(requested)
+        setView('location')
+      } else {
+        setLocationId(null)
+        setView('zones')
+      }
+      setMenuOpen(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [locations])
 
 
 useEffect(() => {
@@ -272,7 +396,11 @@ async function createTopic(e) {
         <div>
           <h3 className="font-serif text-xl text-amber-50">{t.title}</h3>
           <p className="mt-1 text-xs text-amber-100/65">{placeLabel(t)}</p>
-          <p className="mt-1 text-xs text-white/45">{count} participant{count > 1 ? 's' : ''} · {new Date(t.created_at).toLocaleDateString('fr-FR')}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/65">
+            <span>{count} participant{count > 1 ? 's' : ''}</span>
+            <ParticipantAvatars ids={participantsByTopic.get(t.id) || new Set()} profiles={participantProfiles} />
+            <span className="text-white/45">· {new Date(t.created_at).toLocaleDateString('fr-FR')}</span>
+          </div>
         </div>
         <span className="text-sm text-amber-200">Lire le RP →</span>
       </button>
@@ -399,8 +527,52 @@ async function createTopic(e) {
       <div className="relative z-10 mx-auto max-w-[1580px] px-4 py-7 md:px-7">
         <div className="w-full">
           <section className="min-w-0">
-            {view !== 'zones' && (
-              <button onClick={goHome} className="mb-5 text-sm text-amber-200 hover:text-amber-100">← Toutes les zones</button>
+            {view === 'location' && (
+              <nav aria-label="Navigation rapide entre les sous-zones RP" className="mb-5 flex min-w-0 items-center gap-3">
+                <button
+                  type="button"
+                  onClick={goHome}
+                  className="shrink-0 whitespace-nowrap rounded-lg border border-amber-200/25 bg-[#21192b]/80 px-3 py-2 text-sm text-amber-200 transition hover:border-amber-300/60 hover:bg-[#32253e] hover:text-amber-100"
+                >
+                  ← Toutes les zones
+                </button>
+                <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain pb-1">
+                  <div className="flex w-max min-w-full items-center gap-2">
+                    {zones.map(zone => {
+                      const zonePlaces = locations.filter(place => place.zone_id === zone.id)
+                      if (!zonePlaces.length) return null
+                      return (
+                        <div key={zone.id} className="flex shrink-0 items-center gap-1.5 border-l border-amber-200/20 pl-2">
+                          <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-amber-200/65">
+                            {zone.name}
+                          </span>
+                          {zonePlaces.map(place => {
+                            const isCurrent = view === 'location' && locationId === place.id
+                            return (
+                              <button
+                                key={place.id}
+                                type="button"
+                                onClick={() => openLocation(place.id)}
+                                aria-current={isCurrent ? 'page' : undefined}
+                                className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition ${
+                                  isCurrent
+                                    ? 'border-amber-300/70 bg-amber-300/20 font-semibold text-amber-100'
+                                    : 'border-white/15 bg-[#21192b]/70 text-amber-50/85 hover:border-amber-300/50 hover:bg-amber-200/15'
+                                }`}
+                              >
+                                {place.name}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </nav>
+            )}
+            {(view === 'mine' || view === 'others') && (
+              <button type="button" onClick={goHome} className="mb-5 text-sm text-amber-200 hover:text-amber-100">← Toutes les zones</button>
             )}
             {error && <div className="mb-4 rounded-xl border border-rose-300/30 bg-rose-950/30 p-4 text-sm text-rose-100">{error}<button onClick={() => setError('')} className="ml-4 underline">Fermer</button></div>}
             {loading && <p className="py-24 text-center text-amber-100/60">Chargement…</p>}
@@ -423,7 +595,10 @@ async function createTopic(e) {
                         </div>
                       </div>
                       <div className="px-5 pb-5 pt-2">
-                        <p className="mb-3 text-xs uppercase tracking-[.13em] text-amber-200/65">{zoneTopics.length} RP · {players.size} participant{players.size > 1 ? 's' : ''}</p>
+                        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[.13em] text-amber-200/65">
+                          <span>{zoneTopics.length} RP · {players.size} participant{players.size > 1 ? 's' : ''}</span>
+                          <ParticipantAvatars ids={players} profiles={participantProfiles} />
+                        </div>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {zoneLocations.map(l => {
                             const count = topics.filter(t => t.location_id === l.id).length
@@ -449,7 +624,7 @@ async function createTopic(e) {
                 <p className="mb-6 text-sm text-amber-100/65">
                   {view === 'mine' ? 'Les scènes que vous avez créées ou auxquelles vous avez participé.' :
                    view === 'others' ? 'Les scènes des autres joueurs auxquelles vous ne participez pas encore.' :
-                   `${selectedZone?.name || ''} · ${selectedLocation?.description || ''}`}
+                   `${selectedZone?.name || ''} · ${locationDescription(selectedLocation)}`}
                 </p>
                 {view === 'location' && <button onClick={() => openCreate(locationId)} className="mb-5 rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#24191c] hover:bg-amber-200">+ Créer un RP ici</button>}
                 <div className="space-y-3">
