@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import SiteTopbar from "@/components/SiteTopbar";
 
 export default function MembersPage() {
   const router = useRouter();
@@ -160,16 +161,11 @@ const avatarNode = (m) => (
 />
 
 
-      {/* Retour */}
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="fixed left-[24px] top-[24px] z-40 rounded-full border border-white/30 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white text-sm hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/80"
-      >
-        ← Tableau de bord
-      </button>
+      {/* Barre commune : remplace l'ancien bouton Dashboard */}
+      <SiteTopbar title="Membres" />
 
       {/* Carte centrale */}
-      <div className="relative flex min-h-screen items-start justify-center px-3 pb-10 pt-24 sm:px-6 sm:pb-12">
+      <div className="relative flex min-h-screen items-start justify-center px-3 pb-10 pt-8 sm:px-6 sm:pb-12">
         <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x1 ring-1 ring-white/30 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
          
 {/* En-tête et recherche */}

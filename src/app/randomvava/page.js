@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import Link from "next/link"
+import SiteTopbar from "@/components/SiteTopbar"
 import { supabase } from "@/lib/supabaseClient"
 
 const BUCKET = "avatars"
@@ -175,21 +175,18 @@ export default function RandomVavaPage() {
       : `${window.location.origin}/api/randimg/${s}`
 
   return (
-    <main className="fixed inset-0 overflow-hidden">
+    <main className="fixed inset-0 flex flex-col overflow-hidden">
       {/* BG */}
       <div className="absolute inset-0 -z-20">
         <Image src="/images/vava-bg.webp" alt="" fill priority className="object-cover" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
-      <header className="absolute top-6 left-8 right-8 z-40 flex items-center justify-between">
-        <h1 className="text-white text-2xl font-semibold drop-shadow">Librairie d&apos;Avatars</h1>
-        <Link href="/dashboard" className="rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20">
-          ← Dashboard
-        </Link>
-      </header>
+      {/* Barre de navigation commune aux autres pages */}
+      <SiteTopbar title="Librairie d'Avatars" />
 
-<div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden flex flex-col min-h-0">        {/* Création/Upload */}
+      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto md:overflow-hidden px-4 pt-5 pb-6 sm:px-6 flex flex-col">
+        {/* Création/Upload */}
         <section className="max-w-5xl mx-auto rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white mb-6 shrink-0">
           <h2 className="text-lg font-semibold mb-3">Ajouter des portraits</h2>
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
@@ -220,37 +217,38 @@ export default function RandomVavaPage() {
         </section>
 
         {/* Liste des pools (slugs) + sélection */}
-        <section className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
-          <div className="rounded-2xl border border-white/30 bg-black/25 backdrop-blur p-4 text-white min-h-[50vh]">
+        <section className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 md:overflow-hidden">
+          <div className="rounded-2xl border border-white/30 bg-black/25 backdrop-blur p-4 text-white flex flex-col min-h-[260px] md:min-h-0 overflow-hidden">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Pools existants</h3>
               {loadingSlugs && <span className="text-white/70 text-sm">Chargement…</span>}
             </div>
             {error && <div className="text-rose-200 text-sm mb-2">{error}</div>}
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 pb-1">
               {slugs.map(s => (
-                <button
+                <div
                   key={s}
-                  onClick={()=>{ setActiveSlug(s); loadImages(s) }}
-                  className={`w-full text-left rounded-lg px-3 py-2 border transition
+                  className={`flex min-w-0 items-center justify-between gap-3 rounded-lg border px-3 py-2 transition
                     ${activeSlug===s ? 'bg-white/15 border-white/35' : 'bg-white/6 border-white/15 hover:bg-white/10'}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{s}</div>
-                      <div className="text-xs text-white/70">/api/randimg/{s}</div>
-                    </div>
-                    <a
-                      href={randomUrlFor(s)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-md bg-cyan-600/90 text-slate-900 text-xs px-3 py-1.5 hover:bg-emerald-300"
-                      onClick={(e)=>e.stopPropagation()}
-                    >
-                      Ouvrir la Galerie
-                    </a>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveSlug(s); loadImages(s) }}
+                    className="min-w-0 flex-1 text-left"
+                    aria-pressed={activeSlug === s}
+                  >
+                    <div className="truncate font-medium">{s}</div>
+                    <div className="truncate text-xs text-white/70">/api/randimg/{s}</div>
+                  </button>
+                  <a
+                    href={randomUrlFor(s)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-md bg-cyan-600/90 text-slate-900 text-xs px-3 py-1.5 hover:bg-emerald-300"
+                  >
+                    Ouvrir la Galerie
+                  </a>
+                </div>
               ))}
               {!slugs.length && !loadingSlugs && (
                 <div className="text-white/70 text-sm">Aucun pool pour le moment.</div>
@@ -259,10 +257,10 @@ export default function RandomVavaPage() {
           </div>
 
           {/* Détails du pool sélectionné */}
-          <div className="rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white min-h-[50vh]">
+          <div className="rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white flex flex-col min-h-[300px] md:min-h-0 overflow-hidden">
             {activeSlug ? (
               <>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 mb-3">
                   <h3 className="font-semibold">Pool : {activeSlug}</h3>
                   <button
                     onClick={() => copyText(randomUrlFor(activeSlug))}
@@ -276,7 +274,7 @@ export default function RandomVavaPage() {
                 {loadingImages ? (
                   <div className="text-white/70">Chargement des images…</div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[560px] overflow-y-auto overscroll-contain content-start pr-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1 min-h-0 overflow-y-auto overscroll-contain content-start pr-2">
                     {images.map(img => {
                       const canDelete = !!session && (me?.is_admin || img.owner_id === session?.user?.id)
                       return (

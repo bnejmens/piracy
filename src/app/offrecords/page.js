@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
+import SiteTopbar from '@/components/SiteTopbar'
 import { supabase } from '@/lib/supabaseClient'
 
 /**
@@ -243,24 +243,19 @@ export default function OffRecordsPage() {
   const currentTitle = tracks[currentIndex]?.title || `Piste #${currentIndex+1}`
 
   return (
-    <main className="fixed inset-0 overflow-hidden">
+    <main className="fixed inset-0 flex flex-col overflow-hidden">
       {/* BG */}
       <div className="absolute inset-0 -z-20">
         <Image src="/images/radio-bg.webp" alt="" fill priority className="object-cover" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
-      {/* Header */}
-      <header className="absolute top-6 left-8 right-8 z-40 flex items-center justify-between">
-        <h1 className="text-white text-2xl font-semibold drop-shadow">📻 OffRecords</h1>
-        <Link href="/dashboard" className="rounded-full border border-white/25 bg-white/15 backdrop-blur-md px-3 py-1.5 text-white/90 text-sm hover:bg-white/20">
-          ← Dashboard
-        </Link>
-      </header>
+      {/* Barre de navigation commune ; titre intégré à gauche */}
+      <SiteTopbar title="OffRecords" />
 
       {/* Content */}
       {/* ⬇️ NE PLUS SCROLLER LA PAGE : on masque le scroll global ici */}
-      <div className="absolute inset-0 pt-20 pb-8 px-6 overflow-hidden">
+      <div className="relative z-10 flex-1 min-h-0 pt-4 pb-8 px-6 overflow-hidden">
         {/* ⬇️ La grid occupe toute la hauteur, et autorise la contraction */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-full min-h-0">
           {/* Playlists (colonne gauche) */}

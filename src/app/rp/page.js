@@ -338,6 +338,8 @@ async function createTopic(e) {
             {menuOpen === 'access' && (
               <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
                 <Link href="/messages" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Messagerie</Link>
+                <Link href="/profile" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Mon profil</Link>
+                <Link href="/members" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Membres</Link>
                 <a href="/wiki" target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Wiki & chronologie ↗</a>
                 <Link href="/dashboard" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Tableau de bord</Link>
               </div>

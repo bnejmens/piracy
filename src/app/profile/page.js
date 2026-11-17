@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import Link from "next/link";
+import SiteTopbar from "@/components/SiteTopbar";
 import { supabase } from "@/lib/supabaseClient";
 
 /**
@@ -269,10 +269,9 @@ const canEdit = !!me?.id && ownsCurrentChar
 
   return (
     <main className="min-h-svh bg-[url('/images/profil-bg.webp')] bg-cover bg-center p-4">
-      {/* Topbar */}
-      <div className="max-w-7xl mx-auto flex items-center gap-3 mb-4">
-        <Link href="/dashboard" className="rounded-xl bg-white/10 border border-white/20 px-3 py-2 text-white hover:bg-white/15">← Dashboard</Link>
-        <div className="ml-auto" />
+      {/* Barre commune avec le titre de la page */}
+      <div className="-mx-4 -mt-4 mb-6">
+        <SiteTopbar title="Mon profil" />
       </div>
 
       {/* GRID: [Avatar] | [Identité large] | [Traits+Relations] */}
