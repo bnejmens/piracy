@@ -410,7 +410,7 @@ async function createTopic(e) {
   const pageTitle = view === 'mine' ? 'Mes RP' : view === 'others' ? 'Autres aventures' : selectedLocation?.name
 
   return (
-    <main className="relative min-h-screen bg-[#100e17] text-[#f7e8d0]">
+    <main className={`relative flex flex-col bg-[#100e17] text-[#f7e8d0] ${view === 'location' ? 'min-h-dvh md:h-dvh md:overflow-hidden' : 'min-h-screen'}`}>
       
 
 {/* Background RP : illustration sur tout l'écran */}
@@ -437,7 +437,7 @@ async function createTopic(e) {
 
 
 
-      <header className="relative z-30 border-b border-amber-200/20 bg-[#17111f]/95 backdrop-blur-xl">
+      <header className="relative z-30 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1650px] flex-wrap items-center gap-2 px-4 py-3 md:px-8">
           <button onClick={goHome} className="mr-auto font-serif text-xl text-amber-100 hover:text-amber-300">
             Le Monde Magique
@@ -506,7 +506,7 @@ async function createTopic(e) {
 {/* Background de la sous-zone sélectionnée */}
 {view === 'location' && selectedLocation?.image_url && (
   <div
-    className="pointer-events-none absolute inset-x-0 top-[60px] bottom-0 z-0 overflow-hidden"
+    className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
     aria-hidden="true"
   >
     <div
@@ -524,52 +524,55 @@ async function createTopic(e) {
   </div>
 )}
 
-      <div className="relative z-10 mx-auto max-w-[1580px] px-4 py-7 md:px-7">
-        <div className="w-full">
-          <section className="min-w-0">
+      <div className={`relative z-10 mx-auto w-full max-w-[1580px] px-4 py-6 md:px-7 ${view === 'location' ? 'md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden' : ''}`}>
+        <div className={`w-full ${view === 'location' ? 'md:flex md:min-h-0 md:flex-1 md:flex-col' : ''}`}>
+          <section className={`min-w-0 ${view === 'location' ? 'md:flex md:min-h-0 md:flex-1 md:flex-col' : ''}`}>
             {view === 'location' && (
-              <nav aria-label="Navigation rapide entre les sous-zones RP" className="mb-5 flex min-w-0 items-center gap-3">
-                <button
-                  type="button"
-                  onClick={goHome}
-                  className="shrink-0 whitespace-nowrap rounded-lg border border-amber-200/25 bg-[#21192b]/80 px-3 py-2 text-sm text-amber-200 transition hover:border-amber-300/60 hover:bg-[#32253e] hover:text-amber-100"
-                >
-                  ← Toutes les zones
-                </button>
-                <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain pb-1">
-                  <div className="flex w-max min-w-full items-center gap-2">
+              <>
+                <div className="mb-4 shrink-0">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-[.18em] text-amber-200/75">{selectedZone?.name || 'Le Monde Magique'}</div>
+                  <h1 className="font-serif text-3xl text-amber-100 md:text-4xl">{selectedLocation?.name}</h1>
+                </div>
+                <nav aria-label="Navigation entre les sous-zones RP" className="mb-5 shrink-0 rounded-2xl border border-amber-200/30 bg-[#1b1425]/90 p-3 shadow-[0_10px_35px_rgba(0,0,0,.28)] backdrop-blur-xl md:p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/15 pb-3">
+                    <h2 className="text-sm font-semibold uppercase tracking-[.12em] text-amber-100">Explorer les sous-zones</h2>
+                    <button type="button" onClick={goHome} className="rounded-lg border border-amber-200/30 bg-amber-200/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-200/20">
+                      ← Toutes les zones
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
                     {zones.map(zone => {
                       const zonePlaces = locations.filter(place => place.zone_id === zone.id)
                       if (!zonePlaces.length) return null
                       return (
-                        <div key={zone.id} className="flex shrink-0 items-center gap-1.5 border-l border-amber-200/20 pl-2">
-                          <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-amber-200/65">
-                            {zone.name}
-                          </span>
-                          {zonePlaces.map(place => {
-                            const isCurrent = view === 'location' && locationId === place.id
-                            return (
-                              <button
-                                key={place.id}
-                                type="button"
-                                onClick={() => openLocation(place.id)}
-                                aria-current={isCurrent ? 'page' : undefined}
-                                className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition ${
-                                  isCurrent
-                                    ? 'border-amber-300/70 bg-amber-300/20 font-semibold text-amber-100'
-                                    : 'border-white/15 bg-[#21192b]/70 text-amber-50/85 hover:border-amber-300/50 hover:bg-amber-200/15'
-                                }`}
-                              >
-                                {place.name}
-                              </button>
-                            )
-                          })}
+                        <div key={zone.id} className="min-w-0">
+                          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-amber-200/75">{zone.name}</h3>
+                          <div className="flex flex-wrap gap-1.5">
+                            {zonePlaces.map(place => {
+                              const isCurrent = locationId === place.id
+                              return (
+                                <button
+                                  key={place.id}
+                                  type="button"
+                                  onClick={() => openLocation(place.id)}
+                                  aria-current={isCurrent ? 'page' : undefined}
+                                  className={`rounded-lg border px-2.5 py-1.5 text-left text-xs leading-snug transition ${
+                                    isCurrent
+                                      ? 'border-amber-300/70 bg-amber-300/20 font-semibold text-amber-100'
+                                      : 'border-white/15 bg-white/[.055] text-amber-50/85 hover:border-amber-300/50 hover:bg-white/10'
+                                  }`}
+                                >
+                                  {place.name}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
                       )
                     })}
                   </div>
-                </div>
-              </nav>
+                </nav>
+              </>
             )}
             {(view === 'mine' || view === 'others') && (
               <button type="button" onClick={goHome} className="mb-5 text-sm text-amber-200 hover:text-amber-100">← Toutes les zones</button>
@@ -597,7 +600,6 @@ async function createTopic(e) {
                       <div className="px-5 pb-5 pt-2">
                         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[.13em] text-amber-200/65">
                           <span>{zoneTopics.length} RP · {players.size} participant{players.size > 1 ? 's' : ''}</span>
-                          <ParticipantAvatars ids={players} profiles={participantProfiles} />
                         </div>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {zoneLocations.map(l => {
@@ -620,14 +622,25 @@ async function createTopic(e) {
 
             {!loading && view !== 'zones' && (
               <>
-                <h1 className="mb-2 font-serif text-3xl text-amber-100 md:text-4xl">{pageTitle}</h1>
-                <p className="mb-6 text-sm text-amber-100/65">
-                  {view === 'mine' ? 'Les scènes que vous avez créées ou auxquelles vous avez participé.' :
-                   view === 'others' ? 'Les scènes des autres joueurs auxquelles vous ne participez pas encore.' :
-                   `${selectedZone?.name || ''} · ${locationDescription(selectedLocation)}`}
-                </p>
-                {view === 'location' && <button onClick={() => openCreate(locationId)} className="mb-5 rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#24191c] hover:bg-amber-200">+ Créer un RP ici</button>}
-                <div className="space-y-3">
+                {view !== 'location' && (
+                  <div className="mb-5 shrink-0">
+                    <h1 className="mb-2 font-serif text-3xl text-amber-100 md:text-4xl">{pageTitle}</h1>
+                    <p className="text-sm text-amber-100/65">
+                      {view === 'mine'
+                        ? 'Les scènes que vous avez créées ou auxquelles vous avez participé.'
+                        : 'Les scènes des autres joueurs auxquelles vous ne participez pas encore.'}
+                    </p>
+                  </div>
+                )}
+                {view === 'location' && (
+                  <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold uppercase tracking-[.12em] text-amber-100/85">
+                      Scènes RP <span className="ml-1 font-normal tracking-normal text-amber-100/50">({visibleTopics.length})</span>
+                    </h2>
+                    <button onClick={() => openCreate(locationId)} className="rounded-lg bg-amber-300 px-3 py-2 text-xs font-semibold text-[#24191c] hover:bg-amber-200 sm:text-sm">+ Créer un RP ici</button>
+                  </div>
+                )}
+                <div className={`space-y-3 ${view === 'location' ? 'md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain pb-5 pr-1 scrollbar-thin' : ''}`}>
                   {visibleTopics.map(topicCard)}
                   {visibleTopics.length === 0 && <p className="rounded-xl border border-amber-200/15 bg-[#120f1c]/65 backdrop-blur-md p-7 text-center text-white/60">Aucun RP dans cette rubrique pour le moment.</p>}
                 </div>
