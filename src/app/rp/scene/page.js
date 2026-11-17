@@ -307,8 +307,8 @@ const loadTopics = async () => {
   setTopics(list)
 
   const [zonesResult, placesResult] = await Promise.all([
-    supabase.from('rp_zones').select('id,name'),
-    supabase.from('rp_locations').select('id,zone_id,name,image_url'),
+    supabase.from('rp_zones').select('id,name').eq('is_active', true),
+    supabase.from('rp_locations').select('id,zone_id,name,image_url').eq('is_active', true),
   ])
 
   if (!zonesResult.error) setZones(zonesResult.data || [])
@@ -381,6 +381,24 @@ const loadTopics = async () => {
       .limit(300)
     if (error) { console.error(error); return }
     setPosts(data || [])
+
+    // Rafraîchir les avatars du topic courant, y compris après un nouveau post.
+    const ids = [...new Set((data || []).map(post => post.author_character_id).filter(Boolean))]
+    if (ids.length) {
+      const { data: participants, error: participantError } = await supabase
+        .from('characters')
+        .select('id,name,avatar_url')
+        .in('id', ids)
+      if (!participantError) {
+        setParticipantsIndex(current => ({
+          ...current,
+          [topicId]: participants || [],
+        }))
+      }
+    } else {
+      setParticipantsIndex(current => ({ ...current, [topicId]: [] }))
+    }
+
     setTimeout(scrollToEnd, 0)
   }
 
@@ -431,6 +449,20 @@ const loadTopics = async () => {
     }
 
     setPosts(p => [...p, data])
+    if (chosenCharId) {
+      const { data: joinedCharacter } = await supabase
+        .from('characters')
+        .select('id,name,avatar_url')
+        .eq('id', chosenCharId)
+        .maybeSingle()
+      if (joinedCharacter) {
+        setParticipantsIndex(current => {
+          const previous = current[activeTopic.id] || []
+          if (previous.some(person => person.id === joinedCharacter.id)) return current
+          return { ...current, [activeTopic.id]: [...previous, joinedCharacter] }
+        })
+      }
+    }
     setRaw('')
     setPreviewOpen(false)
     setTimeout(scrollToEnd, 0)
@@ -464,6 +496,7 @@ const loadTopics = async () => {
     const { error } = await supabase.from('rp_posts').delete().eq('id', postId)
     if (error) { alert(error.message); return }
     setPosts(ps => ps.filter(p => p.id !== postId))
+    if (activeTopic?.id) await loadPosts(activeTopic.id)
   }
 
   /* ---------- EDIT / DELETE TOPIC ---------- */
@@ -835,6 +868,45 @@ const loadTopics = async () => {
       <p className="truncate text-xs text-amber-200/65">
         {placeLabel(activeTopic)}
       </p>
+
+      {/* Personnages ayant publié dans ce topic (une seule fois par personnage). */}
+      {activeTopic && (() => {
+        const participants = participantsIndex[activeTopic.id] || []
+        const shown = participants.slice(0, 6)
+        const remaining = participants.length - shown.length
+
+        return (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="shrink-0 text-xs text-amber-100/75">
+              {participants.length} participant{participants.length > 1 ? 's' : ''}
+            </span>
+            <div className="flex items-center -space-x-1.5" aria-label="Personnages participants">
+              {shown.map(character => (
+                <button
+                  key={character.id}
+                  type="button"
+                  onClick={() => openPosterCard(null, character.id)}
+                  title={`Voir la fiche de ${character.name}`}
+                  aria-label={`Voir la fiche de ${character.name}`}
+                  className="relative z-0 grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#211928] bg-[#4c3b54] text-[10px] font-semibold text-amber-50 transition hover:z-10 hover:scale-110 hover:border-amber-300 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-amber-300"
+                >
+                  {character.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={character.avatar_url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span>{(character.name || '?').charAt(0).toUpperCase()}</span>
+                  )}
+                </button>
+              ))}
+              {remaining > 0 && (
+                <span className="relative grid h-7 min-w-7 place-items-center rounded-full border-2 border-[#211928] bg-[#4c3b54] px-1 text-[10px] font-semibold text-amber-50">
+                  +{remaining}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </div>
 
     {/* Navigation téléphone */}
@@ -863,6 +935,43 @@ const loadTopics = async () => {
       </button>
     </div>
   </div>
+
+  {/* Accès direct aux sous-zones depuis la lecture d'une scène RP. */}
+  <nav
+    aria-label="Accès aux sous-zones RP"
+    className="relative z-10 flex shrink-0 items-center gap-3 border-b border-amber-200/10 bg-[#17111f]/85 px-4 py-2 lg:px-6"
+  >
+    <button
+      type="button"
+      onClick={() => router.push('/rp')}
+      className="shrink-0 rounded-md border border-amber-200/25 bg-amber-200/10 px-3 py-1.5 text-xs font-medium text-amber-200 transition hover:bg-amber-200/20"
+    >
+      ← Toutes les zones
+    </button>
+
+    <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
+      <div className="flex w-max items-center gap-2 pb-1">
+        {zones.flatMap(zone =>
+          places.filter(place => place.zone_id === zone.id).map(place => (
+            <button
+              key={place.id}
+              type="button"
+              onClick={() => router.push(`/rp?location=${encodeURIComponent(place.id)}`)}
+              title={`${zone.name} · ${place.name}`}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition ${
+                activeLocation?.id === place.id
+                  ? 'border-amber-300/70 bg-amber-200/20 text-amber-100'
+                  : 'border-white/15 bg-white/5 text-white/80 hover:border-amber-300/45 hover:bg-white/10'
+              }`}
+            >
+              <span className="mr-1 text-amber-200/60">{zone.name} ·</span>
+              {place.name}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  </nav>
 
   {/* Deux colonnes sur ordinateur, un panneau sur téléphone */}
   <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(320px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
