@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import SiteTopbar from "@/components/SiteTopbar";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 /**
@@ -269,23 +269,24 @@ const canEdit = !!me?.id && ownsCurrentChar
 
   return (
     <main className="min-h-svh bg-[url('/images/profil-bg.webp')] bg-cover bg-center p-4">
-      {/* Barre commune avec le titre de la page */}
-      <div className="-mx-4 -mt-4 mb-6">
-        <SiteTopbar title="Mon profil" />
+      {/* Topbar */}
+      <div className="max-w-7xl mx-auto flex items-center gap-3 mb-4">
+        <Link href="/dashboard" className="rounded-xl bg-white/10 border border-white/20 px-3 py-2 text-white hover:bg-white/15">← Dashboard</Link>
+        <div className="ml-auto" />
       </div>
 
       {/* GRID: [Avatar] | [Identité large] | [Traits+Relations] */}
       <div className="max-w-7xl mx-auto grid grid-cols-12 gap-5 items-start">
         {/* Avatar + sélection personnage */}
         <aside className="col-span-12 sm:col-span-3 lg:col-span-2">
-          <div className="sticky top-4 flex flex-col items-center gap-3">
+          <div className="sticky top-4 flex flex-col items-center gap-4">
             <CharSwitcher chars={myChars} value={charId} onChange={setCharId} />
             <HeroAvatar src={form.avatar_url} size={220} bust={imgBust} />
 
             {/* Compagnon (mini) */}
-            <div className="mt-8 w-full flex flex-col items-center gap-2 rounded-xl bg-white/0 border border-white/0 p-3">
+            <div className="mt-6 w-full flex flex-col items-center gap-3 rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
               <div
-  className="text-white text-lg bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1 shadow-md"
+  className="text-white text-lg bg-white/12 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-md"
 >
   {form?.companion_name?.trim() || 'Compagnon'}
 </div>
@@ -319,7 +320,7 @@ const canEdit = !!me?.id && ownsCurrentChar
         </aside>
 
         {/* Identité – large */}
-        <section className="col-span-12 sm:col-span-9 lg:col-span-6 rounded-2xl bg-black/35 border border-white/10 backdrop-blur p-4">
+        <section className="col-span-12 sm:col-span-9 lg:col-span-6 rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
           <h2 className="text-white/90 text-lg font-semibold mb-3">Identité</h2>
 
           <Labeled label="Nom">
@@ -391,8 +392,9 @@ const canEdit = !!me?.id && ownsCurrentChar
         {/* Droite: Traits (haut) + Relations (bas) */}
         <section className="col-span-12 lg:col-span-4 grid grid-rows-[auto,1fr] gap-5">
           {/* TRAITS */}
-          <div className="rounded-2xl bg-black/35 border border-white/10 backdrop-blur p-4">
+          <div className="rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
             <h2 className="text-white/90 text-lg font-semibold mb-3">Traits de personnalité</h2>
+            <p className="mb-4 text-sm text-white/65">Palette adoucie et plus uniforme pour une lecture plus confortable sur fond sombre.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-4">
                 <Bipolar leftLabel="Introverti" rightLabel="Extraverti" leftColor="#5b9bff" rightColor="#f6d24a" value={form.traits.intro_extro} onChange={(v)=>onTrait("intro_extro", v)} />
@@ -412,7 +414,7 @@ const canEdit = !!me?.id && ownsCurrentChar
           </div>
 
           {/* RELATIONS */}
-          <div className="rounded-2xl bg-black/35 border border-white/10 backdrop-blur p-4">
+          <div className="rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
             <h2 className="text-white/90 text-lg font-semibold mb-3">Carnet de relations</h2>
             {!charId && (
               <div className="text-white/70 text-sm mb-2">Aucun personnage sélectionné.</div>
@@ -574,22 +576,22 @@ function CreateCharacterInline({ userId, setMyChars, setCharId }) {
   };
 
   return (
-    <div className="mt-4 p-3 rounded border border-white/15 bg-white/5">
-      <p className="text-sm mb-2">Créer un nouveau personnage</p>
+    <div className="mt-4 w-full rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
+      <p className="text-sm mb-2 text-white/90 font-medium">Créer un nouveau personnage</p>
       <div className="flex flex-col gap-2 w-full">
   <input
     type="text"
     value={name}
     placeholder="Nom du personnage"
     onChange={(e) => setName(e.target.value)}
-    className="w-full border p-2 rounded bg-black/20"
+    className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-white placeholder-white/45"
   />
 
   <button
     onClick={onCreate}
     disabled={!canCreate || creating}
     className={`w-full px-3 py-2 rounded text-white text-center ${
-      !canCreate || creating ? 'bg-gray-500' : 'bg-emerald-600 hover:bg-emerald-700'
+      !canCreate || creating ? 'bg-white/15 text-white/60' : 'bg-emerald-500/90 hover:bg-emerald-400 text-slate-950'
     }`}
   >
     {creating ? 'Création…' : 'Créer'}
@@ -627,22 +629,22 @@ function RelationAdder({ characters, types, onAdd, busy, msg }) {
   );
 }
 
-function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#6ea8ff", rightColor="#f6d24a" }) {
+function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#b9a27b", rightColor="#e6d4a7" }) {
   const pct = (value / 10) * 100; // 0..100 → droite
   const gradient = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${pct}%, ${rightColor} ${pct}%, ${rightColor} 100%)`;
   return (
     <div className="space-y-2 select-none">
-      <div className="flex justify-between text-white/70 text-sm">
+      <div className="flex justify-between text-white/78 text-sm">
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
       </div>
-      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
+      <div className="relative h-4 rounded-full border border-white/15 bg-black/35 overflow-hidden">
         <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
         <div
           className="absolute top-1/2 -translate-y-1/2"
           style={{ left: `calc(${pct}% - 6px)` }}
         >
-          <div className="w-3 h-3 rounded-full bg-white shadow" />
+          <div className="h-3 w-3 rounded-full border border-white/70 bg-white shadow-[0_0_10px_rgba(255,255,255,.35)]" />
         </div>
         <input type="range" min={0} max={10} step={1} value={value} onChange={(e) => onChange?.(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label={`${leftLabel} ↔ ${rightLabel}`} />
       </div>
@@ -698,7 +700,7 @@ function AvatarUploader({
           <img src={preview} alt="preview" className="w-full h-full object-cover" />
         </div>
       )}
-      <label className="cursor-pointer rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-white hover:bg-white/15">
+      <label className="cursor-pointer rounded-lg bg-white/12 border border-white/20 px-3 py-2 text-white hover:bg-white/18">
         {busy ? "Envoi…" : label}
         <input type="file" accept="image/*" className="hidden" onChange={onPick} />
       </label>
