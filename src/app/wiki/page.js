@@ -592,7 +592,7 @@ setTree(seedTree())
           src={srcForDisplay(card.image_url)}
           alt=""
           fill
-          unoptimized
+          sizes="(max-width: 767px) 45vw, (max-width: 1023px) 30vw, (max-width: 1279px) 22vw, 16vw"
           className={`object-cover ${
             (!collected && dimUncollected)
               ? 'opacity-40 grayscale'
@@ -672,7 +672,7 @@ setTree(seedTree())
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0 overflow-y-auto overscroll-contain pr-1">
               <div className="relative aspect-[4/5] rounded-xl overflow-hidden ring-2" style={{ borderColor: currentCatColor }}>
-               <Image src={srcForDisplay(viewing.image_url)} alt="" fill unoptimized className="object-cover" />
+               <Image src={srcForDisplay(viewing.image_url)} alt="" fill sizes="(max-width: 767px) 90vw, 420px" className="object-cover" />
               </div>
               <div className="space-y-3">
                 <div className="space-y-1">
