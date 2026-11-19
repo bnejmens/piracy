@@ -100,13 +100,14 @@ setAllChars(all || []);
   // Charger le personnage sélectionné + ses relations
   useEffect(() => {
     if (!charId) { setForm(baseForm()); setRelations([]); return; }
+    let cancelled = false;
     (async () => {
       const { data: c } = await supabase
         .from("characters")
         .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
         .eq("id", charId)
         .maybeSingle();
-      if (c) {
+      if (c && !cancelled) {
         setForm({
           user_id: c.user_id || "",
           name: c.name || "",
@@ -129,9 +130,12 @@ setAllChars(all || []);
         .select("id, other_character_id, type, created_at, other:other_character_id ( id, name, avatar_url )")
         .eq("character_id", charId)
         .order("created_at", { ascending: false });
-      setRelations(rels || []);
-      setRelMsg("");
+      if (!cancelled) {
+        setRelations(rels || []);
+        setRelMsg("");
+      }
     })();
+    return () => { cancelled = true; };
   }, [charId]);
 
   const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -358,6 +362,7 @@ const canEdit = !!me?.id && ownsCurrentChar
 
               <HeroAvatar src={form.companion_avatar_url} size={120} bust={imgBust} />
               <AvatarUploader
+                key={`companion-${charId}`}
                 userId={me.id}
                 charId={charId}
                 prefix="companions"
@@ -419,6 +424,7 @@ const canEdit = !!me?.id && ownsCurrentChar
             {savedMsg && <span className="text-green-300 text-sm">{savedMsg}</span>}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <AvatarUploader
+                key={`main-${charId}`}
                 userId={me.id}
                 charId={charId}
                 onUploaded={async (url) => {
@@ -527,6 +533,7 @@ const canEdit = !!me?.id && ownsCurrentChar
                 <div className="min-w-0 flex-1">
                   <p className="mb-2 text-xs text-white/65">Portrait rond de la baguette</p>
                   <AvatarUploader
+                    key={`wand-${charId}`}
                     userId={me.id}
                     charId={charId}
                     prefix="wands"
