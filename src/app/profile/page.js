@@ -548,7 +548,7 @@ const canEdit = !!me?.id && ownsCurrentChar
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <label htmlFor="wand-image-url" className="mb-1 block text-sm text-white/80">URL de l'image</label>
+                  <label htmlFor="wand-image-url" className="mb-1 block text-sm text-white/80">URL de l&apos;image</label>
                   <input
                     id="wand-image-url"
                     type="url"
@@ -560,8 +560,8 @@ const canEdit = !!me?.id && ownsCurrentChar
                     className="w-full min-w-0 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-amber-300/50"
                   />
                   <p className="mt-2 text-xs leading-relaxed text-white/55">
-                    Copie le lien direct vers l'image (Pinterest, Imgur…). Les liens de pages Pinterest ne sont pas des fichiers image.
-                    Aucun téléversement n'est nécessaire.
+                    Copie le lien direct vers l&apos;image (Pinterest, Imgur…). Les liens de pages Pinterest ne sont pas des fichiers image.
+                    Aucun téléversement n&apos;est nécessaire.
                   </p>
                 </div>
               </div>
