@@ -61,6 +61,7 @@ export default function YouTubePlaylistPlayer({ playlistId, tracks }) {
   const [error, setError] = useState('')
   const ids = tracks.map(t => t.video_id).filter(Boolean)
   const key = ids.join('|')
+  const hasTracks = ids.length > 0
 
   useEffect(() => {
     if (!hostRef.current || !ids.length) return
@@ -104,7 +105,7 @@ export default function YouTubePlaylistPlayer({ playlistId, tracks }) {
     }
     // Le composant est remonté via sa clé lorsqu'on change de playlist.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlistId])
+  }, [playlistId, hasTracks])
 
   useEffect(() => {
     if (!ready || !playerRef.current) return
