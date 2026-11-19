@@ -86,6 +86,8 @@ export default function RPPage() {
   const [draftTitle, setDraftTitle] = useState('')
   const [draftZoneId, setDraftZoneId] = useState('')
   const [draftLocationId, setDraftLocationId] = useState('')
+  const [draftPlaylistId, setDraftPlaylistId] = useState('')
+  const [publicPlaylists, setPublicPlaylists] = useState([])
   const [saving, setSaving] = useState(false)
 const [inviteCharacters, setInviteCharacters] = useState([])
 const [selectedInviteIds, setSelectedInviteIds] = useState([])
@@ -290,6 +292,23 @@ if (
   }, [locations])
 
 
+// Chargement seulement à l'ouverture de la création de RP.
+useEffect(() => {
+  if (!creating) return
+  let cancelled = false
+  supabase.from('off_playlists')
+    .select('id,title')
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+    .limit(300)
+    .then(({ data, error }) => {
+      if (cancelled) return
+      if (error) setError(error.message)
+      setPublicPlaylists(data || [])
+    })
+  return () => { cancelled = true }
+}, [creating])
+
 useEffect(() => {
   if (!creating || !userId) return
 
@@ -336,6 +355,7 @@ function toggleInvite(characterId) {
     setDraftLocationId(loc?.id || '')
     setDraftZoneId(loc?.zone_id || '')
     setDraftTitle('')
+    setDraftPlaylistId('')
     setError('')
 setSelectedInviteIds([])
 setInviteSearch('')
@@ -357,10 +377,11 @@ async function createTopic(e) {
 
   try {
     const { data: topicId, error: createError } =
-      await supabase.rpc('create_rp_with_invitations', {
+      await supabase.rpc('create_rp_with_soundtrack', {
         p_title: draftTitle.trim(),
         p_location_id: draftLocationId,
         p_character_ids: selectedInviteIds,
+        p_playlist_id: draftPlaylistId || null,
       })
 
     if (createError) {
@@ -669,6 +690,20 @@ async function createTopic(e) {
             </select>
             <label htmlFor="rp-title" className="mt-4 block text-sm">Titre</label>
             <input id="rp-title" required maxLength={150} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} placeholder="Titre de votre scène…" className="mt-2 w-full rounded-lg border border-amber-200/25 bg-white/10 p-3 text-white outline-none focus:border-amber-300" />
+
+            <label htmlFor="rp-soundtrack" className="mt-4 block text-sm text-amber-100">Bande-son du RP (facultatif)</label>
+            <select
+              id="rp-soundtrack"
+              value={draftPlaylistId}
+              onChange={e => setDraftPlaylistId(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-amber-200/25 bg-[#32263d] p-3 text-white"
+            >
+              <option value="">Aucune bande-son</option>
+              {publicPlaylists.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-white/55">
+              Choisis une playlist publique d’OffRecords. Les participants pourront choisir de l’écouter.
+            </p>
 
 {/* Invitation des personnages */}
 <div className="mt-5 border-t border-amber-200/20 pt-5">
