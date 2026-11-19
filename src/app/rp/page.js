@@ -634,7 +634,7 @@ async function createTopic(e) {
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {zones.map(z => {
                   const zoneLocations = locations.filter(l => l.zone_id === z.id)
-                  const zoneTopics = topics.filter(t => zoneLocations.some(l => l.id === t.location_id))
+                  const zoneTopics = topics.filter(t => !t.is_archived && zoneLocations.some(l => l.id === t.location_id))
                   const players = new Set(zoneTopics.flatMap(t => [...(participantsByTopic.get(t.id) || [])]))
                   const image = z.image_url || BANNERS[z.slug]
                   return (
@@ -653,7 +653,7 @@ async function createTopic(e) {
                         </div>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {zoneLocations.map(l => {
-                            const count = topics.filter(t => t.location_id === l.id).length
+                            const count = topics.filter(t => t.location_id === l.id && !t.is_archived).length
                             return (
                               <button key={l.id} onClick={() => openLocation(l.id)}
                                 className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-amber-200/15 bg-white/[.055] px-3 py-2.5 text-left transition hover:border-amber-300/55 hover:bg-amber-200/10">
