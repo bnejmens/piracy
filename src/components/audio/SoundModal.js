@@ -60,13 +60,13 @@ export default function SoundModal() {
 
       <section className="relative z-10 flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-amber-200/25 bg-[#21192c]/95 text-[#f9e9d0] shadow-2xl">
 
-        <header className="flex items-start justify-between gap-3 border-b border-amber-200/15 p-5">
+        <header className="flex flex-wrap items-start justify-between gap-2 border-b border-amber-200/15 p-3 sm:gap-3 sm:p-5">
           <div>
             <p className="text-[10px] uppercase tracking-[0.24em] text-amber-300/65">
               Le Monde Magique
             </p>
 
-            <h2 className="mt-1 font-serif text-2xl text-amber-100">
+            <h2 className="mt-1 font-serif text-xl text-amber-100 sm:text-2xl">
               Ambiances sonores
             </h2>
 
@@ -84,7 +84,7 @@ export default function SoundModal() {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3 sm:p-5">
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200/15 bg-white/5 p-3">
             <div>

@@ -213,25 +213,25 @@ async function reloadTree() {
   )
 
   return (
-    <main className="fixed inset-0 overflow-auto bg-slate-950">
+    <main className="relative min-h-dvh overflow-x-hidden bg-slate-950">
       {/* BG */}
       <div className="absolute inset-0 -z-20">
         <Image src="/images/lore-bg.webp" alt="" fill priority className="object-cover opacity-60" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/40 via-slate-900/25 to-slate-950/50" />
 
-      <div className="relative z-10 max-w-6xl mx-auto p-6">
-        <div className="mb-5 flex items-center justify-between">
+      <div className="relative z-10 mx-auto max-w-6xl p-3 sm:p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-white text-2xl font-semibold">Créer une carte</h1>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <button onClick={()=>router.back()} className="rounded-lg bg-white/10 hover:bg-white/15 px-4 py-2 border border-white/20 text-white">Retour</button>
             <button onClick={submit} disabled={!userId} className="rounded-lg bg-emerald-500/90 hover:bg-emerald-500 px-4 py-2 text-white disabled:opacity-50">Créer</button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
           {/* gauche */}
-          <section className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md p-5 space-y-6">
+          <section className="min-w-0 space-y-6 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md sm:p-5">
             {loadingCats ? (
               <div className="text-white/70 text-sm">Chargement des catégories…</div>
             ) : (

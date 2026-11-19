@@ -60,14 +60,14 @@ export default function SiteTopbar({ title }) {
 
   return (
     <header className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 shadow-lg backdrop-blur-xl">
-      <div className="mx-auto flex min-h-[64px] max-w-[1650px] flex-wrap items-center gap-2 px-4 py-3 md:px-8">
-        <h1 className="mr-auto font-serif text-xl text-amber-100 sm:text-2xl">
+      <div className="mx-auto grid min-h-[64px] max-w-[1650px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-3 py-2 sm:flex sm:flex-wrap sm:gap-2 sm:px-4 sm:py-3 md:px-8">
+        <h1 className="col-start-1 row-start-1 min-w-0 truncate font-serif text-lg text-amber-100 sm:mr-auto sm:text-2xl">
           {title}
         </h1>
-        <Link href="/rp" className="rounded-lg px-3 py-2 text-sm text-amber-50/90 transition hover:bg-white/10">
+        <Link href="/rp" className="col-start-1 row-start-2 justify-self-start rounded-lg px-3 py-2 text-sm text-amber-50/90 transition hover:bg-white/10">
           Le Monde Magique
         </Link>
-        <div className="relative">
+        <div className="relative col-start-2 row-start-2 justify-self-end">
           <button
             type="button"
             onClick={() => setOpen(value => !value)}
@@ -108,7 +108,7 @@ export default function SiteTopbar({ title }) {
           href="/profile"
           aria-label={activeCharacter ? `Voir le profil de ${activeCharacter.name}` : 'Mon profil'}
           title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Mon profil'}
-          className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1 pl-1 pr-2.5 transition hover:border-amber-200/50 hover:bg-white/10 sm:pr-3"
+          className="col-start-2 row-start-1 flex shrink-0 items-center justify-self-end gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1 pl-1 pr-2.5 transition hover:border-amber-200/50 hover:bg-white/10 sm:ml-auto sm:pr-3"
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-amber-200/15 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/25">
             {activeCharacter?.avatar_url ? (

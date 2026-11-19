@@ -190,11 +190,11 @@ export default function RandomVavaPage() {
       {/* Barre de navigation commune aux autres pages */}
       <SiteTopbar title="Librairie d'Avatars" />
 
-      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto md:overflow-hidden px-4 pt-5 pb-6 sm:px-6 flex flex-col">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 pb-6 pt-4 sm:px-6 lg:overflow-hidden lg:pt-5">
         {/* Création/Upload */}
-        <section className="max-w-5xl mx-auto rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white mb-6 shrink-0">
+        <section className="mx-auto mb-4 w-full max-w-5xl shrink-0 rounded-2xl border border-white/30 bg-black/20 p-3 text-white backdrop-blur sm:mb-6 sm:p-4">
           <h2 className="text-lg font-semibold mb-3">Ajouter des portraits</h2>
-          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
             <div className="space-y-2">
               <label className="text-sm text-white/80">Nom de la Galerie</label>
               <input
@@ -214,7 +214,7 @@ export default function RandomVavaPage() {
                 accept="image/*"
                 disabled={!slug || uploading || !session}
                 onChange={(e)=>upload(e.target.files)}
-                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-amber-300 file:text-slate-900 file:px-3 file:py-1.5 hover:file:bg-amber-200 disabled:opacity-50"
+                className="block min-w-0 w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-amber-300 file:text-slate-900 file:px-3 file:py-1.5 hover:file:bg-amber-200 disabled:opacity-50"
               />
               {!session && <div className="text-xs text-white/70">Connecte-toi pour uploader.</div>}
             </div>
@@ -222,8 +222,8 @@ export default function RandomVavaPage() {
         </section>
 
         {/* Liste des pools (slugs) + sélection */}
-        <section className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 md:overflow-hidden">
-          <div className="rounded-2xl border border-white/30 bg-black/25 backdrop-blur p-4 text-white flex flex-col min-h-[260px] md:min-h-0 overflow-hidden">
+        <section className="mx-auto grid w-full max-w-5xl min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2 lg:overflow-hidden">
+          <div className="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-2xl border border-white/30 bg-black/25 p-3 text-white backdrop-blur sm:p-4 lg:min-h-0">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Pools existants</h3>
               {loadingSlugs && <span className="text-white/70 text-sm">Chargement…</span>}
@@ -262,11 +262,11 @@ export default function RandomVavaPage() {
           </div>
 
           {/* Détails du pool sélectionné */}
-          <div className="rounded-2xl border border-white/30 bg-black/20 backdrop-blur p-4 text-white flex flex-col min-h-[300px] md:min-h-0 overflow-hidden">
+          <div className="flex min-h-[300px] min-w-0 flex-col overflow-hidden rounded-2xl border border-white/30 bg-black/20 p-3 text-white backdrop-blur sm:p-4 lg:min-h-0">
             {activeSlug ? (
               <>
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 mb-3">
-                  <h3 className="font-semibold">Pool : {activeSlug}</h3>
+                  <h3 className="min-w-0 break-all font-semibold">Pool : {activeSlug}</h3>
                   <button
                     onClick={() => copyText(randomUrlFor(activeSlug))}
                     className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"

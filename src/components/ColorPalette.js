@@ -29,9 +29,9 @@ export default function ColorPalette({ onPick, size = 22, columns = 10, colors }
   ), [colors])
 
   return (
-    <div className="inline-block rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-2 shadow-2xl">
+    <div className="max-w-full overflow-x-auto rounded-2xl border border-white/15 bg-slate-950/85 p-2 shadow-2xl backdrop-blur-xl">
       <div
-        className="grid gap-2"
+        className="grid w-max gap-2"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {palette.map((hex) => (

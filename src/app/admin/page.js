@@ -180,7 +180,7 @@ export default function AdminHub() {
     return (
       <main className="min-h-screen text-white">
         <Bg />
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="mx-auto max-w-6xl px-3 py-5 sm:p-6">
           <Topbar />
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-6">
             Connecte-toi pour accéder au tableau d’administration.
@@ -193,7 +193,7 @@ export default function AdminHub() {
     return (
       <main className="min-h-screen text-white">
         <Bg />
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="mx-auto max-w-6xl px-3 py-5 sm:p-6">
           <Topbar />
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-6">
             Accès réservé aux administrateurs.
@@ -206,7 +206,7 @@ export default function AdminHub() {
   return (
     <main className="min-h-screen text-white">
       <Bg />
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="mx-auto max-w-6xl px-3 py-5 sm:p-6">
         <Topbar />
 
         {/* Onglets + recherche */}
@@ -222,11 +222,11 @@ export default function AdminHub() {
               {t.label}
             </button>
           ))}
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex w-full min-w-0 flex-wrap gap-2 sm:w-auto">
             <input
               value={q} onChange={e=>setQ(e.target.value)}
               placeholder="Rechercher…"
-              className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 outline-none placeholder-white/60"
+              className="min-w-0 w-full flex-1 rounded-md border border-white/20 bg-white/10 px-3 py-1.5 outline-none placeholder-white/60 sm:w-56"
             />
             <button onClick={()=>{
               if(tab==='cards') loadCards()
@@ -241,10 +241,10 @@ export default function AdminHub() {
         </div>
 
         {/* Panneau principal */}
-        <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-4">
+        <div className="mt-4 min-w-0 rounded-2xl border border-white/10 bg-black/30 p-3 backdrop-blur-xl sm:p-4">
           {tab === 'cards' && (
             <section>
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
                 {['pending','published','rejected','all'].map(s => (
                   <button key={s}
                     onClick={()=>setStatusTab(s)}
@@ -261,7 +261,7 @@ export default function AdminHub() {
               {loadingCards ? <p className="text-white/70">Chargement…</p> : (
                 <ul className="space-y-3">
                   {cardsFiltered.map(c => (
-                    <li key={c.id} className="rounded-xl border border-white/15 bg-white/5 p-3 flex items-center gap-3">
+                    <li key={c.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-white/15 bg-white/5 p-3 sm:flex-nowrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={c.image_url || '/images/card-bg.png'} alt="" className="w-14 h-20 object-cover rounded-md ring-1 ring-white/20" />
                       <div className="min-w-0 flex-1">
@@ -271,7 +271,7 @@ export default function AdminHub() {
                         </div>
                         <div className="text-[11px] text-white/50">Envoyée le {fmt(c.submitted_at)} • auteur: {c.submitted_by}</div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
                         <Link href={`/wiki/edit/${c.id}`} className="rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm hover:bg-white/15">Éditer</Link>
                         {c.status!=='published' && (
                           <button onClick={()=>cardSetStatus(c.id,'published')} className="rounded-md bg-emerald-400 text-slate-900 px-2 py-1.5 text-sm hover:bg-emerald-300">Publier</button>
@@ -297,12 +297,12 @@ export default function AdminHub() {
                   {topics
                     .filter(t => (t.title||'').toLowerCase().includes(q.toLowerCase()))
                     .map(t => (
-                    <li key={t.id} className="rounded-xl border border-white/15 bg-white/5 p-3 flex items-center gap-3">
+                    <li key={t.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-white/15 bg-white/5 p-3 sm:flex-nowrap">
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{t.title}</div>
                         <div className="text-xs text-white/60">Créé le {fmt(t.created_at)} • author: {t.author_id}</div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
                         <Link href={`/rp?open=${t.id}`} className="rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm hover:bg-white/15">Ouvrir</Link>
                         <button onClick={()=>deleteTopic(t.id)} className="rounded-md bg-rose-400 text-slate-900 px-2 py-1.5 text-sm hover:bg-rose-300">Supprimer</button>
                       </div>
@@ -323,14 +323,14 @@ export default function AdminHub() {
                   {convos
                     .filter(c => (c.title||'').toLowerCase().includes(q.toLowerCase()))
                     .map(c => (
-                    <li key={c.id} className="rounded-xl border border-white/15 bg-white/5 p-3 flex items-center gap-3">
+                    <li key={c.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-white/15 bg-white/5 p-3 sm:flex-nowrap">
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{c.title || '(Sans titre)'}</div>
                         <div className="text-xs text-white/60">
                           {c.is_group ? 'Groupe' : 'Direct'} • Créée le {fmt(c.created_at)} {c.last_message_at ? `• Dernier msg ${fmt(c.last_message_at)}` : ''}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
                         <Link href={`/messages?open=${c.id}`} className="rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm hover:bg-white/15">Ouvrir</Link>
                         <button onClick={()=>deleteConvo(c.id)} className="rounded-md bg-rose-400 text-slate-900 px-2 py-1.5 text-sm hover:bg-rose-300">Supprimer</button>
                       </div>
@@ -360,7 +360,7 @@ export default function AdminHub() {
                       (c.user_id||'').includes(q)
                     )
                     .map(c => (
-                    <li key={c.id} className="rounded-xl border border-white/15 bg-white/5 p-3 flex items-center gap-3">
+                    <li key={c.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-white/15 bg-white/5 p-3 sm:flex-nowrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={c.avatar_url || '/images/profile-icon.png'} alt="" className="w-10 h-10 rounded-full object-cover ring-1 ring-white/20" />
                       <div className="min-w-0 flex-1">
@@ -370,7 +370,7 @@ export default function AdminHub() {
                           {c.is_archived ? 'Archivé' : 'Actif'} {c.is_active ? '• visible' : '• masqué'}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         <label className="text-xs opacity-80">Archivé</label>
                         <input type="checkbox" checked={!!c.is_archived} onChange={e=>toggleArchiveCharacter(c.id, e.target.checked)} />
                       </div>
@@ -391,14 +391,14 @@ export default function AdminHub() {
                   {users
                     .filter(u => (u.pseudo||'').toLowerCase().includes(q.toLowerCase()) || (u.user_id||'').includes(q))
                     .map(u => (
-                    <li key={u.user_id} className="rounded-xl border border-white/15 bg-white/5 p-3 flex items-center gap-3">
+                    <li key={u.user_id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-white/15 bg-white/5 p-3 sm:flex-nowrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u.avatar_url || '/images/profile-icon.png'} alt="" className="w-10 h-10 rounded-full object-cover ring-1 ring-white/20" />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{u.pseudo || '(sans pseudo)'}</div>
                         <div className="text-xs text-white/60 truncate">{u.user_id}</div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <label className="text-xs opacity-80">Admin</label>
                         <input type="checkbox" checked={!!u.is_admin} onChange={e=>toggleAdmin(u.user_id, e.target.checked)} />
                         <label className="text-xs opacity-80 ml-3">Archivé</label>
@@ -421,8 +421,8 @@ export default function AdminHub() {
 
 function Topbar() {
   return (
-    <div className="flex items-center justify-between">
-      <h1 className="text-xl sm:text-2xl font-semibold">Tableau d’administration</h1>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="min-w-0 text-xl font-semibold sm:text-2xl">Tableau d’administration</h1>
       <Link href="/dashboard" className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15">
         ← Retour
       </Link>
