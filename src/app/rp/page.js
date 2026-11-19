@@ -82,6 +82,7 @@ export default function RPPage() {
   const [view, setView] = useState('zones') // zones | location | mine | others
   const [locationId, setLocationId] = useState(null)
   const [menuOpen, setMenuOpen] = useState(null)
+  const [showArchived, setShowArchived] = useState(false)
   const [creating, setCreating] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftZoneId, setDraftZoneId] = useState('')
@@ -106,9 +107,9 @@ const [inviteLoading, setInviteLoading] = useState(false)
   )
   .eq('is_active', true)
   .order('display_order'),
-      supabase.from('rp_topics').select('id,title,author_id,created_by,created_at,location_id').order('created_at', { ascending: false }).limit(1000),
+      supabase.from('rp_topics').select('id,title,author_id,created_by,created_at,location_id,is_archived,archived_at').order('created_at', { ascending: false }).limit(1000),
       supabase.from('rp_posts').select('topic_id,author_user_id,author_character_id').limit(10000),
-      supabase.from('profiles').select('pseudo,avatar_url,active_character_id').eq('user_id', uid).maybeSingle(),
+      supabase.from('profiles').select('pseudo,avatar_url,active_character_id,is_admin').eq('user_id', uid).maybeSingle(),
     ])
     const failed = [zonesR, locationsR, topicsR, postsR, profileR].find(r => r.error)
     if (failed) throw new Error(failed.error.message)
@@ -245,11 +246,11 @@ if (
   const selectedZone = selectedLocation ? zoneById.get(selectedLocation.zone_id) : null
 
   const visibleTopics = useMemo(() => {
-    if (view === 'mine') return myTopics
-    if (view === 'others') return topics.filter(t => !mineIds.has(t.id))
-    if (view === 'location') return topics.filter(t => t.location_id === locationId)
+    if (view === 'mine') return myTopics.filter(t => !t.is_archived)
+    if (view === 'others') return topics.filter(t => !mineIds.has(t.id) && !t.is_archived)
+    if (view === 'location') return topics.filter(t => t.location_id === locationId && !!t.is_archived === showArchived)
     return []
-  }, [view, topics, myTopics, mineIds, locationId])
+  }, [view, topics, myTopics, mineIds, locationId, showArchived])
 
   // Chaque sous-zone dispose de sa propre URL partageable. La navigation interne
   // met aussi l'adresse à jour pour que F5 et les favoris ouvrent le bon lieu.
@@ -261,6 +262,7 @@ if (
   }
 
   function goHome() {
+    setShowArchived(false)
     updateLocationUrl()
     setView('zones'); setLocationId(null); setMenuOpen(null)
   }
@@ -269,6 +271,7 @@ if (
     setView(next); setLocationId(null); setMenuOpen(null)
   }
   function openLocation(id) {
+    setShowArchived(false)
     updateLocationUrl(id)
     setLocationId(id); setView('location'); setMenuOpen(null)
   }
@@ -409,22 +412,48 @@ async function createTopic(e) {
     return place && area ? `${area.name} · ${place.name}` : 'Lieu non renseigné (ancien RP)'
   }
 
+  async function toggleTopicArchive(topic) {
+    const allowed = topic.author_id === userId || topic.created_by === userId || profile?.is_admin;
+    if (!allowed) return;
+    const archived = !topic.is_archived;
+    if (!confirm(archived
+      ? 'Archiver ce RP ? Il restera consultable, mais personne ne pourra plus publier, modifier ou supprimer ses messages.'
+      : 'Réouvrir ce RP et autoriser à nouveau les publications ?')) return;
+    setError('');
+    const { data, error: archiveError } = await supabase
+      .from('rp_topics')
+      .update({ is_archived: archived })
+      .eq('id', topic.id)
+      .select('id,is_archived,archived_at')
+      .single();
+    if (archiveError) { setError(archiveError.message); return; }
+    setTopics(current => current.map(t => t.id === topic.id ? { ...t, ...data } : t));
+  }
+
   function topicCard(t) {
     const count = participantsByTopic.get(t.id)?.size || 0
+    const canArchive = t.author_id === userId || t.created_by === userId || profile?.is_admin;
     return (
-      <button key={t.id} onClick={() => openTopic(t.id)}
-        className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200/15 bg-white/[.055] px-5 py-4 text-left transition hover:border-amber-300/50 hover:bg-white/10">
-        <div>
-          <h3 className="font-serif text-xl text-amber-50">{t.title}</h3>
+      <article key={t.id} className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200/15 bg-white/[.055] px-3 py-3 transition hover:border-amber-300/50 sm:px-5 sm:py-4">
+        <button type="button" onClick={() => openTopic(t.id)} className="min-w-0 flex-1 text-left">
+          <h3 className="break-words font-serif text-lg text-amber-50 sm:text-xl">{t.title}</h3>
           <p className="mt-1 text-xs text-amber-100/65">{placeLabel(t)}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/65">
             <span>{count} participant{count > 1 ? 's' : ''}</span>
             <ParticipantAvatars ids={participantsByTopic.get(t.id) || new Set()} profiles={participantProfiles} />
             <span className="text-white/45">· {new Date(t.created_at).toLocaleDateString('fr-FR')}</span>
+            {t.is_archived && <span className="rounded-full border border-amber-200/25 bg-black/20 px-2 py-0.5 text-amber-100/70">Archivé · Lecture seule</span>}
           </div>
+        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {view === 'location' && canArchive && (
+            <button type="button" onClick={() => toggleTopicArchive(t)} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/85 hover:bg-white/15">
+              {t.is_archived ? 'Réouvrir' : 'Archiver'}
+            </button>
+          )}
+          <button type="button" onClick={() => openTopic(t.id)} className="rounded-lg px-2 py-2 text-sm text-amber-200 hover:bg-amber-200/10">Lire le RP →</button>
         </div>
-        <span className="text-sm text-amber-200">Lire le RP →</span>
-      </button>
+      </article>
     )
   }
 
@@ -654,10 +683,15 @@ async function createTopic(e) {
                   </div>
                 )}
                 {view === 'location' && (
-                  <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-[.12em] text-amber-100/85">
-                      Scènes RP <span className="ml-1 font-normal tracking-normal text-amber-100/50">({visibleTopics.length})</span>
-                    </h2>
+                  <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="text-sm font-semibold uppercase tracking-[.12em] text-amber-100/85">
+                        Scènes RP <span className="ml-1 font-normal tracking-normal text-amber-100/50">({visibleTopics.length})</span>
+                      </h2>
+                      <button type="button" onClick={() => setShowArchived(v => !v)} aria-pressed={showArchived} className={`rounded-lg border px-3 py-2 text-xs transition ${showArchived ? 'border-amber-200/50 bg-amber-200/15 text-amber-100' : 'border-white/20 bg-white/10 text-white/75 hover:bg-white/15'}`}>
+                        {showArchived ? 'Afficher les RP en cours' : 'Afficher les RP archivés'}
+                      </button>
+                    </div>
                     <button onClick={() => openCreate(locationId)} className="rounded-lg bg-amber-300 px-3 py-2 text-xs font-semibold text-[#24191c] hover:bg-amber-200 sm:text-sm">+ Créer un RP ici</button>
                   </div>
                 )}
