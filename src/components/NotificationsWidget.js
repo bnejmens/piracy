@@ -9,13 +9,13 @@ import { supabase } from '@/lib/supabaseClient'
 async function getLastSeen(userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('last_seen_at')
+    .select('last_activity_read_at')
     .eq('user_id', userId)
     .maybeSingle()
 
   if (error) throw error
 
-  return data?.last_seen_at || '1970-01-01T00:00:00Z'
+  return data?.last_activity_read_at || '1970-01-01T00:00:00Z'
 }
 
 // Invitations en attente pour tous les personnages du compte
@@ -312,7 +312,7 @@ export default function NotificationsWidget() {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ last_seen_at: now })
+      .update({ last_activity_read_at: now })
       .eq('user_id', session.user.id)
 
     if (error) {
