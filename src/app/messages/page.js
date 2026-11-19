@@ -572,7 +572,7 @@ const createConversation = async () => {
           ) : <span className="text-lg text-amber-300">✦</span>}
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h1>
-            <p className="truncate text-[11px] text-white/50">{screen === 'chat' ? 'Conversation' : (me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG')}</p>
+            {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG'}</p>}
           </div>
           <div className="shrink-0 rounded-full border border-amber-200/25 p-0.5" title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Personnage actif'}>
             <Avatar name={activeCharacter?.name || me?.pseudo || 'Joueur'} src={activeCharacter?.avatar_url || null} size="h-10 w-10" />
@@ -585,7 +585,7 @@ const createConversation = async () => {
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 max-h-full flex-1 overflow-y-auto overscroll-contain">
           {screen === 'conversations' && (
             <div className="p-3 space-y-1">
               <button type="button" onClick={openNewConv} className="mb-3 w-full rounded-xl bg-amber-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-200">+ Écrire un message</button>
@@ -602,7 +602,7 @@ const createConversation = async () => {
             </div>
           )}
 
-          {screen === 'contacts' && <div className="p-3 space-y-1">
+          {screen === 'contacts' && <div className="min-h-0 space-y-1 p-3">
             {filteredContacts.map(c => <button type="button" key={c.id} onClick={() => { setNewConvTargets([c.id]); setNewConvTitle(''); setScreen('compose') }} className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-white/10"><Avatar name={c.name} src={c.avatar_url} /><span className="min-w-0 flex-1 truncate text-sm">{c.name}</span><span className="text-amber-300">Écrire ›</span></button>)}
             {!filteredContacts.length && <p className="p-5 text-center text-sm text-white/50">Aucun contact.</p>}
           </div>}
@@ -610,7 +610,7 @@ const createConversation = async () => {
           {screen === 'compose' && <div className="space-y-4 p-4">
             <p className="text-xs text-white/60">Sélectionne un ou plusieurs personnages. Plusieurs destinataires créent une conversation de groupe.</p>
             <label className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/5 p-3 text-xs text-white/90"><input type="checkbox" checked={newConvPrivate} onChange={e => setNewConvPrivate(e.target.checked)} className="mt-0.5 accent-amber-300" /><span><strong>Conversation privée</strong><span className="mt-1 block text-white/60">Visible uniquement par les invités et les administrateurs. Par défaut, toutes les conversations restent publiques et participatives.</span></span></label>
-            <div className="space-y-1">{filteredContacts.map(c => <label key={c.id} className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-white/10"><input type="checkbox" checked={newConvTargets.includes(c.id)} onChange={() => toggleTarget(c.id)} className="accent-amber-300" /><Avatar name={c.name} src={c.avatar_url} size="h-9 w-9" /><span className="text-sm">{c.name}</span></label>)}</div>
+            <div className="max-h-[38dvh] space-y-1 overflow-y-auto overscroll-contain rounded-xl border border-white/10 p-1">{filteredContacts.map(c => <label key={c.id} className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-white/10"><input type="checkbox" checked={newConvTargets.includes(c.id)} onChange={() => toggleTarget(c.id)} className="accent-amber-300" /><Avatar name={c.name} src={c.avatar_url} size="h-9 w-9" /><span className="text-sm">{c.name}</span></label>)}</div>
             <input value={newConvTitle} onChange={e => setNewConvTitle(e.target.value)} placeholder={newConvTargets.length > 1 ? 'Nom du groupe (obligatoire)' : 'Titre de la conversation (facultatif)'} className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm outline-none" />
             <button type="button" disabled={!newConvTargets.length} onClick={createConversation} className="w-full rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40">Créer la conversation</button>
           </div>}
@@ -634,7 +634,6 @@ const createConversation = async () => {
         </div>
 
         {screen === 'chat' && <div className="shrink-0 border-t border-white/10 bg-slate-900/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-3">
-          {myChars.length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-white/60"><span>Envoyer en tant que</span><select value={currentSpeakerId || ''} onChange={e => setCurrentSpeakerId(e.target.value)} className="min-w-0 max-w-[65%] rounded-lg bg-slate-800 px-2 py-1 text-white">{myChars.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}</select></div>}
           <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-2">
             <textarea ref={inputRef} rows={1} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage() } }} placeholder="Écrire un message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm outline-none placeholder:text-white/40" />
             <button type="button" onClick={() => setKeyboardOpen(v => !v)} aria-label="Afficher ou masquer le clavier visuel" className="rounded-xl border border-white/15 px-3 py-3 text-sm hover:bg-white/10">⌨</button>
