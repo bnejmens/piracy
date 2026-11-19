@@ -598,7 +598,7 @@ const loadTopics = async () => {
   /* ---------- RENDER ---------- */
   return (
     
-<main className="fixed inset-0 flex flex-col overflow-hidden bg-[#110e19] text-[#f4e7d2]">
+<main className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-[#110e19] text-[#f4e7d2]">
 
   {/* Ambiance commune à l'accueil RP */}
   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(114,81,126,.3),transparent_58%),linear-gradient(135deg,#1e1728,#100e17_70%)]" />
@@ -937,7 +937,7 @@ const loadTopics = async () => {
   </div>
 
   {/* Deux colonnes sur ordinateur, un panneau sur téléphone */}
-  <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(320px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
+  <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:grid-cols-[minmax(280px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
 
 
         {/* -------- ÉDITEUR -------- */}
@@ -954,7 +954,7 @@ style={{
             {activeTopic ? activeTopic.title : 'Sélectionne un sujet pour écrire'}
           </header>
 
-          <div className="p-4 space-y-3 overflow-y-auto min-h-0">
+          <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto p-3 sm:p-4">
            
             <div className="relative z-20 rounded-lg border border-white/10 bg-white/10 backdrop-blur-md">
   <div className="p-2">
@@ -1074,7 +1074,7 @@ onVimeo={() => {
             {activeTopic ? activeTopic.title : 'Posts'}
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0">
+          <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto p-2 sm:p-4">
             {activeTopic && posts.map(p => {
               const mine = p.author_id === session?.user?.id
               return (
@@ -1133,7 +1133,7 @@ onVimeo={() => {
                     </div>
                   ) : (
                     <div
-                      className="rp-body prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
+                      className="rp-body prose prose-invert min-w-0 max-w-none break-words prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
                       dangerouslySetInnerHTML={{ __html: p.content_html }}
                     />
                   )}
@@ -1155,7 +1155,7 @@ onVimeo={() => {
       {/* -------- MODALE PRÉVISUALISATION -------- */}
             {/* -------- MODALE PRÉVISUALISATION -------- */}
       {isPreviewOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-2 backdrop-blur-sm sm:p-4">
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-[#1c1427]/95 text-[#f4e7d2] shadow-2xl">
             <div className="flex items-center justify-between border-b border-amber-200/10 px-5 py-4">
               <h3 className="font-serif text-xl text-amber-100">
