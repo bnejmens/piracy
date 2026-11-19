@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import SiteTopbar from "@/components/SiteTopbar";
 import { optimizeAvatar } from "@/lib/optimizeAvatar";
 import { supabase } from "@/lib/supabaseClient";
+import { displayExternalImage } from "@/lib/displayExternalImage";
 
 /**
  * Profile Editor – full page
@@ -74,7 +75,7 @@ const toEnumOrNull = (v, allowed) => {
       // Mes personnages
       const { data: chars } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
+        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       setMyChars(chars || []);
@@ -104,14 +105,14 @@ setAllChars(all || []);
     (async () => {
       const { data: c } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
+        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
         .eq("id", charId)
         .maybeSingle();
       if (c && !cancelled) {
         setForm({
           user_id: c.user_id || "",
           name: c.name || "",
-          gender: c.gender || "",
+          orientation: c.orientation || "",
           bio: c.bio || "",
           avatar_url: c.avatar_url || "",
           age: c.age ?? "",
@@ -171,7 +172,7 @@ setAllChars(all || []);
       if (!session) return;
       const { data, error } = await supabase
         .from('characters')
-        .select('id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url')
+        .select('id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
       if (error) { setSavedMsg(error.message); return; }
@@ -197,10 +198,10 @@ if ((form.name ?? '').trim() !== (current.name ?? '')) {
   payload.name = (form.name ?? '').trim();
 }
 
-// gender (enum masculin/féminin, sinon null)
-if ((form.gender ?? null) !== (current.gender ?? null)) {
-  const allowed = ['masculin', 'féminin'];
-  payload.gender = form.gender && allowed.includes(form.gender) ? form.gender : null;
+// Orientation : saisie libre et facultative, sans choix imposé.
+if ((form.orientation ?? '').trim() !== (current.orientation ?? '')) {
+  const orientation = (form.orientation ?? '').trim();
+  payload.orientation = orientation || null;
 }
 
 // age (int ou null)
@@ -251,8 +252,14 @@ for (const field of ['wand_composition', 'wand_size']) {
   const previous = (current[field] ?? '').trim();
   if (next !== previous) payload[field] = next || null;
 }
-if ((form.wand_image_url || '') !== (current.wand_image_url || '')) {
-  payload.wand_image_url = form.wand_image_url || null;
+const wandUrl = (form.wand_image_url || '').trim();
+if (wandUrl && !displayExternalImage(wandUrl)) {
+  setSavedMsg('Image de baguette : indique une URL http:// ou https:// valide.');
+  setSaving(false);
+  return;
+}
+if (wandUrl !== (current.wand_image_url || '')) {
+  payload.wand_image_url = wandUrl || null;
 }
 
 // Rien à sauver ?
@@ -390,12 +397,16 @@ const canEdit = !!me?.id && ownsCurrentChar
             <input value={form.name} onChange={(e)=>onChange("name", e.target.value)} className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none" placeholder="Nom du personnage" />
           </Labeled>
 
-          <Labeled label="Genre">
-            <select value={form.gender} onChange={(e)=>onChange("gender", e.target.value)} className="w-full rounded-lg bg-neutral-800 border border-white/10 px-3 py-2 text-white focus:outline-none">
-              <option value="">—</option>
-              <option value="masculin">Masculin</option>
-              <option value="féminin">Féminin</option>
-            </select>
+          <Labeled label="Orientation (facultatif)">
+            <input
+              type="text"
+              value={form.orientation}
+              maxLength={120}
+              onChange={(e) => onChange("orientation", e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/40 focus:border-amber-300/50"
+              placeholder="Saisie libre, ou laisser vide"
+            />
+            <span className="mt-1 block text-xs text-white/55">Visible par les autres membres uniquement si renseignée.</span>
           </Labeled>
 
           <Labeled label="Âge">
@@ -522,33 +533,36 @@ const canEdit = !!me?.id && ownsCurrentChar
                 />
               </Labeled>
               <div className="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/25 bg-white/5">
-                  {form.wand_image_url ? (
+                <div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/30 bg-black/25">
+                  <span className="px-2 text-center text-[11px] text-white/45">Aperçu baguette</span>
+                  {displayExternalImage(form.wand_image_url) && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.wand_image_url} alt="Baguette du personnage" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs text-white/50">Baguette</span>
+                    <img
+                      key={form.wand_image_url}
+                      src={displayExternalImage(form.wand_image_url)}
+                      alt="Baguette du personnage"
+                      referrerPolicy="no-referrer"
+                      onError={e => { e.currentTarget.style.display = 'none'; }}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="mb-2 text-xs text-white/65">Portrait rond de la baguette</p>
-                  <AvatarUploader
-                    key={`wand-${charId}`}
-                    userId={me.id}
-                    charId={charId}
-                    prefix="wands"
-                    label="Importer une image"
-                    onUploaded={async url => {
-                      const { error } = await supabase
-                        .from('characters')
-                        .update({ wand_image_url: url })
-                        .eq('id', charId)
-                        .eq('user_id', me.id);
-                      if (error) throw error;
-                      onChange('wand_image_url', url);
-                      setMyChars(list => list.map(c => c.id === charId ? { ...c, wand_image_url: url } : c));
-                    }}
+                  <label htmlFor="wand-image-url" className="mb-1 block text-sm text-white/80">URL de l'image</label>
+                  <input
+                    id="wand-image-url"
+                    type="url"
+                    value={form.wand_image_url}
+                    onChange={e => onChange('wand_image_url', e.target.value)}
+                    disabled={!canEdit}
+                    maxLength={2000}
+                    placeholder="https://i.pinimg.com/..."
+                    className="w-full min-w-0 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-amber-300/50"
                   />
+                  <p className="mt-2 text-xs leading-relaxed text-white/55">
+                    Copie le lien direct vers l'image (Pinterest, Imgur…). Les liens de pages Pinterest ne sont pas des fichiers image.
+                    Aucun téléversement n'est nécessaire.
+                  </p>
                 </div>
               </div>
               <button
@@ -586,7 +600,7 @@ function baseForm() {
   return {
     user_id: "",
     name: "",
-    gender: "",
+    orientation: "",
     bio: "",
     avatar_url: "",
     age: "",
