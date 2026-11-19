@@ -278,8 +278,8 @@ const canEdit = !!me?.id && ownsCurrentChar
       {/* GRID: [Avatar] | [Identité large] | [Traits+Relations] */}
       <div className="max-w-7xl mx-auto grid grid-cols-12 gap-5 items-start">
         {/* Avatar + sélection personnage */}
-        <aside className="col-span-12 sm:col-span-3 lg:col-span-2">
-          <div className="sticky top-4 flex flex-col items-center gap-4">
+        <aside className="col-span-12 min-w-0 lg:col-span-2">
+          <div className="flex min-w-0 flex-col items-center gap-4 lg:sticky lg:top-4">
             <CharSwitcher chars={myChars} value={charId} onChange={setCharId} />
             <HeroAvatar src={form.avatar_url} size={220} bust={imgBust} />
 
@@ -320,7 +320,7 @@ const canEdit = !!me?.id && ownsCurrentChar
         </aside>
 
         {/* Identité – large */}
-        <section className="col-span-12 sm:col-span-9 lg:col-span-6 rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
+        <section className="col-span-12 min-w-0 lg:col-span-6 rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
           <h2 className="text-white/90 text-lg font-semibold mb-3">Identité</h2>
 
           <Labeled label="Nom">
@@ -368,7 +368,7 @@ const canEdit = !!me?.id && ownsCurrentChar
 </button>
 
             {savedMsg && <span className="text-green-300 text-sm">{savedMsg}</span>}
-            <div className="flex gap-2 items-center">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <AvatarUploader
                 userId={me.id}
                 charId={charId}
@@ -384,13 +384,13 @@ const canEdit = !!me?.id && ownsCurrentChar
 ;
                 }}
               />
-              <input value={form.avatar_url} onChange={(e)=>onChange("avatar_url", e.target.value)} placeholder="URL avatar" className="w-64 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none" />
+              <input value={form.avatar_url} onChange={(e)=>onChange("avatar_url", e.target.value)} placeholder="URL avatar" className="w-full min-w-0 max-w-full rounded-lg sm:w-64 bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none" />
             </div>
           </div>
         </section>
 
         {/* Droite: Traits (haut) + Relations (bas) */}
-        <section className="col-span-12 lg:col-span-4 grid grid-rows-[auto,1fr] gap-5">
+        <section className="col-span-12 min-w-0 lg:col-span-4 grid grid-rows-[auto,1fr] gap-5">
           {/* TRAITS */}
           <div className="rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
             <h2 className="text-white/90 text-lg font-semibold mb-3">Traits de personnalité</h2>
@@ -519,7 +519,7 @@ function HeroAvatar({ src, size = 200, bust = 0 }) {
   const S = size;
   const safeSrc = src ? `${src}${src.includes("?") ? "&" : "?"}v=${bust}` : null;
   return (
-    <div className="relative rounded-full border border-white/20 shadow-xl overflow-hidden bg-white/5" style={{ width: S, height: S }}>
+    <div className="relative aspect-square w-full overflow-hidden rounded-full border border-white/20 bg-white/5 shadow-xl" style={{ maxWidth: S }}>
       {safeSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img key={safeSrc} src={safeSrc} alt="avatar" className="w-full h-full object-cover" />
@@ -576,7 +576,7 @@ function CreateCharacterInline({ userId, setMyChars, setCharId }) {
 
   return (
     <div className="mt-4 w-full rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
-      <p className="mb-3 whitespace-nowrap text-xs font-semibold text-white/90 sm:text-[11px] lg:text-xs">Nouveau personnage</p>
+      <p className="mb-3 text-xs font-semibold text-white/90 sm:text-[11px] lg:text-xs">Nouveau personnage</p>
       <div className="flex flex-col gap-2 w-full">
   <input
     type="text"
