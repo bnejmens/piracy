@@ -12,6 +12,7 @@ const QUICK_LINKS = [
   { href: '/messages', label: 'Messagerie' },
   { href: '/profile', label: 'Mon profil' },
   { href: '/members', label: 'Membres' },
+  { href: '/randomvava', label: 'Random Vava' },
   { href: '/offrecords', label: 'OffRecords' },
   { href: '/wiki', label: 'Wiki & chronologie' },
   { href: '/dashboard', label: 'Tableau de bord' },
