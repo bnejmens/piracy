@@ -5,6 +5,7 @@ import SiteTopbar from "@/components/SiteTopbar";
 import { optimizeAvatar } from "@/lib/optimizeAvatar";
 import { supabase } from "@/lib/supabaseClient";
 import { displayExternalImage } from "@/lib/displayExternalImage";
+import Bipolar from "@/components/PersonalityTraitScale";
 
 /**
  * Profile Editor – full page
@@ -75,7 +76,7 @@ const toEnumOrNull = (v, allowed) => {
       // Mes personnages
       const { data: chars } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
+        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       setMyChars(chars || []);
@@ -105,7 +106,7 @@ setAllChars(all || []);
     (async () => {
       const { data: c } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
+        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url")
         .eq("id", charId)
         .maybeSingle();
       if (c && !cancelled) {
@@ -120,6 +121,7 @@ setAllChars(all || []);
           traits: { ...baseTraits(), ...(c.traits || {}) },
           companion_name: c.companion_name || "",
           companion_avatar_url: c.companion_avatar_url || "",
+          companion_description: c.companion_description || "",
           wand_composition: c.wand_composition || "",
           wand_size: c.wand_size || "",
           wand_image_url: c.wand_image_url || "",
@@ -163,6 +165,19 @@ setAllChars(all || []);
     setSavedMsg('Nom du compagnon enregistré ✔');
   };
 
+  const saveCompanionDescription = async () => {
+    if (!me?.id || !charId) return;
+    const description = (form.companion_description || '').trim();
+    const old = (myChars.find(c => c.id === charId)?.companion_description || '').trim();
+    if (description === old) return;
+    const { error } = await supabase.from('characters')
+      .update({ companion_description: description || null })
+      .eq('id', charId).eq('user_id', me.id);
+    if (error) { setSavedMsg(error.message || 'Erreur description du compagnon'); return; }
+    setMyChars(list => list.map(c => c.id === charId ? { ...c, companion_description: description || null } : c));
+    setSavedMsg('Description du compagnon enregistrée ✔');
+  };
+
   // Le menu de personnage de la topbar synchronise aussi la fiche ouverte.
   useEffect(() => {
     const onCharacterChanged = async (event) => {
@@ -172,7 +187,7 @@ setAllChars(all || []);
       if (!session) return;
       const { data, error } = await supabase
         .from('characters')
-        .select('id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url')
+        .select('id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
       if (error) { setSavedMsg(error.message); return; }
@@ -234,6 +249,12 @@ if (JSON.stringify(form.traits || {}) !== JSON.stringify(current.traits || {})) 
 if ((form.companion_name ?? '').trim() !== (current.companion_name ?? '')) {
   const v = (form.companion_name ?? '').trim();
   payload.companion_name = v === '' ? null : v;
+}
+
+// companion_description
+if ((form.companion_description ?? '').trim() !== (current.companion_description ?? '')) {
+  const description = (form.companion_description ?? '').trim();
+  payload.companion_description = description || null;
 }
 
 // companion_avatar_url
@@ -342,16 +363,15 @@ const canEdit = !!me?.id && ownsCurrentChar
 
       {/* GRID: [Avatar] | [Identité large] | [Traits+Relations] */}
       <div className="max-w-7xl mx-auto grid grid-cols-12 gap-5 items-start">
-        {/* Avatar + sélection personnage */}
+        {/* Avatar du personnage actif : changement uniquement dans la topbar */}
         <aside className="col-span-12 min-w-0 lg:col-span-2">
           <div className="flex min-w-0 flex-col items-center gap-4 lg:sticky lg:top-4">
-            <CharSwitcher chars={myChars} value={charId} onChange={setCharId} />
             <HeroAvatar src={form.avatar_url} size={220} bust={imgBust} />
 
             {/* Compagnon (mini) */}
-            <div className="mt-6 w-full flex flex-col items-center gap-3 rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
+            <div className="mt-3 w-full flex flex-col items-center gap-3 rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
               <div className="w-full">
-                <label htmlFor="companion-name" className="mb-1 block text-center text-xs text-white/70">Nom du compagnon</label>
+                <label htmlFor="companion-name" className="mb-1 block text-center text-xs text-white/70">Compagnon</label>
                 <input
                   id="companion-name"
                   type="text"
@@ -361,13 +381,27 @@ const canEdit = !!me?.id && ownsCurrentChar
                   onBlur={saveCompanionName}
                   onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
                   disabled={!charId || savingCompanion}
-                  placeholder="Nom du compagnon"
+                  placeholder="Son nom…"
                   className="w-full rounded-full border border-white/20 bg-white/10 px-3 py-2 text-center text-sm text-white outline-none placeholder:text-white/55 focus:border-amber-300/60"
                 />
                 {savingCompanion && <p className="mt-1 text-center text-xs text-white/60">Enregistrement…</p>}
               </div>
 
               <HeroAvatar src={form.companion_avatar_url} size={120} bust={imgBust} />
+              <div className="w-full">
+                <label htmlFor="companion-description" className="mb-1 block text-center text-xs text-white/70">Description</label>
+                <textarea
+                  id="companion-description"
+                  rows={3}
+                  maxLength={500}
+                  value={form.companion_description}
+                  onChange={e => onChange('companion_description', e.target.value)}
+                  onBlur={saveCompanionDescription}
+                  disabled={!canEdit}
+                  placeholder="Espèce, tempérament, particularités…"
+                  className="min-h-[72px] w-full resize-y rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs leading-relaxed text-white outline-none placeholder:text-white/45 focus:border-amber-300/60"
+                />
+              </div>
               <AvatarUploader
                 key={`companion-${charId}`}
                 userId={me.id}
@@ -608,6 +642,7 @@ function baseForm() {
     traits: baseTraits(),
     companion_name: "",
     companion_avatar_url: "",
+    companion_description: "",
     wand_composition: "",
     wand_size: "",
     wand_image_url: "",
@@ -629,26 +664,6 @@ function Labeled({ label, children }) {
       <span className="block mb-1">{label}</span>
       {children}
     </label>
-  );
-}
-
-function CharSwitcher({ chars, value, onChange }) {
-  if (!chars?.length) return null;
-  return (
-    <div className="rounded-xl bg-white/5 border border-white/10 p-2 w-full">
-      <select
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-neutral-800 text-white px-3 py-2 outline-none rounded-lg w-full"
-        aria-label="Choisir un personnage"
-      >
-        {chars.map(c => (
-          <option key={c.id} value={c.id} className="bg-neutral-900">
-            {c.name || c.id}
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }
 
@@ -704,29 +719,6 @@ function RelationAdder({ characters, types, onAdd, busy, msg }) {
         </button>
       </div>
       {!!msg && <div className="text-xs text-white/70">{msg}</div>}
-    </div>
-  );
-}
-
-function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#8c6ab8", rightColor="#e6d4a7" }) {
-  const pct = (value / 10) * 100; // 0..100 → droite
-  const gradient = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${pct}%, ${rightColor} ${pct}%, ${rightColor} 100%)`;
-  return (
-    <div className="space-y-2 select-none">
-      <div className="flex justify-between text-white/78 text-sm">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
-      <div className="relative h-4 rounded-full border border-white/15 bg-black/35 overflow-hidden">
-        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: `calc(${pct}% - 6px)` }}
-        >
-          <div className="h-3 w-3 rounded-full border border-white/70 bg-white shadow-[0_0_10px_rgba(255,255,255,.35)]" />
-        </div>
-        <input type="range" min={0} max={10} step={1} value={value} onChange={(e) => onChange?.(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label={`${leftLabel} ↔ ${rightLabel}`} />
-      </div>
     </div>
   );
 }
