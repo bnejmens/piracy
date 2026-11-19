@@ -565,7 +565,7 @@ const createConversation = async () => {
     <main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-slate-950 px-0 py-0 text-white sm:px-4 sm:py-6">
       <div className="absolute inset-0 bg-cover bg-center opacity-45" style={{ backgroundImage: "url('/images/msg-bg.webp')" }} />
       <div className="absolute inset-0 bg-slate-950/35" />
-      <section className="relative z-10 flex h-[100dvh] w-full max-w-[490px] min-h-0 flex-col overflow-hidden border border-white/15 bg-slate-950/90 shadow-[0_20px_90px_rgba(0,0,0,.65)] backdrop-blur-xl sm:h-[min(850px,94dvh)] sm:rounded-[32px] sm:border-[5px] sm:border-slate-700">
+      <section className="relative z-10 flex h-[100dvh] min-h-0 w-full max-w-[490px] flex-col overflow-hidden border border-white/15 bg-slate-950/90 shadow-[0_20px_90px_rgba(0,0,0,.65)] backdrop-blur-xl sm:h-[min(850px,94dvh)] sm:rounded-[32px] sm:border-[5px] sm:border-slate-700">
         <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-white/5 px-4 py-3">
           {screen === 'chat' ? (
             <button type="button" aria-label="Retour aux conversations" onClick={() => { setScreen('conversations'); setKeyboardOpen(false) }} className="rounded-full p-2 hover:bg-white/10">←</button>
@@ -615,7 +615,7 @@ const createConversation = async () => {
             <button type="button" disabled={!newConvTargets.length} onClick={createConversation} className="w-full rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40">Créer la conversation</button>
           </div>}
 
-          {screen === 'chat' && <div className="flex min-h-full flex-col justify-end gap-3 p-4">
+          {screen === 'chat' && <div className="flex min-h-full min-w-0 flex-col justify-end gap-3 p-3 sm:p-4">
             {!messages.length && <p className="py-8 text-center text-sm text-white/50">Début de la conversation</p>}
             {messages.map(m => {
               const mine = isMine(m)
@@ -633,14 +633,14 @@ const createConversation = async () => {
           </div>}
         </div>
 
-        {screen === 'chat' && <div className="shrink-0 border-t border-white/10 bg-slate-900/95 px-3 pt-2 pb-2">
+        {screen === 'chat' && <div className="shrink-0 border-t border-white/10 bg-slate-900/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-3">
           {myChars.length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-white/60"><span>Envoyer en tant que</span><select value={currentSpeakerId || ''} onChange={e => setCurrentSpeakerId(e.target.value)} className="min-w-0 max-w-[65%] rounded-lg bg-slate-800 px-2 py-1 text-white">{myChars.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}</select></div>}
           <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-2">
             <textarea ref={inputRef} rows={1} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage() } }} placeholder="Écrire un message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm outline-none placeholder:text-white/40" />
             <button type="button" onClick={() => setKeyboardOpen(v => !v)} aria-label="Afficher ou masquer le clavier visuel" className="rounded-xl border border-white/15 px-3 py-3 text-sm hover:bg-white/10">⌨</button>
             <button type="submit" disabled={sending || !input.trim()} className="rounded-xl bg-amber-300 px-3 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40">➤</button>
           </form>
-          {keyboardOpen && <div className="mt-3 space-y-1.5 select-none" onMouseDown={e => e.preventDefault()}>
+          {keyboardOpen && <div className="mt-3 max-h-[32dvh] space-y-1.5 overflow-y-auto select-none" onMouseDown={e => e.preventDefault()}>
             {['1234567890', 'azertyuiop', 'qsdfghjklm', 'wxcvbn'].map((row, i) => <div key={i} className="flex justify-center gap-1">{Array.from(row).map(k => <button key={k} type="button" onClick={() => pressKey(k)} className="h-10 min-w-0 flex-1 rounded-md bg-slate-700 text-sm font-medium active:bg-amber-400 active:text-slate-950">{caps ? k.toUpperCase() : k}</button>)}</div>)}
             <div className="flex gap-1"><button type="button" onClick={() => pressKey('.')} className="rounded-md bg-slate-700 px-2 py-2 text-xs">.</button><button type="button" onClick={() => pressKey(',')} className="rounded-md bg-slate-700 px-2 py-2 text-xs">,</button><button type="button" onClick={() => pressKey('shift')} className="rounded-md bg-slate-700 px-3 py-2 text-xs">⇧</button><button type="button" onClick={() => pressKey('space')} className="flex-1 rounded-md bg-slate-700 py-2 text-xs">Espace</button><button type="button" onClick={() => pressKey('backspace')} className="rounded-md bg-slate-700 px-3 py-2 text-xs">⌫</button><button type="button" onClick={() => pressKey('enter')} className="rounded-md bg-slate-700 px-3 py-2 text-xs">↵</button></div>
           </div>}
