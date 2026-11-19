@@ -63,7 +63,7 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <main className="relative min-h-dvh overflow-x-hidden">
       {/* Fond servi directement par le navigateur, sans optimisation Next.js */}
       <div
         aria-hidden="true"
@@ -73,7 +73,7 @@ export default function AuthPage() {
       <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
 
       {/* CONTENU AU PREMIER PLAN */}
-      <div className="relative z-20 flex min-h-screen items-center justify-center p-4">
+      <div className="relative z-20 flex min-h-dvh items-center justify-center px-3 py-6 sm:p-4">
         {checkingSession ? (
           <p className="text-sm text-slate-100">Vérification de la connexion…</p>
         ) : (
@@ -81,7 +81,7 @@ export default function AuthPage() {
           {/* Lueur haute */}
           <div className="pointer-events-none h-1 rounded-t-2xl bg-cyan-300/60" />
 
-          <div className="p-6 sm:p-8 text-slate-100">
+          <div className="p-4 text-slate-100 sm:p-8">
             <h1 className="text-2xl font-semibold tracking-wide mb-2">
                 ⭒   ALWAYS   ⭒
             </h1>
