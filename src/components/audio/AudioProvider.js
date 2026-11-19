@@ -228,6 +228,11 @@ export default function AudioProvider({ children }) {
 
     if (!nextActive) {
       audioRefs.current[src]?.pause()
+
+      // Le dernier son coupé doit aussi arrêter l'état « en lecture » du mixeur.
+      if (playing && SOUNDS.every(sound => sound.src === src || !mix[sound.src]?.active)) {
+        setPlaying(false)
+      }
     }
 
     setMix(previous => ({
