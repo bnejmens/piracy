@@ -107,7 +107,7 @@ export default function SiteTopbar({ title }) {
           href="/profile"
           aria-label={activeCharacter ? `Voir le profil de ${activeCharacter.name}` : 'Mon profil'}
           title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Mon profil'}
-          className="ml-1 flex shrink-0 items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1 pl-1 pr-2.5 transition hover:border-amber-200/50 hover:bg-white/10 sm:pr-3"
+          className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1 pl-1 pr-2.5 transition hover:border-amber-200/50 hover:bg-white/10 sm:pr-3"
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-amber-200/15 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/25">
             {activeCharacter?.avatar_url ? (
