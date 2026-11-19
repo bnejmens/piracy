@@ -1,0 +1,29 @@
+name: Verify Next.js build (no deployment)
+
+on:
+  push:
+    branches:
+      - feature/offrecords-community-rp-soundtracks-20261119
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Fausse configuration utilisable uniquement pour compiler le front.
+      # Aucune connexion à la base Piracy et aucun secret de production.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-build-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
