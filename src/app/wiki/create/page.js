@@ -213,7 +213,7 @@ async function reloadTree() {
   )
 
   return (
-    <main className="fixed inset-0 overflow-auto bg-slate-950">
+    <main className="relative min-h-dvh overflow-x-hidden bg-slate-950">
       {/* BG */}
       <div className="absolute inset-0 -z-20">
         <Image src="/images/lore-bg.webp" alt="" fill priority className="object-cover opacity-60" />
