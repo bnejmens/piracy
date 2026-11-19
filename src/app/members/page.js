@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import SiteTopbar from "@/components/SiteTopbar";
 import { displayExternalImage } from "@/lib/displayExternalImage";
+import Bipolar from "@/components/PersonalityTraitScale";
 
 export default function MembersPage() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function MembersPage() {
   .select(`
     id, user_id, name, orientation, avatar_url, bio, created_at,
     age, occupation, traits, is_active, is_archived,
-    companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url,
+    companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url,
     character_relationships:character_relationships!character_id (
       id, type, other_character_id,
       other:other_character_id ( id, name, avatar_url )
@@ -352,6 +353,7 @@ const avatarNode = (m) => (
                       <div className="min-w-0">
                         <p className="break-words text-base font-semibold text-white/90">{modalChar.companion_name?.trim() || 'Non renseigné'}</p>
                         <p className="mt-1 text-xs text-white/50">Compagnon du personnage</p>
+                        {modalChar.companion_description?.trim() && <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-white/70">{modalChar.companion_description}</p>}
                       </div>
                     </div>
                   </section>
@@ -495,40 +497,6 @@ function TraitsSummary({ traits }) {
 }
 
 // --- À ajouter tout en bas de MembersPage (avant export default si tu as une exportation nommée, sinon juste à la fin du fichier) ---
-function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#8c6ab8", rightColor="#e6d4a7" }) {
-  const pct = (Math.max(0, Math.min(10, Number(value ?? 5))) / 10) * 100; // 0..100
-  const gradient = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${pct}%, ${rightColor} ${pct}%, ${rightColor} 100%)`;
-  return (
-    <div className="space-y-2 select-none">
-      <div className="flex justify-between text-white/70 text-sm">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
-      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
-        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: `calc(${pct}% - 6px)` }}
-        >
-          <div className="w-3 h-3 rounded-full bg-white shadow" />
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={10}
-          step={1}
-          value={value}
-          onChange={(e) => onChange?.(Number(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          aria-label={`${leftLabel} ↔ ${rightLabel}`}
-          disabled
-        />
-      </div>
-    </div>
-  );
-}
-
-
 function relationLabel(type) {
   const map = {
     love_interest: "Love interest",
