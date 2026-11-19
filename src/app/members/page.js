@@ -51,13 +51,13 @@ if (e1) throw e1;
         // 2) Profils -> nom joueur
         const { data: profs, error: e2 } = await supabase
           .from("profiles")
-          .select("user_id, pseudo, email");
+          .select("user_id, pseudo");
         if (e2) throw e2;
 
         const byUser = Object.fromEntries((profs || []).map(p => [p.user_id, p]));
         const list = (chars || []).map(c => {
           const owner = byUser[c.user_id];
-          const ownerName = owner?.pseudo?.trim() || owner?.email?.split("@")[0] || "Joueur";
+          const ownerName = owner?.pseudo?.trim() || "Joueur";
           return { ...c, ownerName };
         });
 

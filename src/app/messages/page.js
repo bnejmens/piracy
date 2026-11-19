@@ -43,6 +43,7 @@ export default function MessagesPage() {
   const [newConvOpen, setNewConvOpen] = useState(false)
   const [newConvTitle, setNewConvTitle] = useState('')
   const [newConvTargets, setNewConvTargets] = useState([])
+  const [newConvPrivate, setNewConvPrivate] = useState(false)
 
   const [contactModal, setContactModal] = useState({
     open: false, contact: null, convs: [], loading: false
@@ -108,7 +109,7 @@ export default function MessagesPage() {
   const loadConversations = async () => {
     const { data: convs, error } = await supabase
       .from('conversations')
-      .select('id, is_group, direct_key, title, created_by, last_message_at, created_at')
+      .select('id, is_group, is_private, direct_key, title, created_by, last_message_at, created_at')
       .order('last_message_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false, nullsFirst: true })
       .limit(50)
@@ -213,7 +214,10 @@ export default function MessagesPage() {
       .eq('conversation_id', conv.id)
       .order('created_at', { ascending: true })
       .limit(500)
-    if (!error) {
+    if (error) {
+      alert(error.message || 'Conversation inaccessible')
+      setScreen('conversations')
+    } else {
       setMessages(data || [])
       setTimeout(scrollToBottom, 0)
     }
@@ -371,6 +375,7 @@ const isMine = (m) => {
   const openNewConv = () => {
     setNewConvTitle('')
     setNewConvTargets([])
+    setNewConvPrivate(false)
     setSearch('')
     setScreen('compose')
   }
@@ -411,6 +416,7 @@ const createConversation = async () => {
         p_sender_character_id: currentSpeakerId,
         p_target_character_ids: newConvTargets,
         p_title: title || null,
+        p_is_private: newConvPrivate,
       })
 
     if (error) throw error
@@ -418,6 +424,7 @@ const createConversation = async () => {
     setNewConvOpen(false)
     setNewConvTargets([])
     setNewConvTitle('')
+    setNewConvPrivate(false)
 
     await loadConversations()
 
@@ -426,6 +433,7 @@ const createConversation = async () => {
       id: conversationId,
       title: title || 'Conversation',
       is_group: true,
+      is_private: newConvPrivate,
       created_by: session.user.id,
     })
 
@@ -525,7 +533,7 @@ const createConversation = async () => {
                 const person = [...charsById.values()].find(ch => ch.name === info.label)
                 return <button key={c.id} type="button" onClick={() => openConversation(c)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-white/10">
                   <Avatar name={info.label} src={person?.avatar_url} />
-                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{c.title?.trim() || info.label || 'Conversation'}</div><div className="truncate text-xs text-white/50">{last ? short(last.content, 58) : 'Aucun message'}</div></div>
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{c.is_private ? "🔒 " : ""}{c.title?.trim() || info.label || 'Conversation'}</div><div className="truncate text-xs text-white/50">{last ? short(last.content, 58) : 'Aucun message'}</div></div>
                   <span className="shrink-0 text-[10px] text-white/40">{last?.created_at ? new Date(last.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''}</span>
                 </button>
               })}
@@ -540,6 +548,7 @@ const createConversation = async () => {
 
           {screen === 'compose' && <div className="space-y-4 p-4">
             <p className="text-xs text-white/60">Sélectionne un ou plusieurs personnages. Plusieurs destinataires créent une conversation de groupe.</p>
+            <label className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/5 p-3 text-xs text-white/90"><input type="checkbox" checked={newConvPrivate} onChange={e => setNewConvPrivate(e.target.checked)} className="mt-0.5 accent-amber-300" /><span><strong>Conversation privée</strong><span className="mt-1 block text-white/60">Visible uniquement par les invités et les administrateurs. Par défaut, toutes les conversations restent publiques et participatives.</span></span></label>
             <div className="space-y-1">{filteredContacts.map(c => <label key={c.id} className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-white/10"><input type="checkbox" checked={newConvTargets.includes(c.id)} onChange={() => toggleTarget(c.id)} className="accent-amber-300" /><Avatar name={c.name} src={c.avatar_url} size="h-9 w-9" /><span className="text-sm">{c.name}</span></label>)}</div>
             <input value={newConvTitle} onChange={e => setNewConvTitle(e.target.value)} placeholder={newConvTargets.length > 1 ? 'Nom du groupe (obligatoire)' : 'Titre de la conversation (facultatif)'} className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm outline-none" />
             <button type="button" disabled={!newConvTargets.length} onClick={createConversation} className="w-full rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40">Créer la conversation</button>

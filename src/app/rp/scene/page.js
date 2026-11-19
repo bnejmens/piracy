@@ -207,10 +207,10 @@ async function openPosterCard(authorId, authorCharacterId) {
       if (ch?.user_id) {
         const { data: owner } = await supabase
           .from('profiles')
-          .select('pseudo, email')
+          .select('pseudo')
           .eq('user_id', ch.user_id)
           .maybeSingle();
-        ownerName = owner?.pseudo?.trim() || owner?.email?.split('@')[0] || ownerName;
+        ownerName = owner?.pseudo?.trim() || ownerName;
       }
 
       setViewer({ type: 'char', data: { ...ch, ownerName } });
@@ -218,7 +218,7 @@ async function openPosterCard(authorId, authorCharacterId) {
       // pas de perso : simple profil utilisateur
       const { data: p, error: e2 } = await supabase
         .from('profiles')
-        .select('user_id, pseudo, avatar_url, email')
+        .select('user_id, pseudo, avatar_url')
         .eq('user_id', authorId)
         .maybeSingle();
       if (e2) throw e2;
@@ -1274,10 +1274,10 @@ function TopicParticipants({ topicId }) {
         let profList = []
         if (authorsNeedingProfile.length) {
           const { data: profs } = await supabase
-            .from('profiles').select('user_id, pseudo, email, avatar_url').in('user_id', authorsNeedingProfile)
+            .from('profiles').select('user_id, pseudo, avatar_url').in('user_id', authorsNeedingProfile)
           profList = (profs || []).map(p => ({
             key: `user:${p.user_id}`,
-            label: p.pseudo?.trim() || p.email?.split('@')[0] || 'Profil',
+            label: p.pseudo?.trim() || 'Profil',
             avatar: p.avatar_url || null,
           }))
         }
@@ -1333,9 +1333,9 @@ function PostHeader({ authorId, authorCharacterId, createdAt, onAvatarClick }) {
         if (ok && ch) { setDisplay({ name: ch.name, avatar_url: ch.avatar_url }); return }
       }
       const { data: p } = await supabase
-        .from('profiles').select('pseudo, avatar_url, email').eq('user_id', authorId).maybeSingle()
+        .from('profiles').select('pseudo, avatar_url').eq('user_id', authorId).maybeSingle()
       if (ok) {
-        const name = p?.pseudo?.trim() || p?.email?.split('@')[0] || 'Auteur'
+        const name = p?.pseudo?.trim() || 'Auteur'
         setDisplay({ name, avatar_url: p?.avatar_url || null })
       }
     }
@@ -1458,7 +1458,7 @@ function ProfileModal({ viewer, onClose }) {
   const stop = (e) => e.stopPropagation()
 
   if (type === 'user') {
-    const name = data?.pseudo?.trim() || data?.email?.split('@')[0] || 'Joueur'
+    const name = data?.pseudo?.trim() || 'Joueur'
     return (
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
         <div className="w-[min(96vw,720px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-6 text-white" onClick={stop}>
@@ -1470,7 +1470,7 @@ function ProfileModal({ viewer, onClose }) {
             </div>
             <div>
               <div className="text-xl font-semibold">{name}</div>
-              <div className="text-white/60 text-sm">{data?.email}</div>
+              
             </div>
           </div>
           <div className="mt-6 flex justify-end">
