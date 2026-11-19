@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import DOMPurify from 'isomorphic-dompurify'
 import { supabase } from '@/lib/supabaseClient'
+import YouTubePlaylistPlayer from '@/components/offrecords/YouTubePlaylistPlayer'
 
  // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
  const IFRAME_HOST_OK = /(^|\.)((youtube\.com)|(youtube-nocookie\.com)|(youtu\.be)|(player\.vimeo\.com))$/i;
@@ -156,6 +157,14 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+  const [soundtrack, setSoundtrack] = useState(null)
+  const [soundtrackOpen, setSoundtrackOpen] = useState(false)
+  const [soundtrackTracks, setSoundtrackTracks] = useState([])
+  const [soundtrackChoices, setSoundtrackChoices] = useState([])
+  const [soundtrackEditorOpen, setSoundtrackEditorOpen] = useState(false)
+  const [soundtrackChoiceId, setSoundtrackChoiceId] = useState('')
+  const [soundtrackSaving, setSoundtrackSaving] = useState(false)
+  const [soundtrackError, setSoundtrackError] = useState('')
 const [sceneMenuOpen, setSceneMenuOpen] = useState(false)
 const [zonesMenuOpen, setZonesMenuOpen] = useState(false)
 const [expandedZoneId, setExpandedZoneId] = useState(null)
@@ -239,6 +248,78 @@ async function openPosterCard(authorId, authorCharacterId) {
  })
   }, [raw])
 
+  // Une playlist privée ou supprimée ne doit jamais apparaître dans un RP public.
+  useEffect(() => {
+    let cancelled = false
+    setSoundtrack(null)
+    setSoundtrackTracks([])
+    setSoundtrackOpen(false)
+    const id = activeTopic?.soundtrack_playlist_id
+    if (!id) return
+    supabase.from('off_playlists')
+      .select('id,title,cover_url,character_id,owner_id')
+      .eq('id', id)
+      .eq('is_public', true)
+      .maybeSingle()
+      .then(async ({ data, error }) => {
+        if (cancelled || error || !data) return
+        let creator = 'Joueur'
+        if (data.character_id) {
+          const { data: character } = await supabase.from('characters')
+            .select('name').eq('id', data.character_id).maybeSingle()
+          creator = character?.name || creator
+        } else if (data.owner_id) {
+          const { data: owner } = await supabase.from('profiles')
+            .select('pseudo').eq('user_id', data.owner_id).maybeSingle()
+          creator = owner?.pseudo || creator
+        }
+        if (!cancelled) setSoundtrack({ ...data, creator })
+      })
+    return () => { cancelled = true }
+  }, [activeTopic?.id, activeTopic?.soundtrack_playlist_id])
+
+  useEffect(() => {
+    if (!soundtrackOpen || !soundtrack?.id) return
+    let cancelled = false
+    supabase.from('off_tracks')
+      .select('id,video_id,title,created_at')
+      .eq('playlist_id', soundtrack.id)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) setSoundtrackError(error.message)
+        setSoundtrackTracks(data || [])
+      })
+    return () => { cancelled = true }
+  }, [soundtrackOpen, soundtrack?.id])
+
+  const editSoundtrack = async () => {
+    if (!activeTopic || !session) return
+    setSoundtrackError('')
+    setSoundtrackChoiceId(activeTopic.soundtrack_playlist_id || '')
+    const { data, error } = await supabase.from('off_playlists')
+      .select('id,title').eq('is_public', true)
+      .order('created_at', { ascending: false }).limit(300)
+    if (error) { setSoundtrackError(error.message); return }
+    setSoundtrackChoices(data || [])
+    setSoundtrackEditorOpen(true)
+  }
+
+  const saveSoundtrack = async () => {
+    if (!activeTopic?.id || soundtrackSaving) return
+    setSoundtrackSaving(true)
+    setSoundtrackError('')
+    const { data, error } = await supabase.from('rp_topics')
+      .update({ soundtrack_playlist_id: soundtrackChoiceId || null })
+      .eq('id', activeTopic.id)
+      .select('id,soundtrack_playlist_id').single()
+    setSoundtrackSaving(false)
+    if (error) { setSoundtrackError(error.message); return }
+    setActiveTopic(t => t && t.id === data.id ? { ...t, soundtrack_playlist_id: data.soundtrack_playlist_id } : t)
+    setTopics(all => all.map(t => t.id === data.id ? { ...t, soundtrack_playlist_id: data.soundtrack_playlist_id } : t))
+    setSoundtrackEditorOpen(false)
+  }
+
   // Source de vérité = me.active_character_id ; fallback = premier perso actif
   // Utiliser automatiquement le personnage actif du compte
 useEffect(() => {
@@ -294,7 +375,7 @@ useEffect(() => {
 const loadTopics = async () => {
   const { data, error } = await supabase
     .from('rp_topics')
-    .select('id,title,created_at,updated_at,author_id,created_by,location_id')
+    .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -507,7 +588,7 @@ const loadTopics = async () => {
       .from('rp_topics')
       .update({ title: next.trim() })
       .eq('id', t.id)
-      .select('id,title,created_at,updated_at,author_id,created_by,location_id')
+      .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id')
       .single()
     if (error) { alert(error.message); return }
     setTopics(ts => ts.map(x => x.id === t.id ? data : x))
@@ -936,6 +1017,44 @@ const loadTopics = async () => {
     </div>
   </div>
 
+  {/* Bande-son facultative : seuls les morceaux publics sont présentés. */}
+  {activeTopic && (soundtrack || activeTopic.author_id === session?.user?.id || activeTopic.created_by === session?.user?.id) && (
+    <div className="relative z-10 shrink-0 border-b border-amber-200/15 bg-[#231a2d]/90 px-3 py-2 lg:px-6">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {soundtrack ? (
+          <>
+            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-amber-200/25 bg-[#4c3b54] text-amber-200">
+              {soundtrack.cover_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={(() => {
+                    try {
+                      const u = new URL(soundtrack.cover_url)
+                      return ['http:', 'https:'].includes(u.protocol) ? `/api/img?u=${encodeURIComponent(u.href)}` : ''
+                    } catch { return '' }
+                  })()}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={e => { e.currentTarget.style.display = 'none' }}
+                />
+              ) : <span aria-hidden="true">♫</span>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] uppercase tracking-wide text-amber-200/70">Bande-son proposée par l’auteur</p>
+              <p className="truncate text-sm font-semibold text-amber-50">{soundtrack.title}</p>
+              <p className="truncate text-[11px] text-white/55">Par {soundtrack.creator} · Écoute facultative</p>
+            </div>
+            <button type="button" onClick={() => { setSoundtrackError(''); setSoundtrackOpen(true) }} className="rounded-lg border border-amber-200/30 bg-amber-200/15 px-3 py-2 text-xs text-amber-100 hover:bg-amber-200/25">▶ Écouter</button>
+          </>
+        ) : <span className="min-w-0 flex-1 text-xs text-white/55">Aucune bande-son publique pour ce RP.</span>}
+        {(activeTopic.author_id === session?.user?.id || activeTopic.created_by === session?.user?.id) && (
+          <button type="button" onClick={editSoundtrack} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/85 hover:bg-white/15">{soundtrack ? 'Modifier la bande-son' : '+ Ajouter une bande-son'}</button>
+        )}
+      </div>
+    </div>
+  )}
+
   {/* Deux colonnes sur ordinateur, un panneau sur téléphone */}
   <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:grid-cols-[minmax(280px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
 
@@ -1150,6 +1269,38 @@ onVimeo={() => {
 
 {viewer && (
   <ProfileModal viewer={viewer} onClose={() => setViewer(null)} />
+)}
+
+{/* Lecteur YouTube vidéo visible, à fermer librement pour reprendre toute la place. */}
+{soundtrackOpen && soundtrack && (
+  <aside aria-label="Lecteur de bande-son RP" className="fixed bottom-3 right-3 z-50 max-h-[80dvh] w-[min(94vw,430px)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/35 bg-[#211729] p-3 text-amber-50 shadow-2xl sm:bottom-5 sm:right-5">
+    <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
+      <p className="min-w-0 truncate font-serif text-sm text-amber-100">Bande-son : {soundtrack.title}</p>
+      <button type="button" onClick={() => setSoundtrackOpen(false)} aria-label="Fermer le lecteur" className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-sm">×</button>
+    </div>
+    {soundtrackError && <p role="alert" className="mb-2 text-xs text-rose-200">{soundtrackError}</p>}
+    <YouTubePlaylistPlayer playlistId={soundtrack.id} tracks={soundtrackTracks} />
+    <p className="mt-2 text-[11px] text-white/45">Cette fenêtre reste visible pendant l’écriture. La fermer arrête la musique.</p>
+  </aside>
+)}
+
+{soundtrackEditorOpen && (
+  <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 p-3 backdrop-blur-md" onMouseDown={e => { if (e.target === e.currentTarget && !soundtrackSaving) setSoundtrackEditorOpen(false) }}>
+    <div role="dialog" aria-modal="true" aria-label="Modifier la bande-son RP" className="w-full max-w-lg rounded-2xl border border-amber-200/25 bg-[#2b2036] p-4 text-amber-50 shadow-2xl sm:p-6">
+      <h3 className="font-serif text-xl text-amber-100">Bande-son du RP</h3>
+      <p className="mt-2 text-xs leading-relaxed text-white/60">Choisis une playlist publique d’OffRecords. Elle sera proposée à tous les lecteurs, sans démarrage automatique.</p>
+      {soundtrackError && <p role="alert" className="mt-3 text-xs text-rose-200">{soundtrackError}</p>}
+      <label htmlFor="scene-soundtrack" className="mt-4 block text-sm text-amber-100">Playlist</label>
+      <select id="scene-soundtrack" value={soundtrackChoiceId} onChange={e => setSoundtrackChoiceId(e.target.value)} className="mt-2 w-full rounded-lg border border-amber-200/25 bg-[#392d44] px-3 py-3 text-sm text-white">
+        <option value="">Aucune bande-son</option>
+        {soundtrackChoices.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+      </select>
+      <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <button type="button" disabled={soundtrackSaving} onClick={() => setSoundtrackEditorOpen(false)} className="rounded-lg border border-white/20 px-4 py-2 text-sm">Annuler</button>
+        <button type="button" disabled={soundtrackSaving} onClick={saveSoundtrack} className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#261c32] disabled:opacity-50">{soundtrackSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
+      </div>
+    </div>
+  </div>
 )}
 
       {/* -------- MODALE PRÉVISUALISATION -------- */}
