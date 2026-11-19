@@ -44,11 +44,11 @@ export default function SoundModal() {
     })
   }, [sounds, category, search])
 
-  if (!isOpen) return null
+  // Toujours afficher les sons sélectionnés, quels que soient les filtres/recherche.
+  const activeSounds = sounds.filter(sound => mix[sound.src]?.active)
+  const activeCount = activeSounds.length
 
-  const activeCount = sounds.filter(
-    sound => mix[sound.src]?.active
-  ).length
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center p-3 sm:p-6">
@@ -115,6 +115,72 @@ export default function SoundModal() {
               {error}
             </p>
           )}
+
+          {/* Liste accessible immédiatement, indépendamment de la recherche et des catégories. */}
+          <section aria-label="Sons activés" className="rounded-xl border border-amber-300/35 bg-amber-200/[0.07] p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-serif text-lg text-amber-100">Mes sons activés</h3>
+                <p className="mt-1 text-xs text-white/55">
+                  {playing
+                    ? 'Retrouve ici toutes les ambiances en cours, sans parcourir les filtres.'
+                    : 'Tes sons sélectionnés pour la prochaine écoute.'}
+                </p>
+              </div>
+              <span className="rounded-full border border-amber-300/30 bg-amber-300/15 px-2.5 py-1 text-xs font-medium text-amber-100">
+                {activeCount} actif{activeCount > 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {activeSounds.length ? (
+              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                {activeSounds.map(sound => {
+                  const settings = mix[sound.src] || { active: true, volume: 0.4 }
+                  return (
+                    <div key={sound.src} className="rounded-lg border border-amber-200/15 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span className="text-lg" aria-hidden="true">{sound.icon}</span>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-amber-50">{sound.label}</div>
+                            <div className="truncate text-[11px] text-white/45">{sound.category || 'Autres'}</div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleSound(sound.src)}
+                          aria-label={`Désactiver ${sound.label}`}
+                          className="shrink-0 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white/85 transition hover:border-amber-200/40 hover:bg-white/15"
+                        >
+                          Désactiver
+                        </button>
+                      </div>
+                      <div className="mt-2.5 flex items-center gap-3">
+                        <span className="text-[11px] text-white/55">Volume</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={settings.volume}
+                          onChange={e => setSoundVolume(sound.src, Number(e.target.value))}
+                          aria-label={`Volume ${sound.label}`}
+                          className="min-w-0 flex-1 accent-amber-300"
+                        />
+                        <span className="w-9 text-right text-xs tabular-nums text-white/60">
+                          {Math.round(settings.volume * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-white/10 bg-black/15 px-3 py-4 text-xs text-white/55">
+                Aucun son activé. Sélectionne une ambiance ci-dessous pour la retrouver ici.
+              </p>
+            )}
+          </section>
 
           <div>
             <div className="mb-2 flex items-center justify-between text-sm">
