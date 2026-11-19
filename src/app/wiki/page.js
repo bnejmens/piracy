@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import SiteTopbar from '@/components/SiteTopbar'
 import { supabase } from '../../lib/supabaseClient'
 import { seedTree } from './categories'
 import { getCardPaths, pathLabel, pathMatches } from './categoryPaths'
@@ -440,20 +441,16 @@ setTree(seedTree())
   if (loading) return <div className="p-6 text-slate-900">Chargement…</div>
 
   return (
-    <main className="fixed inset-0 overflow-hidden">
-      {/* Bouton retour */}
-      <button
-        onClick={() => { window.location.href = '/dashboard' }}
-        className="fixed left-60 bottom-[20px] z-50 rounded-full border border-white/25 bg-white/20 backdrop-blur-md px-3.5 py-1.5 text-white/90 text-md hover:bg-white/60"
-      >
-        ← Tableau de bord
-      </button>
+    <main className="fixed inset-0 flex flex-col overflow-hidden">
 
       {/* BG */}
       <div className="absolute inset-0 -z-20">
         <Image src="/images/lore-bg.webp" alt="" fill priority className="object-cover" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/20 via-slate-900/15 to-slate-950/35" />
+
+      {/* Navigation commune : tous les menus et personnage actif à droite. */}
+      <SiteTopbar title="Wiki & Lore" />
 
       {/* Confetti */}
       {Boolean(confetti.length) && (
@@ -467,7 +464,7 @@ setTree(seedTree())
         </div>
       )}
 
-      <div className="relative z-10 h-full grid gap-6 p-6 grid-cols-[30%_1fr] xl:grid-cols-[28%_1fr] lg:grid-cols-1">
+      <div className="relative z-10 grid min-h-0 flex-1 gap-6 p-6 grid-cols-[30%_1fr] xl:grid-cols-[28%_1fr] lg:grid-cols-1">
         {/* ---- Colonne gauche ---- */}
         <section className="rounded-2xl border border-white/15 bg-black/30 backdrop-blur-md overflow-hidden flex flex-col">
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between">

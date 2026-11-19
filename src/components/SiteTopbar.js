@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
 // Barre commune inspirée de la navigation de la page RP.
 // Son titre remplace les anciens boutons de retour isolés.
@@ -11,6 +12,7 @@ const QUICK_LINKS = [
   { href: '/messages', label: 'Messagerie' },
   { href: '/profile', label: 'Mon profil' },
   { href: '/members', label: 'Membres' },
+  { href: '/randomvava', label: 'Random Vava' },
   { href: '/offrecords', label: 'OffRecords' },
   { href: '/wiki', label: 'Wiki & chronologie' },
   { href: '/dashboard', label: 'Tableau de bord' },
@@ -19,6 +21,42 @@ const QUICK_LINKS = [
 export default function SiteTopbar({ title }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [activeCharacter, setActiveCharacter] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadActiveCharacter = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!mounted) return
+      if (!session?.user?.id) {
+        setActiveCharacter(null)
+        return
+      }
+
+      // Même personnage actif que sur le Dashboard, sans dépendre
+      // du champ profiles.active_character_id qui peut être ancien.
+      const { data, error } = await supabase
+        .from('characters')
+        .select('id, name, avatar_url')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!mounted) return
+      if (error) {
+        console.warn('Avatar du personnage actif :', error.message)
+        return
+      }
+      setActiveCharacter(data || null)
+    }
+
+    loadActiveCharacter()
+    return () => { mounted = false }
+  }, [pathname])
 
   return (
     <header className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 shadow-lg backdrop-blur-xl">
@@ -65,6 +103,31 @@ export default function SiteTopbar({ title }) {
             </>
           )}
         </div>
+
+        <Link
+          href="/profile"
+          aria-label={activeCharacter ? `Voir le profil de ${activeCharacter.name}` : 'Mon profil'}
+          title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Mon profil'}
+          className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1 pl-1 pr-2.5 transition hover:border-amber-200/50 hover:bg-white/10 sm:pr-3"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-amber-200/15 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/25">
+            {activeCharacter?.avatar_url ? (
+              <img
+                src={activeCharacter.avatar_url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              (activeCharacter?.name?.[0] || '?').toUpperCase()
+            )}
+          </span>
+          <span className="hidden max-w-32 flex-col text-left sm:flex">
+            <span className="text-[10px] leading-tight text-amber-100/55">Personnage actif</span>
+            <span className="truncate text-xs font-medium text-amber-50">
+              {activeCharacter?.name || 'Mon profil'}
+            </span>
+          </span>
+        </Link>
       </div>
     </header>
   )
