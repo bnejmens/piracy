@@ -200,7 +200,7 @@ async function openPosterCard(authorId, authorCharacterId) {
       const { data: ch, error: e1 } = await supabase
         .from('characters')
         .select(`
-          id, user_id, name, gender, avatar_url, bio, created_at,
+          id, user_id, name, orientation, avatar_url, bio, created_at,
           age, occupation, traits,
           companion_name, companion_avatar_url, companion_description,
           character_relationships:character_relationships!character_id (
@@ -295,7 +295,7 @@ async function openPosterCard(authorId, authorCharacterId) {
   }, [soundtrackOpen, soundtrack?.id])
 
   const editSoundtrack = async () => {
-    if (!activeTopic || !session) return
+    if (!activeTopic || !session || activeTopic.is_archived) return
     setSoundtrackError('')
     setSoundtrackChoiceId(activeTopic.soundtrack_playlist_id || '')
     const { data, error } = await supabase.from('off_playlists')
@@ -307,7 +307,7 @@ async function openPosterCard(authorId, authorCharacterId) {
   }
 
   const saveSoundtrack = async () => {
-    if (!activeTopic?.id || soundtrackSaving) return
+    if (!activeTopic?.id || activeTopic.is_archived || soundtrackSaving) return
     setSoundtrackSaving(true)
     setSoundtrackError('')
     const { data, error } = await supabase.from('rp_topics')
@@ -376,7 +376,7 @@ useEffect(() => {
 const loadTopics = async () => {
   const { data, error } = await supabase
     .from('rp_topics')
-    .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id')
+    .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id,is_archived,archived_at')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -490,7 +490,7 @@ const loadTopics = async () => {
     const { data, error } = await supabase
       .from('rp_topics')
       .insert({ title, author_id: session?.user?.id })
-      .select('id, title, created_at, author_id')
+      .select('id, title, created_at, author_id, is_archived, archived_at')
       .single()
     if (error) { alert(error.message); return }
     setTopics(t => [data, ...t])
@@ -499,6 +499,7 @@ const loadTopics = async () => {
   }
 
   const publishPost = async () => {
+    if (activeTopic?.is_archived) { alert('Ce RP est archivé et ne peut plus recevoir de messages.'); return; }
     const chosenCharId = postAsCharId
     if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
       alert("Choisis un personnage et un sujet, puis écris un message.")
@@ -552,11 +553,13 @@ const loadTopics = async () => {
 
   /* ---------- EDIT / DELETE POST ---------- */
   const startEditPost = (p) => {
+    if (activeTopic?.is_archived) return;
     setEditingPostId(p.id)
     setEditingRaw(p.content_raw || '')
   }
   const cancelEditPost = () => { setEditingPostId(null); setEditingRaw('') }
   const saveEditPost = async () => {
+    if (activeTopic?.is_archived) { alert('Ce RP est archivé et ses posts ne sont plus modifiables.'); return; }
     if (!editingPostId || !editingRaw.trim()) return
  const processedHtml = DOMPurify.sanitize(bbcodeToHtml(editingRaw), {
    ALLOWED_TAGS, ALLOWED_ATTR,
@@ -574,6 +577,7 @@ const loadTopics = async () => {
     cancelEditPost()
   }
   const deletePost = async (postId) => {
+    if (activeTopic?.is_archived) { alert('Ce RP est archivé et ses posts ne peuvent plus être supprimés.'); return; }
     if (!confirm('Supprimer ce post ?')) return
     const { error } = await supabase.from('rp_posts').delete().eq('id', postId)
     if (error) { alert(error.message); return }
@@ -583,19 +587,21 @@ const loadTopics = async () => {
 
   /* ---------- EDIT / DELETE TOPIC ---------- */
   const renameTopic = async (t) => {
+    if (t.is_archived) { alert('Réouvre ce RP depuis sa sous-zone pour le modifier.'); return; }
     const next = prompt('Nouveau titre ?', t.title)
     if (!next || !next.trim()) return
     const { data, error } = await supabase
       .from('rp_topics')
       .update({ title: next.trim() })
       .eq('id', t.id)
-      .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id')
+      .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id,is_archived,archived_at')
       .single()
     if (error) { alert(error.message); return }
     setTopics(ts => ts.map(x => x.id === t.id ? data : x))
     if (activeTopic?.id === t.id) setActiveTopic(data)
   }
   const removeTopic = async (t) => {
+    if (t.is_archived) { alert('Réouvre ce RP depuis sa sous-zone avant de le supprimer.'); return; }
     if (!confirm('Supprimer ce sujet et tous ses posts ?')) return
     const { error } = await supabase.from('rp_topics').delete().eq('id', t.id)
     if (error) { alert(error.message); return }
@@ -899,7 +905,7 @@ const loadTopics = async () => {
                 </div>
               </button>
 
-              {(topic.author_id === session?.user?.id ||
+              {!topic.is_archived && (topic.author_id === session?.user?.id ||
                 topic.created_by === session?.user?.id) && (
                 <div className="mt-2 flex justify-end gap-2 border-t border-white/10 pt-2">
                   <button
@@ -946,6 +952,7 @@ const loadTopics = async () => {
       <h1 className="truncate font-serif text-lg text-amber-100 sm:text-2xl">
         {activeTopic?.title || 'Lecture RP'}
       </h1>
+      {activeTopic?.is_archived && <span className="mt-1 inline-flex rounded-full border border-amber-200/25 bg-amber-200/10 px-2 py-0.5 text-[11px] text-amber-100">Archivé · Lecture seule</span>}
 
       <p className="truncate text-xs text-amber-200/65">
         {placeLabel(activeTopic)}
@@ -1049,7 +1056,7 @@ const loadTopics = async () => {
             <button type="button" onClick={() => { setSoundtrackError(''); setSoundtrackOpen(true) }} className="rounded-lg border border-amber-200/30 bg-amber-200/15 px-3 py-2 text-xs text-amber-100 hover:bg-amber-200/25">▶ Écouter</button>
           </>
         ) : <span className="min-w-0 flex-1 text-xs text-white/55">Aucune bande-son publique pour ce RP.</span>}
-        {(activeTopic.author_id === session?.user?.id || activeTopic.created_by === session?.user?.id) && (
+        {!activeTopic.is_archived && (activeTopic.author_id === session?.user?.id || activeTopic.created_by === session?.user?.id) && (
           <button type="button" onClick={editSoundtrack} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/85 hover:bg-white/15">{soundtrack ? 'Modifier la bande-son' : '+ Ajouter une bande-son'}</button>
         )}
       </div>
@@ -1072,7 +1079,9 @@ style={{
         >
           <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-[#32263f]/80 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Sélectionne un sujet pour écrire'}
+            {activeTopic?.is_archived && <span className="ml-2 text-xs text-amber-100/65">· Archivé</span>}
           </header>
+          {activeTopic?.is_archived && <p className="border-b border-amber-200/15 bg-amber-200/10 px-4 py-3 text-xs text-amber-100">Ce RP est terminé : la lecture reste possible, mais les messages ne peuvent plus être publiés ni modifiés.</p>}
 
           <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto p-3 sm:p-4">
            
@@ -1154,6 +1163,7 @@ onVimeo={() => {
               ref={textareaRef}
               rows={8}
               value={raw}
+              disabled={!!activeTopic?.is_archived}
               onChange={e => setRaw(e.target.value)}
               placeholder="Écris ton post en BBCode…"
               className="w-full lg:min-h-[120px] rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
@@ -1170,7 +1180,7 @@ onVimeo={() => {
               </button>
               <button
                 onClick={publishPost}
-                disabled={!activeTopic || !raw.trim() || !postAsCharId}
+                disabled={!activeTopic || !!activeTopic.is_archived || !raw.trim() || !postAsCharId}
                 className="rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2 hover:bg-amber-200 disabled:opacity-50"
               >
                 Publier
@@ -1202,7 +1212,7 @@ onVimeo={() => {
                          className="relative rounded-2xl border px-4 py-3"
                          style={frost(mine ? GLASS.cardMine : GLASS.cardOther)}>
 
-                  {mine && editingPostId !== p.id && (
+                  {mine && !activeTopic?.is_archived && editingPostId !== p.id && (
                     <div className="absolute right-3 top-3 flex gap-2">
                       <button
                         onClick={() => startEditPost(p)}
@@ -1650,7 +1660,7 @@ function ProfileModal({ viewer, onClose }) {
           <div className="min-w-0">
             <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{c.name}</h3>
             <p className="text-xs text-white/60">
-              {c.gender || 'Genre non renseigné'} • Joueur : {c.ownerName || '—'}
+              {c.orientation?.trim() ? `Orientation : ${c.orientation} · ` : ''}Joueur : {c.ownerName || '—'}
             </p>
             <div className="mt-1 text-xs text-white/70 space-x-3">
               {c.age ? <span>Âge : {c.age}</span> : null}
