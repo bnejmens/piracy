@@ -101,42 +101,27 @@ export default function DashboardPage() {
   return () => window.removeEventListener('resize', onResize);
 }, []);
 
-  // changement du personnage actif
+  // Changement atomique : la même opération que le menu de la topbar.
   const setActiveCharacter = async (charId) => {
-    if (!profile?.user_id || !charId) return
+    if (!profile?.user_id || !charId) return;
 
-    // reset tous les persos à inactif
-    await supabase
-      .from('characters')
-      .update({ is_active: false })
-      .eq('user_id', profile.user_id)
+    const { error } = await supabase.rpc('activate_my_character', {
+      p_character_id: charId,
+    });
+    if (error) { alert(error.message); return; }
 
-    // active le perso choisi
-    const { error } = await supabase
-      .from('characters')
-      .update({ is_active: true })
+    const { data: ch } = await supabase.from('characters')
+      .select('*')
       .eq('id', charId)
+      .eq('user_id', profile.user_id)
+      .maybeSingle();
 
-    if (error) { alert(error.message); return }
-
-    // recharge le perso actif
-    const { data: ch } = await supabase
-      .from('characters').select('*').eq('id', charId).maybeSingle()
-
-    setCharacter(ch || null)
-setCharacter(ch || null)
-
-// 🔹 recharge la liste pour mettre à jour les ticks
-const { data: chars } = await supabase
-  .from('characters')
-  .select('id, name, avatar_url, is_active')
-  .eq('user_id', profile.user_id)
-  .order('created_at', { ascending: true })
-setMyChars(chars || [])
-
-setPickerOpen(false)
-
-    setPickerOpen(false)
+    setCharacter(ch || null);
+    setMyChars(chars => chars.map(c => ({ ...c, is_active: c.id === charId })));
+    setPickerOpen(false);
+    window.dispatchEvent(new CustomEvent('piracy:active-character-changed', {
+      detail: { characterId: charId },
+    }));
   }
 
   // chargement initial
