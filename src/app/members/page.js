@@ -166,7 +166,7 @@ const avatarNode = (m) => (
 
       {/* Carte centrale */}
       <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto overscroll-contain px-3 pb-6 pt-5 sm:px-6 sm:pb-8 sm:pt-6">
-        <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x1 ring-1 ring-white/30 p-6 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
+        <div className="w-full max-w-6xl rounded-3xl border border-white/30 bg-white/30 backdrop-blur-x1 ring-1 ring-white/30 p-3 sm:p-8 text-white shadow-[0_20px_80px_rgba(0,0,0,.45)]">
          
 {/* En-tête et recherche */}
 <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -201,7 +201,7 @@ const avatarNode = (m) => (
 </div>
 
 {/* Grille responsive des personnages */}
-<div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+<div className="grid grid-cols-2 gap-x-2 gap-y-4 sm:grid-cols-3 sm:gap-x-3 sm:gap-y-5 lg:grid-cols-4">
   {pageItems.map(m => avatarNode(m))}
 </div>
 
@@ -242,7 +242,7 @@ const avatarNode = (m) => (
     onClick={() => setModalChar(null)}
   >
     <div
-  className="w-[min(96vw,980px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-6 sm:p-8 text-white shadow-2xl max-h-[90vh] overflow-y-auto overscroll-contain"
+  className="max-h-[90dvh] w-full max-w-[980px] overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-slate-950/90 p-3 text-white shadow-2xl backdrop-blur-xl sm:p-8"
   onClick={(e) => e.stopPropagation()}
 >
       {/* Header identité */}
@@ -276,7 +276,7 @@ const avatarNode = (m) => (
 </div>
 
 {/* Contenu : on ne garde PLUS la carte Avatar à gauche */}
-<div className="mt-6 grid gap-6 lg:grid-cols-[300px,1fr]">
+<div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-6">
   {/* Colonne gauche : uniquement Compagnon */}
 <aside className="flex flex-col gap-4">
   <div className="rounded-xl border border-white/10 bg-white/5 p-4">
