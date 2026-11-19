@@ -1,14 +1,27 @@
-
-// Vocabulaire unique du niveau 3, disponible dans chaque sous-catégorie.
-// Ajouter une entrée ici la rend sélectionnable dans tout le Wiki.
-export const LEVEL_3_OPTIONS = [
+// Taxonomie du Wiki : sous-sous-catégories pertinentes par branche.
+// Les labels restent identiques aux classements enregistrés dans les cartes.
+const PLACE_OPTIONS = [
   { slug: 'londres', label: 'Londres' },
   { slug: 'ministere', label: 'Ministère' },
   { slug: 'godric-s', label: "Godric's" },
   { slug: 'poudlard', label: 'Poudlard' },
+]
+
+const NATURE_OPTIONS = [
   { slug: 'faune', label: 'Faune' },
   { slug: 'flore', label: 'Flore' },
 ]
+
+// Export historique conservé pour les autres éventuels consommateurs.
+export const LEVEL_3_OPTIONS = [...PLACE_OPTIONS, ...NATURE_OPTIONS]
+
+function optionsForBranch(root, sub) {
+  if (root.slug === 'univers' && sub.slug === 'faune-et-flore') return NATURE_OPTIONS
+  if (root.slug === 'univers' && sub.slug === 'lieux') return PLACE_OPTIONS
+  if (root.slug === 'personnages') return PLACE_OPTIONS
+  // Historique et Jouabilité n'ont pas besoin de niveau 3.
+  return []
+}
 
 export function seedTree() {
   const roots = [
@@ -45,13 +58,13 @@ export function seedTree() {
       ],
     },
   ]
-  // Un seul référentiel pour toutes les branches, mais des identifiants
-  // propres à chaque chemin pour préserver la navigation et le filtrage.
+
+  // Préserver les identifiants et slugs utilisés pour la navigation.
   return roots.map(root => ({
     ...root,
     children: root.children.map(sub => ({
       ...sub,
-      children: LEVEL_3_OPTIONS.map(option => ({
+      children: optionsForBranch(root, sub).map(option => ({
         id: `${sub.id}-${option.slug}`,
         slug: option.slug,
         label: option.label,
