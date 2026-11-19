@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
+import SoundTrigger from '@/components/audio/SoundTrigger'
 
 export default function MessagesPage() {
   const router = useRouter()
@@ -574,8 +575,11 @@ const createConversation = async () => {
             <h1 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h1>
             {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG'}</p>}
           </div>
-          <div className="shrink-0 rounded-full border border-amber-200/25 p-0.5" title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Personnage actif'}>
-            <Avatar name={activeCharacter?.name || me?.pseudo || 'Joueur'} src={activeCharacter?.avatar_url || null} size="h-10 w-10" />
+          <div className="flex shrink-0 items-center gap-2">
+            <SoundTrigger inline />
+            <div className="rounded-full border border-amber-200/25 p-0.5" title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Personnage actif'}>
+              <Avatar name={activeCharacter?.name || me?.pseudo || 'Joueur'} src={activeCharacter?.avatar_url || null} size="h-10 w-10" />
+            </div>
           </div>
         </header>
 
