@@ -74,7 +74,7 @@ const toEnumOrNull = (v, allowed) => {
       // Mes personnages
       const { data: chars } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url")
+        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       setMyChars(chars || []);
@@ -103,7 +103,7 @@ setAllChars(all || []);
     (async () => {
       const { data: c } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url")
+        .select("id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url")
         .eq("id", charId)
         .maybeSingle();
       if (c) {
@@ -118,6 +118,9 @@ setAllChars(all || []);
           traits: { ...baseTraits(), ...(c.traits || {}) },
           companion_name: c.companion_name || "",
           companion_avatar_url: c.companion_avatar_url || "",
+          wand_composition: c.wand_composition || "",
+          wand_size: c.wand_size || "",
+          wand_image_url: c.wand_image_url || "",
         });
         setImgBust(Date.now());
       }
@@ -133,6 +136,47 @@ setAllChars(all || []);
 
   const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const onTrait = (k, v) => setForm(f => ({ ...f, traits: { ...f.traits, [k]: v } }));
+
+  // Le nom se modifie directement dans l'encart Compagnon ; sortie de champ = enregistrement.
+  const [savingCompanion, setSavingCompanion] = useState(false);
+  const saveCompanionName = async () => {
+    if (!me?.id || !charId || savingCompanion) return;
+    const name = (form.companion_name || '').trim();
+    const old = (myChars.find(c => c.id === charId)?.companion_name || '').trim();
+    if (name === old) return;
+    setSavingCompanion(true);
+    const { error } = await supabase.from('characters')
+      .update({ companion_name: name || null })
+      .eq('id', charId)
+      .eq('user_id', me.id);
+    setSavingCompanion(false);
+    if (error) {
+      setSavedMsg(error.message || 'Erreur lors de la modification du compagnon');
+      return;
+    }
+    setMyChars(list => list.map(c => c.id === charId ? { ...c, companion_name: name || null } : c));
+    setSavedMsg('Nom du compagnon enregistré ✔');
+  };
+
+  // Le menu de personnage de la topbar synchronise aussi la fiche ouverte.
+  useEffect(() => {
+    const onCharacterChanged = async (event) => {
+      const chosenId = event.detail?.characterId;
+      if (!chosenId) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data, error } = await supabase
+        .from('characters')
+        .select('id, user_id, name, bio, avatar_url, gender, is_active, age, occupation, traits, companion_name, companion_avatar_url, wand_composition, wand_size, wand_image_url')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+      if (error) { setSavedMsg(error.message); return; }
+      setMyChars(data || []);
+      setCharId(chosenId);
+    };
+    window.addEventListener('piracy:active-character-changed', onCharacterChanged);
+    return () => window.removeEventListener('piracy:active-character-changed', onCharacterChanged);
+  }, []);
 
  const onSave = async () => {
   if (!charId) return
@@ -195,6 +239,16 @@ if ((form.companion_avatar_url ?? null) !== (current.companion_avatar_url ?? nul
 // avatar_url
 if ((form.avatar_url ?? null) !== (current.avatar_url ?? null)) {
   payload.avatar_url = (form.avatar_url ?? '') === '' ? null : form.avatar_url;
+}
+
+// Baguette : composition, taille libre (ex. 28 cm / 11 pouces), image.
+for (const field of ['wand_composition', 'wand_size']) {
+  const next = (form[field] ?? '').trim();
+  const previous = (current[field] ?? '').trim();
+  if (next !== previous) payload[field] = next || null;
+}
+if ((form.wand_image_url || '') !== (current.wand_image_url || '')) {
+  payload.wand_image_url = form.wand_image_url || null;
 }
 
 // Rien à sauver ?
@@ -285,11 +339,22 @@ const canEdit = !!me?.id && ownsCurrentChar
 
             {/* Compagnon (mini) */}
             <div className="mt-6 w-full flex flex-col items-center gap-3 rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
-              <div
-  className="text-white text-lg bg-white/12 backdrop-blur-md border border-white/20 rounded-full px-4 py-1 shadow-md"
->
-  {form?.companion_name?.trim() || 'Compagnon'}
-</div>
+              <div className="w-full">
+                <label htmlFor="companion-name" className="mb-1 block text-center text-xs text-white/70">Nom du compagnon</label>
+                <input
+                  id="companion-name"
+                  type="text"
+                  maxLength={100}
+                  value={form.companion_name}
+                  onChange={e => onChange('companion_name', e.target.value)}
+                  onBlur={saveCompanionName}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  disabled={!charId || savingCompanion}
+                  placeholder="Nom du compagnon"
+                  className="w-full rounded-full border border-white/20 bg-white/10 px-3 py-2 text-center text-sm text-white outline-none placeholder:text-white/55 focus:border-amber-300/60"
+                />
+                {savingCompanion && <p className="mt-1 text-center text-xs text-white/60">Enregistrement…</p>}
+              </div>
 
               <HeroAvatar src={form.companion_avatar_url} size={120} bust={imgBust} />
               <AvatarUploader
@@ -309,13 +374,6 @@ const canEdit = !!me?.id && ownsCurrentChar
                 }}
               />
             </div>
-{/* Création de personnage si aucun n'existe */}
-  <CreateCharacterInline
-    userId={me?.id}
-    setMyChars={setMyChars}
-    setCharId={setCharId}
-  />
-
           </div>
         </aside>
 
@@ -345,15 +403,6 @@ const canEdit = !!me?.id && ownsCurrentChar
 
           <Labeled label="Description / histoire">
             <textarea value={form.bio} onChange={(e)=>onChange("bio", e.target.value)} rows={12} className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none" placeholder="..." />
-          </Labeled>
-
-          <Labeled label="Nom du compagnon">
-            <input
-              value={form.companion_name}
-              onChange={(e)=>onChange("companion_name", e.target.value)}
-              className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none"
-              placeholder="Nom de la créature / plante / esprit…"
-            />
           </Labeled>
 
           <div className="flex flex-wrap items-center justify-between gap-3 mt-2">
@@ -390,7 +439,7 @@ const canEdit = !!me?.id && ownsCurrentChar
         </section>
 
         {/* Droite: Traits (haut) + Relations (bas) */}
-        <section className="col-span-12 min-w-0 lg:col-span-4 grid grid-rows-[auto,1fr] gap-5">
+        <section className="col-span-12 min-w-0 lg:col-span-4 flex flex-col gap-5">
           {/* TRAITS */}
           <div className="rounded-2xl bg-black/50 border border-white/15 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
             <h2 className="text-white/90 text-lg font-semibold mb-3">Traits de personnalité</h2>
@@ -441,6 +490,70 @@ const canEdit = !!me?.id && ownsCurrentChar
               )}
             </ul>
           </div>
+
+          {/* BAGUETTE */}
+          <div className="rounded-2xl border border-white/15 bg-black/50 p-4 shadow-[0_18px_50px_rgba(0,0,0,.35)] backdrop-blur-xl">
+            <h2 className="mb-3 text-lg font-semibold text-white/90">Baguette magique</h2>
+            <div className="space-y-3">
+              <Labeled label="Composition">
+                <input
+                  value={form.wand_composition}
+                  onChange={e => onChange('wand_composition', e.target.value)}
+                  disabled={!canEdit}
+                  maxLength={500}
+                  placeholder="Ex. bois de houx, plume de phénix"
+                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/40 focus:border-amber-300/60"
+                />
+              </Labeled>
+              <Labeled label="Taille">
+                <input
+                  value={form.wand_size}
+                  onChange={e => onChange('wand_size', e.target.value)}
+                  disabled={!canEdit}
+                  maxLength={80}
+                  placeholder="Ex. 28 cm ou 11 pouces"
+                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/40 focus:border-amber-300/60"
+                />
+              </Labeled>
+              <div className="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/25 bg-white/5">
+                  {form.wand_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={form.wand_image_url} alt="Baguette du personnage" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-white/50">Baguette</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-2 text-xs text-white/65">Portrait rond de la baguette</p>
+                  <AvatarUploader
+                    userId={me.id}
+                    charId={charId}
+                    prefix="wands"
+                    label="Importer une image"
+                    onUploaded={async url => {
+                      const { error } = await supabase
+                        .from('characters')
+                        .update({ wand_image_url: url })
+                        .eq('id', charId)
+                        .eq('user_id', me.id);
+                      if (error) throw error;
+                      onChange('wand_image_url', url);
+                      setMyChars(list => list.map(c => c.id === charId ? { ...c, wand_image_url: url } : c));
+                    }}
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving || !canEdit}
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15 disabled:opacity-50"
+              >
+                {saving ? 'Enregistrement…' : 'Enregistrer la baguette'}
+              </button>
+            </div>
+          </div>
         </section>
       </div>
     </main>
@@ -474,6 +587,9 @@ function baseForm() {
     traits: baseTraits(),
     companion_name: "",
     companion_avatar_url: "",
+    wand_composition: "",
+    wand_size: "",
+    wand_image_url: "",
   };
 }
 
@@ -539,63 +655,6 @@ function MiniAvatar({ src, size = 40 }) {
       ) : (
         <div className="w-full h-full grid place-items-center text-white/40">—</div>
       )}
-    </div>
-  );
-}
-
-function CreateCharacterInline({ userId, setMyChars, setCharId }) {
-  const [name, setName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const canCreate = !!userId && name.trim().length > 1;
-
-  const onCreate = async () => {
-    if (!canCreate) return;
-    setCreating(true);
-    const payload = {
-      user_id: userId,
-      name: name.trim(),
-      is_active: true, // optionnel si ta colonne existe
-    };
-
-    const { data, error } = await supabase
-      .from('characters')
-      .insert(payload)
-      .select('id, user_id, name, avatar_url, is_active')
-      .single();
-
-    if (error) {
-      console.error('[characters.insert]', error);
-      alert(error.message || 'Création impossible (RLS ?)');
-    } else {
-      setMyChars(prev => ([...(prev || []), data]));
-      setCharId(data.id);     // bascule tout de suite sur ce perso
-      setName('');
-    }
-    setCreating(false);
-  };
-
-  return (
-    <div className="mt-4 w-full rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,.35)] p-4">
-      <p className="mb-3 text-xs font-semibold text-white/90 sm:text-[11px] lg:text-xs">Nouveau personnage</p>
-      <div className="flex flex-col gap-2 w-full">
-  <input
-    type="text"
-    value={name}
-    placeholder="Nom du personnage"
-    onChange={(e) => setName(e.target.value)}
-    className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-white placeholder-white/45"
-  />
-
-  <button
-    onClick={onCreate}
-    disabled={!canCreate || creating}
-    className={`w-full px-3 py-2 rounded text-white text-center ${
-      !canCreate || creating ? 'bg-white/15 text-white/60' : 'bg-emerald-500/90 hover:bg-emerald-400 text-slate-950'
-    }`}
-  >
-    {creating ? 'Création…' : 'Créer'}
-  </button>
-</div>
     </div>
   );
 }
