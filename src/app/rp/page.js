@@ -652,8 +652,8 @@ async function createTopic(e) {
       </div>
 
       {creating && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => !saving && setCreating(false)}>
-          <form onSubmit={createTopic} onClick={e => e.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-amber-200/30 bg-[#241b2d] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-2 sm:p-4" onClick={() => !saving && setCreating(false)}>
+          <form onSubmit={createTopic} onClick={e => e.stopPropagation()} className="max-h-[92dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/30 bg-[#241b2d] p-3 shadow-2xl sm:p-6">
             <h2 className="font-serif text-2xl text-amber-100">Créer un nouveau RP</h2>
             <p className="mb-5 mt-2 text-sm text-white/60">Choisissez obligatoirement une zone et un lieu.</p>
             {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
@@ -766,7 +766,7 @@ async function createTopic(e) {
   </p>
 </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-4 py-2 hover:bg-white/10">Annuler</button>
               <button type="submit" disabled={saving || !draftTitle.trim() || !draftLocationId} className="rounded-lg bg-amber-300 px-4 py-2 font-semibold text-[#24191c] disabled:opacity-40">{saving ? 'Création…' : 'Créer le RP'}</button>
             </div>
