@@ -80,21 +80,21 @@ export default function DashboardPage() {
     const h = window.innerHeight;
     const base = Math.min(w, h);
 
-    // Heuristiques : en "mobile haut" (~400x900), on écarte davantage,
-    // on réduit un peu l’avatar et on diminue un poil les icônes.
-    if (w <= 480 && h >= 800) {
-      // Avatar ~150–220px
-      setCenterSize(Math.round(clamp(base * 0.40, 150, 220)));
-      // Radius plus grand pour dégager le visage (≈ 0.46 * base)
-      setRadius(Math.round(clamp(base * 0.32, 180, 320)));
-      // Icônes un peu plus petites
-      setIconSize(Math.round(clamp(base * 0.14, 64, 92)));
-    } else {
-      // Comportement par défaut (desktop/tablette)
-      setCenterSize(Math.round(clamp(base * 0.34, 180, 380)));
-      setRadius(Math.round(clamp(base * 0.38, 160, 300)));
-      setIconSize(Math.round(clamp(base * 0.12, 80, 110)));
-    }
+    // L'anneau doit rester intégralement visible, même à 320px
+    // ou en paysage sur un petit écran, sans toucher aux pas du Maraudeur.
+    const compact = w < 640 || h < 480
+    const icon = Math.round(compact ? clamp(base * 0.15, 48, 74) : clamp(base * 0.12, 70, 110))
+    const widthLimit = (w - icon) / 2 - 16
+    const topReserve = h < 520 ? 100 : h < 700 ? 120 : 150
+    const heightLimit = (h - topReserve - icon) / 2
+    const targetRadius = compact ? clamp(base * 0.36, 105, 210) : clamp(base * 0.38, 160, 300)
+    const nextRadius = Math.round(clamp(Math.min(targetRadius, widthLimit, heightLimit), 75, 300))
+    const desiredCenter = compact ? clamp(base * 0.34, 96, 170) : clamp(base * 0.34, 150, 380)
+    const maxCenter = 2 * Math.max(36, nextRadius - icon * 0.55 - 10)
+
+    setIconSize(icon)
+    setRadius(nextRadius)
+    setCenterSize(Math.round(Math.min(desiredCenter, maxCenter)))
   };
   onResize();
   window.addEventListener('resize', onResize);
@@ -192,14 +192,14 @@ setPickerOpen(false)
     <main className="fixed inset-0 overflow-hidden">
 
       {/* Nom + bouton changement perso */}
-      <div className="absolute top-6 left-8 z-40"> 
+      <div className="absolute left-3 top-3 z-40 flex max-w-[calc(100vw-155px)] flex-wrap items-center gap-1 sm:left-8 sm:top-6 sm:max-w-none"> 
         <span className={`text-xl md:text-2xl font-semibold tracking-wide drop-shadow ${nameClass}`} style={{ textShadow: '0 1px 10px rgba(0,0,0,.5)' }}>
           {displayName}
         </span>
         {!!myChars.length && (
           <button
             onClick={() => setPickerOpen(true)}
-            className="ml-3 align-middle rounded-full border border-white/30 bg-white/15 backdrop-blur-md px-2 py-1 text-[12px] text-white/90 hover:bg-white/20"
+            className="rounded-full border border-white/30 bg-white/15 px-2 py-1 text-xs text-white/90 backdrop-blur-md hover:bg-white/20 sm:ml-3"
             title="Changer de personnage"
           >
             Changer
@@ -218,7 +218,7 @@ setPickerOpen(false)
       <MaraudersPresence />
 
     {/* Logout + Notifications (empilés en haut à droite) */}
-<div className="absolute top-6 right-8 z-40 flex flex-col items-end gap-2">
+<div className="absolute right-3 top-3 z-40 flex flex-col items-end gap-2 sm:right-8 sm:top-6">
   <button
     onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
     className="rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-md hover:bg-white/20 focus:outline-none"
@@ -259,18 +259,18 @@ setPickerOpen(false)
             {/* Choix personnage */}
 {pickerOpen && (
   <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4">
-    <div className="w-[min(94vw,720px)] rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl p-5 text-white shadow-2xl">
+    <div className="max-h-[90dvh] w-full max-w-[720px] overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-slate-950/90 p-3 text-white shadow-2xl backdrop-blur-xl sm:p-5">
 
       {/* Pseudo joueur */}
       <div className="mb-4 rounded-xl border border-white/15 bg-white/5 p-3">
         <label className="text-sm text-white/90">Ton pseudo de joueur</label>
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2 sm:flex-nowrap">
           <input
             value={pseudoInput}
             onChange={(e)=>setPseudoInput(e.target.value)}
             onKeyDown={(e)=>{ if (e.key==='Enter') savePseudo() }}
             placeholder="Ex: BlackBeard"
-            className="flex-1 rounded-md bg-white/10 border border-white/20 px-3 py-2 outline-none placeholder-white/60"
+            className="min-w-0 w-full flex-1 rounded-md border border-white/20 bg-white/10 px-3 py-2 outline-none placeholder-white/60"
           />
           <button
             onClick={savePseudo}
@@ -285,7 +285,7 @@ setPickerOpen(false)
 
       <div className="my-3 h-px bg-white/10" aria-hidden />
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-semibold">Choisir le personnage actif</h3>
         <button
           onClick={()=>setPickerOpen(false)}
@@ -296,14 +296,14 @@ setPickerOpen(false)
       </div>
 
       {/* Grille des personnages */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
         {myChars.map(ch => (
           <button key={ch.id} onClick={()=>setActiveCharacter(ch.id)}
             className={`group relative rounded-xl p-3 border transition text-left
               ${ch.is_active ? 'bg-white/15 border-white/35' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}
             title={ch.name}
           >
-            <div className="w-20 h-20 mx-auto rounded-full overflow-hidden ring-2 ring-white/20 bg-white/5">
+            <div className="mx-auto h-16 w-16 overflow-hidden rounded-full bg-white/5 ring-2 ring-white/20 sm:h-20 sm:w-20">
               {ch.avatar_url
                 ? <img src={ch.avatar_url} alt="" className="w-full h-full object-cover" />
                 : <div className="grid place-items-center w-full h-full text-white/70 text-xl">
