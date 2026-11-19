@@ -464,15 +464,15 @@ setTree(seedTree())
         </div>
       )}
 
-      <div className="relative z-10 grid min-h-0 flex-1 gap-6 p-6 grid-cols-[30%_1fr] xl:grid-cols-[28%_1fr] lg:grid-cols-1">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-3 sm:p-4 lg:grid lg:grid-cols-[minmax(240px,28%)_minmax(0,1fr)] lg:gap-5 lg:overflow-hidden lg:p-6">
         {/* ---- Colonne gauche ---- */}
-        <section className="rounded-2xl border border-white/15 bg-black/30 backdrop-blur-md overflow-hidden flex flex-col">
+        <section className="flex min-h-[180px] max-h-[42dvh] min-w-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-black/30 backdrop-blur-md lg:min-h-0 lg:max-h-none">
           <header className="px-4 py-3 border-b border-white/10 text-white/90 font-medium flex items-center justify-between">
             <span>Wiki / Lore</span>
             <Link href="/wiki/create" className="rounded-lg bg-amber-300 text-slate-900 text-xs font-medium px-2.5 py-1 hover:bg-amber-200">+ Créer</Link>
           </header>
 
-          <div className="p-3 overflow-y-auto space-y-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
             <div className="rounded-lg border border-white/15 bg-white/5 p-2">
               <input
                 value={search}
@@ -555,8 +555,8 @@ setTree(seedTree())
 
         {/* ---- Grille ---- */}
         
-<section className="rounded-2xl border border-black/30 bg-white/10 backdrop-blur-xxs overflow-hidden flex flex-col min-h-0">
-          <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+<section className="flex min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-black/30 bg-white/10 backdrop-blur-xxs lg:min-h-0">
+          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-3 sm:px-4">
             <div className="text-white/90 font-medium">
               {l1Node?.label || 'Catégorie'} — {l2List.find(x=>x.id===l2)?.label || 'Sous-catégorie'}
             </div>
@@ -566,7 +566,7 @@ setTree(seedTree())
           </header>
 
           
-<div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-y-auto content-start">
+<div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-3 sm:grid-cols-3 sm:gap-4 sm:p-4 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
            
 {filtered.map(card => {
   const r = RARITY[card.rarity] || RARITY.commun
@@ -649,11 +649,11 @@ setTree(seedTree())
       {/* ---- Modale ---- */}
       {viewing && (
         <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4">
-<div className="w-full max-w-3xl max-h-[calc(100dvh-2rem)] min-h-0 flex flex-col overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-md p-4">            
+<div className="flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80 p-3 backdrop-blur-md sm:p-4">            
 <div className="flex flex-wrap items-center justify-between gap-3 mb-3 shrink-0">
               <div className="flex items-center gap-3">
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: currentCatColor }} />
-                <h3 className="text-white text-lg font-semibold">{viewing.title}</h3>
+                <h3 className="min-w-0 break-words text-lg font-semibold text-white">{viewing.title}</h3>
                 <span className="text-xs text-white/70">• {new Date(viewing.created_at).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -668,7 +668,7 @@ setTree(seedTree())
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0 overflow-y-auto overscroll-contain pr-1">
-              <div className="relative aspect-[4/5] rounded-xl overflow-hidden ring-2" style={{ borderColor: currentCatColor }}>
+              <div className="relative mx-auto aspect-[4/5] w-full max-w-[320px] overflow-hidden rounded-xl ring-2 md:max-w-none" style={{ borderColor: currentCatColor }}>
                <Image src={srcForDisplay(viewing.image_url)} alt="" fill sizes="(max-width: 767px) 90vw, 420px" className="object-cover" />
               </div>
               <div className="space-y-3">
