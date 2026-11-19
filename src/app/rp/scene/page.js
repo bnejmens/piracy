@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import DOMPurify from 'isomorphic-dompurify'
 import { supabase } from '@/lib/supabaseClient'
 import YouTubePlaylistPlayer from '@/components/offrecords/YouTubePlaylistPlayer'
+import Bipolar from '@/components/PersonalityTraitScale'
 
  // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
  const IFRAME_HOST_OK = /(^|\.)((youtube\.com)|(youtube-nocookie\.com)|(youtu\.be)|(player\.vimeo\.com))$/i;
@@ -201,7 +202,7 @@ async function openPosterCard(authorId, authorCharacterId) {
         .select(`
           id, user_id, name, gender, avatar_url, bio, created_at,
           age, occupation, traits,
-          companion_name, companion_avatar_url,
+          companion_name, companion_avatar_url, companion_description,
           character_relationships:character_relationships!character_id (
             id, type, other_character_id,
             other:other_character_id ( id, name, avatar_url )
@@ -1719,25 +1720,6 @@ function RelationsList({ relations }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function Bipolar({ leftLabel, rightLabel, value=5 }) {
-  const v = Math.max(0, Math.min(10, Number(value ?? 5)));
-  const pct = (v / 10) * 100;
-  const gradient = `linear-gradient(90deg, #6ea8ff 0%, #6ea8ff ${pct}%, #f6d24a ${pct}%, #f6d24a 100%)`;
-  return (
-    <div className="space-y-2 select-none">
-      <div className="flex justify-between text-white/70 text-sm">
-        <span>{leftLabel}</span><span>{rightLabel}</span>
-      </div>
-      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
-        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
-        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `calc(${pct}% - 6px)` }}>
-          <div className="w-3 h-3 rounded-full bg-white shadow" />
-        </div>
-      </div>
-    </div>
   );
 }
 
