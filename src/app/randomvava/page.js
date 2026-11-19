@@ -110,7 +110,7 @@ export default function RandomVavaPage() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const optimized = await optimizeAvatar(file, { maxDimension: 800, quality: 0.83 })
-        const path = `${slug}/${Date.now()}-${i}-${crypto.randomUUID()}.${optimized.extension}`
+        const path = `${session.user.id}/pools/${slug}/${Date.now()}-${i}-${crypto.randomUUID()}.${optimized.extension}`
 
         const { error: upErr } = await supabase
           .storage.from(BUCKET)
