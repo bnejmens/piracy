@@ -255,19 +255,19 @@ export default function OffRecordsPage() {
 
       {/* Content */}
       {/* ⬇️ NE PLUS SCROLLER LA PAGE : on masque le scroll global ici */}
-      <div className="relative z-10 flex-1 min-h-0 pt-4 pb-8 px-6 overflow-hidden">
+      <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-4 sm:px-6 lg:overflow-hidden">
         {/* ⬇️ La grid occupe toute la hauteur, et autorise la contraction */}
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-full min-h-0">
+        <div className="mx-auto grid w-full max-w-6xl min-h-0 grid-cols-1 gap-4 lg:h-full lg:grid-cols-[minmax(250px,320px)_minmax(0,1fr)]">
           {/* Playlists (colonne gauche) */}
-          <section className="rounded-2xl border border-white/20 bg-black/30 backdrop-blur p-4 text-white flex flex-col min-h-0">
+          <section className="flex min-h-[230px] min-w-0 flex-col rounded-2xl border border-white/20 bg-black/30 p-3 text-white backdrop-blur sm:p-4 lg:min-h-0">
             <h2 className="font-semibold mb-3">Mes playlists</h2>
 
-            <div className="flex gap-2 mb-3">
+            <div className="mb-3 flex min-w-0 gap-2">
               <input
                 value={titleInput}
                 onChange={e=>setTitleInput(e.target.value)}
                 placeholder="Titre (ex: SMOG oh go)"
-                className="flex-1 rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
+                className="min-w-0 flex-1 rounded-md border border-white/20 bg-white/10 px-3 py-2 placeholder-white/60"
               />
               <button
                 onClick={createList}
@@ -283,7 +283,7 @@ export default function OffRecordsPage() {
               <div className="text-white/70 text-sm">Chargement…</div>
             ) : (
               // ⬇️ Zone scrollable interne : prend tout l’espace restant
-              <div className="space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
+              <div className="max-h-64 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none">
                 {lists.map(L => (
                   <button
                     key={L.id}
@@ -301,14 +301,14 @@ export default function OffRecordsPage() {
           </section>
 
           {/* Lecteur + pistes (colonne droite) */}
-          <section className="rounded-2xl border border-white/20 bg-black/30 backdrop-blur p-4 text-white flex flex-col min-h-0">
+          <section className="flex min-h-[320px] min-w-0 flex-col rounded-2xl border border-white/20 bg-black/30 p-3 text-white backdrop-blur sm:p-4 lg:min-h-0">
             {!active ? (
               <div className="text-white/70">Sélectionne une playlist à gauche.</div>
             ) : (
               <>
                 {/* Lecteur */}
                 <div className="rounded-xl border border-white/20 bg-gradient-to-b from-black/50 to-black/30 p-4 mb-4">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm text-white/70">Lecture : {active.title || active.slug}</div>
                     <div className="text-sm text-white/70">Piste : {currentIndex+1}/{tracks.length || 0}</div>
                   </div>
@@ -317,24 +317,24 @@ export default function OffRecordsPage() {
                     <div ref={playerElRef} className="w-full aspect-video" />
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button onClick={prev} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏮︎</button>
                     <button onClick={play} className="rounded-md bg-emerald-400/90 text-slate-900 px-3 py-1.5 hover:bg-emerald-300">▶︎</button>
                     <button onClick={pause} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏸︎</button>
                     <button onClick={next} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">⏭︎</button>
                     <button onClick={shuffle} className="rounded-md bg-white/10 border border-white/20 px-3 py-1.5 hover:bg-white/15">🔀</button>
-                    <div className="ml-auto text-sm text-white/80 truncate" title={currentTitle}>🎵 {currentTitle}</div>
+                    <div className="min-w-0 basis-full truncate text-sm text-white/80 sm:ml-auto sm:basis-auto" title={currentTitle}>🎵 {currentTitle}</div>
                   </div>
                 </div>
 
                 {/* Ajout de titre */}
                 <div className="rounded-lg border border-white/15 bg-white/5 p-3 mb-3">
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_240px_auto] gap-2">
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,220px)_auto]">
                     <input
                       value={paste}
                       onChange={e=>setPaste(e.target.value)}
                       placeholder='Colle ici un lien YouTube ou un <iframe …>'
-                      className="rounded-md bg-white/10 border border-white/20 px-3 py-2 placeholder-white/60"
+                      className="min-w-0 w-full rounded-md border border-white/20 bg-white/10 px-3 py-2 placeholder-white/60"
                     />
                     <input
                       value={pasteTitle}
@@ -356,7 +356,7 @@ export default function OffRecordsPage() {
                 </div>
 
                 {/* Pistes — zone scrollable interne qui prend tout le reste */}
-                <div className="rounded-lg border border-white/15 bg-white/5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                <div className="max-h-[380px] min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/15 bg-white/5 lg:max-h-none">
                   {loadingTracks ? (
                     <div className="p-3 text-white/70">Chargement des titres…</div>
                   ) : !tracks.length ? (
