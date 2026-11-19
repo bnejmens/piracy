@@ -6,43 +6,8 @@ import Image from 'next/image'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import useCharacterSubscriptions from '@/hooks/useCharacterSubscriptions'
-import { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 import NotificationsWidget from '@/components/NotificationsWidget'
 import MaraudersPresence from '@/components/MaraudersPresence'
-
-function timeAgo(ts) {
-  if (!ts) return 'inconnu';
-  const d = new Date(ts).getTime();
-  if (Number.isNaN(d)) return 'inconnu';
-  const s = Math.floor((Date.now() - d) / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s/60);
-  if (m < 60) return `${m} min`;
-  const h = Math.floor(m/60);
-  if (h < 24) return `${h} h`;
-  const days = Math.floor(h/24);
-  return `${days} j`;
-}
-
-function stripHtml(html) {
-  if (!html) return '';
-  const tmp = typeof window !== 'undefined' ? document.createElement('div') : null;
-  if (!tmp) return html.replace(/<[^>]+>/g, '');
-  tmp.innerHTML = html;
-  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
-}
-function snippet10(html) {
-  const txt = stripHtml(html);
-  return txt.length <= 10 ? txt : txt.slice(0, 10) + '…';
-}
-
-function resolveAvatar(url) {
-  if (!url) return '';
-  if (/^https?:\/\//i.test(url)) return url;
-  // si tu stockes uniquement le chemin dans le bucket "avatars"
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  return `${base}/storage/v1/object/public/avatars/${url.replace(/^\/+/, '')}`;
-}
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
@@ -59,11 +24,6 @@ export default function DashboardPage() {
   const [hasNewMessage, setHasNewMessage] = useState(false)
   const [hasNewRP, setHasNewRP] = useState(false)
   const [hasNewNotif, setHasNewNotif] = useState(false)
-
-// Derniers posts (QEEL-like)
-const [recentPosts, setRecentPosts] = useState([]); // [{id, content_html, author_id, created_at, author:{avatar_url,name}}]
-const [recentLoading, setRecentLoading] = useState(false);
-
 
   // responsive geometry
   const [radius, setRadius] = useState(180)
@@ -88,47 +48,6 @@ const [recentLoading, setRecentLoading] = useState(false);
    setProfile(p => ({ ...(p||{}), pseudo: v }));
    alert('Pseudo mis à jour ✓');
  }
-
-async function loadRecentPosts() {
-  setRecentLoading(true);
-
-  // 1) on récupère les 3 derniers posts (en prenant bien author_character_id)
-  const { data: posts, error: pErr } = await supabase
-    .from('rp_posts')
-    .select('id, content_html, author_character_id, created_at')
-    .order('created_at', { ascending: false })
-    .limit(3);
-
-  if (pErr || !posts?.length) {
-    if (pErr) console.error('rp_posts error:', pErr);
-    setRecentPosts([]);
-    setRecentLoading(false);
-    return;
-  }
-
-  // 2) jointure auteurs → characters.id
-  const charIds = [...new Set(posts.map(p => p.author_character_id).filter(Boolean))];
-
-  let authorsById = {};
-  if (charIds.length) {
-    const { data: chars, error: cErr } = await supabase
-      .from('characters')
-      .select('id, name, avatar_url')
-      .in('id', charIds);
-
-    if (cErr) console.error('characters error:', cErr);
-    if (chars) authorsById = Object.fromEntries(chars.map(a => [a.id, a]));
-  }
-
-  // 3) merge
-  const merged = posts.map(p => ({
-    ...p,
-    author: authorsById[p.author_character_id] || null
-  }));
-
-  setRecentPosts(merged);
-  setRecentLoading(false);
-}
 
   // hook de souscriptions temps réel
   useCharacterSubscriptions(character?.id, {
@@ -219,26 +138,6 @@ setPickerOpen(false)
 
     setPickerOpen(false)
   }
-
-useEffect(() => {
-  // premier chargement
-  loadRecentPosts();
-
-  // abonnement aux insert/update sur rp_posts
-  const channel = supabase
-    .channel('rp_posts_live')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'rp_posts' },
-      () => { loadRecentPosts(); }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
-
 
   // chargement initial
   useEffect(() => {
@@ -468,42 +367,6 @@ useEffect(() => {
           </div>
         </div>
       )}
-
-{/* Bas-droit : derniers posts */}
-<div className="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-3">
-  {/* Derniers posts */}
-  <div className="w-64 rounded-xl border border-white/15 bg-black/20 backdrop-blur-md p-3 space-y-2">
-    <div className="text-white/70 text-sm mb-1">Derniers posts</div>
-    {recentPosts.length ? (
-      recentPosts.map(p => (
-        <div key={p.id} className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 ring-1 ring-white/15">
-            {p.author?.avatar_url ? (
-              <img src={p.author.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="grid place-items-center w-full h-full text-white/60 text-xs">
-                {(p.author?.name?.[0] || '?').toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="text-white/90 text-xs font-medium truncate">
-              {p.author?.name || 'Anonyme'}
-            </div>
-            <div className="text-white/60 text-xs truncate">
-              {snippet10(p.content_html)}
-            </div>
-          </div>
-        </div>
-      ))
-    ) : (
-      <div className="text-white/50 text-xs">Aucun post récent</div>
-    )}
-  </div>
-
-
-</div>
-
 
     </main>
   )
