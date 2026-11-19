@@ -94,3 +94,37 @@ body {
     animation: none;
   }
 }
+
+/* Les contenus RP sont rédigés par les joueurs : une image, une table ou
+   un embed large ne doit jamais pousser la colonne hors du viewport. */
+.rp-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rp-body img,
+.rp-body video,
+.rp-body iframe,
+.rp-body canvas,
+.rp-body object {
+  max-width: 100%;
+}
+.rp-body img,
+.rp-body video {
+  height: auto;
+}
+.rp-body pre,
+.rp-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* iOS/Android : éviter le zoom automatique à la saisie des petits champs
+   (les contrôles restent dimensionnés par la mise en page). */
+@media (max-width: 767px) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
