@@ -159,6 +159,11 @@ export default function MessagesPage() {
       try {
         const allCharIds = new Set()
         for (const c of convos) {
+          // Charger aussi les personnages des conversations de groupe,
+          // pas seulement ceux des messages directs.
+          for (const participant of participantsByConv[c.id] || []) {
+            if (participant.character_id) allCharIds.add(String(participant.character_id))
+          }
           if (!c.is_group && c.direct_key?.startsWith('c:')) {
             const [a, b] = c.direct_key.slice(2).split('_')
             if (a) allCharIds.add(a)
@@ -200,7 +205,7 @@ export default function MessagesPage() {
       }
     }
     preload()
-  }, [convos, contacts, myChars, charCache])
+  }, [convos, participantsByConv, contacts, myChars, charCache])
 
   /* ==================== OPENERS / SEND ==================== */
   const openConversation = async (conv) => {
@@ -488,6 +493,60 @@ const createConversation = async () => {
       {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : (name?.[0] || '?').toUpperCase()}
     </div>
   )
+  // Les portraits de conversation proviennent des participants réels,
+  // indépendamment du titre de la discussion.
+  const portraitsForConversation = (conv) => {
+    const ids = new Set((participantsByConv[conv.id] || [])
+      .map(participant => participant.character_id && String(participant.character_id))
+      .filter(Boolean))
+
+    // Certaines anciennes conversations directes n'ont qu'un participant enregistré.
+    if (!conv.is_group && conv.direct_key?.startsWith('c:')) {
+      conv.direct_key.slice(2).split('_').filter(Boolean).forEach(id => ids.add(String(id)))
+    }
+
+    const portraits = [...ids].map(id => charsById.get(id)).filter(Boolean)
+    portraits.sort((a, b) =>
+      Number(a.user_id === session?.user?.id) - Number(b.user_id === session?.user?.id))
+
+    // Pour un échange à deux, l'avatar du correspondant est le plus utile.
+    return conv.is_group ? portraits : portraits.slice(0, 1)
+  }
+
+  const ConversationPortrait = ({ conv }) => {
+    const people = portraitsForConversation(conv)
+    if (!people.length) {
+      return (
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-amber-200/25 bg-amber-200/10 text-xl text-amber-200/70" aria-label="Conversation sans portrait">
+          ✉
+        </div>
+      )
+    }
+
+    if (people.length === 1) {
+      return <Avatar name={people[0].name} src={people[0].avatar_url} />
+    }
+
+    const positions = people.length === 2
+      ? [{ left: 0, top: 7 }, { left: 17, top: 7 }]
+      : [{ left: 0, top: 0 }, { left: 18, top: 0 }, { left: 9, top: 18 }]
+
+    return (
+      <div className="relative h-11 w-12 shrink-0" aria-label={`Participants : ${people.map(p => p.name).join(', ')}`} title={people.map(p => p.name).join(' · ')}>
+        {people.slice(0, 3).map((person, i) => (
+          <div key={person.id} className="absolute h-7 w-7 rounded-full ring-2 ring-slate-900" style={positions[i]}>
+            <Avatar name={person.name} src={person.avatar_url} size="h-7 w-7" />
+          </div>
+        ))}
+        {people.length > 3 && (
+          <span className="absolute -bottom-1 -right-1 rounded-full border border-white/20 bg-slate-800 px-1 text-[9px] font-semibold text-amber-100">
+            +{people.length - 3}
+          </span>
+        )}
+      </div>
+    )
+  }
+
   const navButton = (label, target) => (
     <button type="button" onClick={() => { setScreen(target); setKeyboardOpen(false) }}
       className={`flex-1 py-3 text-xs sm:text-sm transition ${screen === target ? 'text-amber-300' : 'text-white/60 hover:text-white'}`}>
@@ -498,6 +557,7 @@ const createConversation = async () => {
   if (error) return <main className="min-h-svh bg-slate-950 p-6 text-rose-300">Erreur : {error}</main>
 
   const activeInfo = activeConv ? infoForConv(activeConv) : null
+  const activeCharacter = myChars.find(c => String(c.id) === String(currentSpeakerId)) || myChars[0] || null
   const filteredContacts = displayContacts.filter(c => c.is_character && c.user_id !== session?.user?.id && c.name?.toLowerCase().includes(search.toLowerCase()))
   const filteredConvos = convos.filter(c => (c.title || infoForConv(c).label).toLowerCase().includes(search.toLowerCase()))
 
@@ -512,9 +572,11 @@ const createConversation = async () => {
           ) : <span className="text-lg text-amber-300">✦</span>}
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h1>
-            <p className="truncate text-[11px] text-white/50">{screen === 'chat' ? 'Conversation' : (myChars.find(c => c.id === currentSpeakerId)?.name || 'Téléphone RPG')}</p>
+            <p className="truncate text-[11px] text-white/50">{screen === 'chat' ? 'Conversation' : (me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG')}</p>
           </div>
-          <button type="button" onClick={() => router.push('/dashboard')} className="rounded-full border border-white/15 px-3 py-2 text-xs text-white/80 hover:bg-white/10">Dashboard</button>
+          <div className="shrink-0 rounded-full border border-amber-200/25 p-0.5" title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Personnage actif'}>
+            <Avatar name={activeCharacter?.name || me?.pseudo || 'Joueur'} src={activeCharacter?.avatar_url || null} size="h-10 w-10" />
+          </div>
         </header>
 
         {(screen === 'conversations' || screen === 'contacts' || screen === 'compose') && (
@@ -530,9 +592,8 @@ const createConversation = async () => {
               {filteredConvos.map(c => {
                 const info = infoForConv(c)
                 const last = lastMsgByConv[c.id]
-                const person = [...charsById.values()].find(ch => ch.name === info.label)
                 return <button key={c.id} type="button" onClick={() => openConversation(c)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-white/10">
-                  <Avatar name={info.label} src={person?.avatar_url} />
+                  <ConversationPortrait conv={c} />
                   <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{c.is_private ? "🔒 " : ""}{c.title?.trim() || info.label || 'Conversation'}</div><div className="truncate text-xs text-white/50">{last ? short(last.content, 58) : 'Aucun message'}</div></div>
                   <span className="shrink-0 text-[10px] text-white/40">{last?.created_at ? new Date(last.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''}</span>
                 </button>

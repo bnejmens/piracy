@@ -174,7 +174,7 @@ async function reloadTree() {
         ))}
       </div>
 
-      {(l2List?.length||0)>0 && (
+      {(l3List?.length||0)>0 && (
         <>
           <div className="flex items-center justify-between mt-4">
             <div className="text-white/80 text-sm">Sous-sous-catégories (optionnel)</div>
