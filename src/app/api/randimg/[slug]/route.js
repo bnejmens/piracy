@@ -38,13 +38,12 @@ export async function GET(_req, { params }) {
 
   const pick = candidates[Math.floor(Math.random() * candidates.length)]
 
-  // cache-busting pour éviter toute mise en cache de la redirection/CDN
-  const bust = `${pick}${pick.includes("?") ? "&" : "?"}r=${Date.now()}_${Math.random().toString(36).slice(2)}`
-
+  // La redirection reste non mise en cache : chaque appel effectue un tirage.
+  // L'URL stable de l'image permet au navigateur/CDN de réutiliser les octets.
   return new Response(null, {
     status: 302,
     headers: {
-      Location: bust,
+      Location: pick,
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       Pragma: "no-cache",
       Expires: "0",
