@@ -1,8 +1,8 @@
 
 export default function VerificationEmailPage() {
   return (
-    <main className="fixed inset-0 flex items-center justify-center bg-slate-900 text-slate-100 p-4">
-      <div className="w-full max-w-md text-center p-8 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl">
+    <main className="flex min-h-dvh items-center justify-center bg-slate-900 p-3 text-slate-100 sm:p-4">
+      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white/10 p-4 text-center shadow-2xl backdrop-blur-xl sm:p-8">
 
         <div className="text-5xl mb-6">✉️</div>
 
