@@ -7,6 +7,8 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import DOMPurify from 'isomorphic-dompurify'
 import { supabase } from '@/lib/supabaseClient'
+import YouTubePlaylistPlayer from '@/components/offrecords/YouTubePlaylistPlayer'
+import Bipolar from '@/components/PersonalityTraitScale'
 
  // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
  const IFRAME_HOST_OK = /(^|\.)((youtube\.com)|(youtube-nocookie\.com)|(youtu\.be)|(player\.vimeo\.com))$/i;
@@ -156,6 +158,14 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+  const [soundtrack, setSoundtrack] = useState(null)
+  const [soundtrackOpen, setSoundtrackOpen] = useState(false)
+  const [soundtrackTracks, setSoundtrackTracks] = useState([])
+  const [soundtrackChoices, setSoundtrackChoices] = useState([])
+  const [soundtrackEditorOpen, setSoundtrackEditorOpen] = useState(false)
+  const [soundtrackChoiceId, setSoundtrackChoiceId] = useState('')
+  const [soundtrackSaving, setSoundtrackSaving] = useState(false)
+  const [soundtrackError, setSoundtrackError] = useState('')
 const [sceneMenuOpen, setSceneMenuOpen] = useState(false)
 const [zonesMenuOpen, setZonesMenuOpen] = useState(false)
 const [expandedZoneId, setExpandedZoneId] = useState(null)
@@ -190,9 +200,9 @@ async function openPosterCard(authorId, authorCharacterId) {
       const { data: ch, error: e1 } = await supabase
         .from('characters')
         .select(`
-          id, user_id, name, gender, avatar_url, bio, created_at,
+          id, user_id, name, orientation, avatar_url, bio, created_at,
           age, occupation, traits,
-          companion_name, companion_avatar_url,
+          companion_name, companion_avatar_url, companion_description,
           character_relationships:character_relationships!character_id (
             id, type, other_character_id,
             other:other_character_id ( id, name, avatar_url )
@@ -238,6 +248,78 @@ async function openPosterCard(authorId, authorCharacterId) {
    ADD_ATTR: ['allow','allowfullscreen','frameborder','referrerpolicy','loading']
  })
   }, [raw])
+
+  // Une playlist privée ou supprimée ne doit jamais apparaître dans un RP public.
+  useEffect(() => {
+    let cancelled = false
+    setSoundtrack(null)
+    setSoundtrackTracks([])
+    setSoundtrackOpen(false)
+    const id = activeTopic?.soundtrack_playlist_id
+    if (!id) return
+    supabase.from('off_playlists')
+      .select('id,title,cover_url,character_id,owner_id')
+      .eq('id', id)
+      .eq('is_public', true)
+      .maybeSingle()
+      .then(async ({ data, error }) => {
+        if (cancelled || error || !data) return
+        let creator = 'Joueur'
+        if (data.character_id) {
+          const { data: character } = await supabase.from('characters')
+            .select('name').eq('id', data.character_id).maybeSingle()
+          creator = character?.name || creator
+        } else if (data.owner_id) {
+          const { data: owner } = await supabase.from('profiles')
+            .select('pseudo').eq('user_id', data.owner_id).maybeSingle()
+          creator = owner?.pseudo || creator
+        }
+        if (!cancelled) setSoundtrack({ ...data, creator })
+      })
+    return () => { cancelled = true }
+  }, [activeTopic?.id, activeTopic?.soundtrack_playlist_id])
+
+  useEffect(() => {
+    if (!soundtrackOpen || !soundtrack?.id) return
+    let cancelled = false
+    supabase.from('off_tracks')
+      .select('id,video_id,title,created_at')
+      .eq('playlist_id', soundtrack.id)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) setSoundtrackError(error.message)
+        setSoundtrackTracks(data || [])
+      })
+    return () => { cancelled = true }
+  }, [soundtrackOpen, soundtrack?.id])
+
+  const editSoundtrack = async () => {
+    if (!activeTopic || !session || activeTopic.is_archived) return
+    setSoundtrackError('')
+    setSoundtrackChoiceId(activeTopic.soundtrack_playlist_id || '')
+    const { data, error } = await supabase.from('off_playlists')
+      .select('id,title').eq('is_public', true)
+      .order('created_at', { ascending: false }).limit(300)
+    if (error) { setSoundtrackError(error.message); return }
+    setSoundtrackChoices(data || [])
+    setSoundtrackEditorOpen(true)
+  }
+
+  const saveSoundtrack = async () => {
+    if (!activeTopic?.id || activeTopic.is_archived || soundtrackSaving) return
+    setSoundtrackSaving(true)
+    setSoundtrackError('')
+    const { data, error } = await supabase.from('rp_topics')
+      .update({ soundtrack_playlist_id: soundtrackChoiceId || null })
+      .eq('id', activeTopic.id)
+      .select('id,soundtrack_playlist_id').single()
+    setSoundtrackSaving(false)
+    if (error) { setSoundtrackError(error.message); return }
+    setActiveTopic(t => t && t.id === data.id ? { ...t, soundtrack_playlist_id: data.soundtrack_playlist_id } : t)
+    setTopics(all => all.map(t => t.id === data.id ? { ...t, soundtrack_playlist_id: data.soundtrack_playlist_id } : t))
+    setSoundtrackEditorOpen(false)
+  }
 
   // Source de vérité = me.active_character_id ; fallback = premier perso actif
   // Utiliser automatiquement le personnage actif du compte
@@ -294,7 +376,7 @@ useEffect(() => {
 const loadTopics = async () => {
   const { data, error } = await supabase
     .from('rp_topics')
-    .select('id,title,created_at,updated_at,author_id,created_by,location_id')
+    .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id,is_archived,archived_at')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -408,7 +490,7 @@ const loadTopics = async () => {
     const { data, error } = await supabase
       .from('rp_topics')
       .insert({ title, author_id: session?.user?.id })
-      .select('id, title, created_at, author_id')
+      .select('id, title, created_at, author_id, is_archived, archived_at')
       .single()
     if (error) { alert(error.message); return }
     setTopics(t => [data, ...t])
@@ -417,6 +499,7 @@ const loadTopics = async () => {
   }
 
   const publishPost = async () => {
+    if (activeTopic?.is_archived) { alert('Ce RP est archivé et ne peut plus recevoir de messages.'); return; }
     const chosenCharId = postAsCharId
     if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
       alert("Choisis un personnage et un sujet, puis écris un message.")
@@ -470,11 +553,13 @@ const loadTopics = async () => {
 
   /* ---------- EDIT / DELETE POST ---------- */
   const startEditPost = (p) => {
+    if (activeTopic?.is_archived) return;
     setEditingPostId(p.id)
     setEditingRaw(p.content_raw || '')
   }
   const cancelEditPost = () => { setEditingPostId(null); setEditingRaw('') }
   const saveEditPost = async () => {
+    if (activeTopic?.is_archived) { alert('Ce RP est archivé et ses posts ne sont plus modifiables.'); return; }
     if (!editingPostId || !editingRaw.trim()) return
  const processedHtml = DOMPurify.sanitize(bbcodeToHtml(editingRaw), {
    ALLOWED_TAGS, ALLOWED_ATTR,
@@ -492,6 +577,7 @@ const loadTopics = async () => {
     cancelEditPost()
   }
   const deletePost = async (postId) => {
+    if (activeTopic?.is_archived) { alert('Ce RP est archivé et ses posts ne peuvent plus être supprimés.'); return; }
     if (!confirm('Supprimer ce post ?')) return
     const { error } = await supabase.from('rp_posts').delete().eq('id', postId)
     if (error) { alert(error.message); return }
@@ -501,19 +587,21 @@ const loadTopics = async () => {
 
   /* ---------- EDIT / DELETE TOPIC ---------- */
   const renameTopic = async (t) => {
+    if (t.is_archived) { alert('Réouvre ce RP depuis sa sous-zone pour le modifier.'); return; }
     const next = prompt('Nouveau titre ?', t.title)
     if (!next || !next.trim()) return
     const { data, error } = await supabase
       .from('rp_topics')
       .update({ title: next.trim() })
       .eq('id', t.id)
-      .select('id,title,created_at,updated_at,author_id,created_by,location_id')
+      .select('id,title,created_at,updated_at,author_id,created_by,location_id,soundtrack_playlist_id,is_archived,archived_at')
       .single()
     if (error) { alert(error.message); return }
     setTopics(ts => ts.map(x => x.id === t.id ? data : x))
     if (activeTopic?.id === t.id) setActiveTopic(data)
   }
   const removeTopic = async (t) => {
+    if (t.is_archived) { alert('Réouvre ce RP depuis sa sous-zone avant de le supprimer.'); return; }
     if (!confirm('Supprimer ce sujet et tous ses posts ?')) return
     const { error } = await supabase.from('rp_topics').delete().eq('id', t.id)
     if (error) { alert(error.message); return }
@@ -817,7 +905,7 @@ const loadTopics = async () => {
                 </div>
               </button>
 
-              {(topic.author_id === session?.user?.id ||
+              {!topic.is_archived && (topic.author_id === session?.user?.id ||
                 topic.created_by === session?.user?.id) && (
                 <div className="mt-2 flex justify-end gap-2 border-t border-white/10 pt-2">
                   <button
@@ -864,6 +952,7 @@ const loadTopics = async () => {
       <h1 className="truncate font-serif text-lg text-amber-100 sm:text-2xl">
         {activeTopic?.title || 'Lecture RP'}
       </h1>
+      {activeTopic?.is_archived && <span className="mt-1 inline-flex rounded-full border border-amber-200/25 bg-amber-200/10 px-2 py-0.5 text-[11px] text-amber-100">Archivé · Lecture seule</span>}
 
       <p className="truncate text-xs text-amber-200/65">
         {placeLabel(activeTopic)}
@@ -936,6 +1025,44 @@ const loadTopics = async () => {
     </div>
   </div>
 
+  {/* Bande-son facultative : seuls les morceaux publics sont présentés. */}
+  {activeTopic && (soundtrack || activeTopic.author_id === session?.user?.id || activeTopic.created_by === session?.user?.id) && (
+    <div className="relative z-10 shrink-0 border-b border-amber-200/15 bg-[#231a2d]/90 px-3 py-2 lg:px-6">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {soundtrack ? (
+          <>
+            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-amber-200/25 bg-[#4c3b54] text-amber-200">
+              {soundtrack.cover_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={(() => {
+                    try {
+                      const u = new URL(soundtrack.cover_url)
+                      return ['http:', 'https:'].includes(u.protocol) ? `/api/img?u=${encodeURIComponent(u.href)}` : ''
+                    } catch { return '' }
+                  })()}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={e => { e.currentTarget.style.display = 'none' }}
+                />
+              ) : <span aria-hidden="true">♫</span>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] uppercase tracking-wide text-amber-200/70">Bande-son proposée par l’auteur</p>
+              <p className="truncate text-sm font-semibold text-amber-50">{soundtrack.title}</p>
+              <p className="truncate text-[11px] text-white/55">Par {soundtrack.creator} · Écoute facultative</p>
+            </div>
+            <button type="button" onClick={() => { setSoundtrackError(''); setSoundtrackOpen(true) }} className="rounded-lg border border-amber-200/30 bg-amber-200/15 px-3 py-2 text-xs text-amber-100 hover:bg-amber-200/25">▶ Écouter</button>
+          </>
+        ) : <span className="min-w-0 flex-1 text-xs text-white/55">Aucune bande-son publique pour ce RP.</span>}
+        {!activeTopic.is_archived && (activeTopic.author_id === session?.user?.id || activeTopic.created_by === session?.user?.id) && (
+          <button type="button" onClick={editSoundtrack} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/85 hover:bg-white/15">{soundtrack ? 'Modifier la bande-son' : '+ Ajouter une bande-son'}</button>
+        )}
+      </div>
+    </div>
+  )}
+
   {/* Deux colonnes sur ordinateur, un panneau sur téléphone */}
   <div className="rp-scene-grid relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:grid-cols-[minmax(280px,38%)_minmax(0,1fr)] lg:gap-5 lg:p-5">
 
@@ -952,7 +1079,9 @@ style={{
         >
           <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-[#32263f]/80 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Sélectionne un sujet pour écrire'}
+            {activeTopic?.is_archived && <span className="ml-2 text-xs text-amber-100/65">· Archivé</span>}
           </header>
+          {activeTopic?.is_archived && <p className="border-b border-amber-200/15 bg-amber-200/10 px-4 py-3 text-xs text-amber-100">Ce RP est terminé : la lecture reste possible, mais les messages ne peuvent plus être publiés ni modifiés.</p>}
 
           <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto p-3 sm:p-4">
            
@@ -1034,6 +1163,7 @@ onVimeo={() => {
               ref={textareaRef}
               rows={8}
               value={raw}
+              disabled={!!activeTopic?.is_archived}
               onChange={e => setRaw(e.target.value)}
               placeholder="Écris ton post en BBCode…"
               className="w-full lg:min-h-[120px] rounded-xl bg-white/10 border border-white/15 px-3 py-2 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-amber-300/60"
@@ -1050,7 +1180,7 @@ onVimeo={() => {
               </button>
               <button
                 onClick={publishPost}
-                disabled={!activeTopic || !raw.trim() || !postAsCharId}
+                disabled={!activeTopic || !!activeTopic.is_archived || !raw.trim() || !postAsCharId}
                 className="rounded-lg bg-amber-300 text-slate-900 font-medium px-3 py-2 hover:bg-amber-200 disabled:opacity-50"
               >
                 Publier
@@ -1082,7 +1212,7 @@ onVimeo={() => {
                          className="relative rounded-2xl border px-4 py-3"
                          style={frost(mine ? GLASS.cardMine : GLASS.cardOther)}>
 
-                  {mine && editingPostId !== p.id && (
+                  {mine && !activeTopic?.is_archived && editingPostId !== p.id && (
                     <div className="absolute right-3 top-3 flex gap-2">
                       <button
                         onClick={() => startEditPost(p)}
@@ -1150,6 +1280,38 @@ onVimeo={() => {
 
 {viewer && (
   <ProfileModal viewer={viewer} onClose={() => setViewer(null)} />
+)}
+
+{/* Lecteur YouTube vidéo visible, à fermer librement pour reprendre toute la place. */}
+{soundtrackOpen && soundtrack && (
+  <aside aria-label="Lecteur de bande-son RP" className="fixed bottom-3 right-3 z-50 max-h-[80dvh] w-[min(94vw,430px)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/35 bg-[#211729] p-3 text-amber-50 shadow-2xl sm:bottom-5 sm:right-5">
+    <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
+      <p className="min-w-0 truncate font-serif text-sm text-amber-100">Bande-son : {soundtrack.title}</p>
+      <button type="button" onClick={() => setSoundtrackOpen(false)} aria-label="Fermer le lecteur" className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-sm">×</button>
+    </div>
+    {soundtrackError && <p role="alert" className="mb-2 text-xs text-rose-200">{soundtrackError}</p>}
+    <YouTubePlaylistPlayer playlistId={soundtrack.id} tracks={soundtrackTracks} />
+    <p className="mt-2 text-[11px] text-white/45">Cette fenêtre reste visible pendant l’écriture. La fermer arrête la musique.</p>
+  </aside>
+)}
+
+{soundtrackEditorOpen && (
+  <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 p-3 backdrop-blur-md" onMouseDown={e => { if (e.target === e.currentTarget && !soundtrackSaving) setSoundtrackEditorOpen(false) }}>
+    <div role="dialog" aria-modal="true" aria-label="Modifier la bande-son RP" className="w-full max-w-lg rounded-2xl border border-amber-200/25 bg-[#2b2036] p-4 text-amber-50 shadow-2xl sm:p-6">
+      <h3 className="font-serif text-xl text-amber-100">Bande-son du RP</h3>
+      <p className="mt-2 text-xs leading-relaxed text-white/60">Choisis une playlist publique d’OffRecords. Elle sera proposée à tous les lecteurs, sans démarrage automatique.</p>
+      {soundtrackError && <p role="alert" className="mt-3 text-xs text-rose-200">{soundtrackError}</p>}
+      <label htmlFor="scene-soundtrack" className="mt-4 block text-sm text-amber-100">Playlist</label>
+      <select id="scene-soundtrack" value={soundtrackChoiceId} onChange={e => setSoundtrackChoiceId(e.target.value)} className="mt-2 w-full rounded-lg border border-amber-200/25 bg-[#392d44] px-3 py-3 text-sm text-white">
+        <option value="">Aucune bande-son</option>
+        {soundtrackChoices.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+      </select>
+      <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <button type="button" disabled={soundtrackSaving} onClick={() => setSoundtrackEditorOpen(false)} className="rounded-lg border border-white/20 px-4 py-2 text-sm">Annuler</button>
+        <button type="button" disabled={soundtrackSaving} onClick={saveSoundtrack} className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#261c32] disabled:opacity-50">{soundtrackSaving ? 'Enregistrement…' : 'Enregistrer'}</button>
+      </div>
+    </div>
+  </div>
 )}
 
       {/* -------- MODALE PRÉVISUALISATION -------- */}
@@ -1498,7 +1660,7 @@ function ProfileModal({ viewer, onClose }) {
           <div className="min-w-0">
             <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{c.name}</h3>
             <p className="text-xs text-white/60">
-              {c.gender || 'Genre non renseigné'} • Joueur : {c.ownerName || '—'}
+              {c.orientation?.trim() ? `Orientation : ${c.orientation} · ` : ''}Joueur : {c.ownerName || '—'}
             </p>
             <div className="mt-1 text-xs text-white/70 space-x-3">
               {c.age ? <span>Âge : {c.age}</span> : null}
@@ -1568,25 +1730,6 @@ function RelationsList({ relations }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function Bipolar({ leftLabel, rightLabel, value=5 }) {
-  const v = Math.max(0, Math.min(10, Number(value ?? 5)));
-  const pct = (v / 10) * 100;
-  const gradient = `linear-gradient(90deg, #6ea8ff 0%, #6ea8ff ${pct}%, #f6d24a ${pct}%, #f6d24a 100%)`;
-  return (
-    <div className="space-y-2 select-none">
-      <div className="flex justify-between text-white/70 text-sm">
-        <span>{leftLabel}</span><span>{rightLabel}</span>
-      </div>
-      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
-        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
-        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `calc(${pct}% - 6px)` }}>
-          <div className="w-3 h-3 rounded-full bg-white shadow" />
-        </div>
-      </div>
-    </div>
   );
 }
 

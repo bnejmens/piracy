@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import SiteTopbar from "@/components/SiteTopbar";
+import { displayExternalImage } from "@/lib/displayExternalImage";
+import Bipolar from "@/components/PersonalityTraitScale";
 
 export default function MembersPage() {
   const router = useRouter();
@@ -13,7 +15,7 @@ export default function MembersPage() {
   const [error, setError] = useState(null);
 
   // Affiche des PERSONNAGES (pas seulement le profil actif)
-  const [items, setItems] = useState([]); // [{ id, user_id, name, gender, avatar_url, bio, age, occupation, traits, relationships, ownerName }]
+  const [items, setItems] = useState([]); // Personnages + relations + pseudo du joueur
   const [search, setSearch] = useState("");
   const [modalChar, setModalChar] = useState(null);
   const [includeArchivedMine, setIncludeArchivedMine] = useState(false);
@@ -33,9 +35,9 @@ export default function MembersPage() {
    let query = supabase
   .from('characters')
   .select(`
-    id, user_id, name, gender, avatar_url, bio, created_at,
+    id, user_id, name, orientation, avatar_url, bio, created_at,
     age, occupation, traits, is_active, is_archived,
-    companion_name, companion_avatar_url,
+    companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url,
     character_relationships:character_relationships!character_id (
       id, type, other_character_id,
       other:other_character_id ( id, name, avatar_url )
@@ -97,6 +99,15 @@ const filtered = useMemo(() => {
 useEffect(() => {
   setPage(1);
 }, [search, includeArchivedMine]);
+
+useEffect(() => {
+  if (!modalChar) return;
+  const closeOnEscape = event => {
+    if (event.key === 'Escape') setModalChar(null);
+  };
+  window.addEventListener('keydown', closeOnEscape);
+  return () => window.removeEventListener('keydown', closeOnEscape);
+}, [modalChar]);
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -235,161 +246,179 @@ const avatarNode = (m) => (
         </div>
       </div>
 
-      {/* MODAL détails personnage */}
-{modalChar && (
-  <div
-    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4"
-    onClick={() => setModalChar(null)}
-  >
-    <div
-  className="max-h-[90dvh] w-full max-w-[980px] overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-slate-950/90 p-3 text-white shadow-2xl backdrop-blur-xl sm:p-8"
-  onClick={(e) => e.stopPropagation()}
->
-      {/* Header identité */}
-<div className="flex items-center gap-5 pb-5 border-b border-white/10">
-  <div className="relative w-[144px] h-[144px] rounded-2xl overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5">
-    {modalChar.avatar_url ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={modalChar.avatar_url}
-        alt=""
-        className="w-full h-full object-cover"
-        referrerPolicy="no-referrer"
-      />
-    ) : (
-      <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-3xl">
-        {modalChar.name?.[0]?.toUpperCase() || "?"}
-      </div>
-    )}
-  </div>
+      {/* Fiche personnage — mêmes teintes prune, ivoire et or que le Profil. */}
+      {modalChar && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#090610]/85 p-2 backdrop-blur-md sm:p-5"
+          onMouseDown={event => { if (event.target === event.currentTarget) setModalChar(null); }}
+        >
+          <article
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="member-profile-title"
+            className="flex max-h-[calc(100dvh-1rem)] w-full max-w-[1100px] min-w-0 flex-col overflow-hidden rounded-3xl border border-amber-200/25 bg-[#1b1525]/95 text-amber-50 shadow-[0_30px_100px_rgba(0,0,0,.65)] sm:max-h-[94dvh]"
+          >
+            <header className="relative shrink-0 border-b border-amber-200/20 bg-gradient-to-r from-[#3b2948] via-[#271b32] to-[#19131f] p-3 pr-12 sm:p-5 sm:pr-14">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+                <div className="grid h-[84px] w-[84px] shrink-0 place-items-center overflow-hidden rounded-full border-2 border-amber-200/50 bg-black/25 ring-4 ring-white/5 sm:h-[120px] sm:w-[120px]">
+                  {modalChar.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={modalChar.avatar_url}
+                      alt={`Portrait de ${modalChar.name}`}
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="font-serif text-3xl text-amber-100">{modalChar.name?.[0]?.toUpperCase() || '?'}</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-[11px] uppercase tracking-[0.17em] text-amber-200/75">Fiche de personnage</p>
+                  <h2 id="member-profile-title" className="break-words font-serif text-xl font-semibold leading-tight text-amber-50 sm:text-3xl">{modalChar.name}</h2>
+                  <p className="mt-1 text-xs text-white/65">Interprété par <span className="font-medium text-amber-100">{modalChar.ownerName}</span></p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {modalChar.age !== null && modalChar.age !== undefined && (
+                      <span className="rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-xs text-white/85">{modalChar.age} ans</span>
+                    )}
+                    {modalChar.occupation && (
+                      <span className="max-w-full break-words rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-xs text-white/85">{modalChar.occupation}</span>
+                    )}
+                    {modalChar.orientation?.trim() && (
+                      <span className="max-w-full break-words rounded-full border border-amber-200/20 bg-amber-200/10 px-2.5 py-1 text-xs text-amber-100">
+                        Orientation : {modalChar.orientation.trim()}
+                      </span>
+                    )}
+                    {modalChar.is_archived && (
+                      <span className="rounded-full border border-amber-200/20 px-2.5 py-1 text-xs text-amber-100">Archivé</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Fermer la fiche"
+                onClick={() => setModalChar(null)}
+                className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-black/25 text-xl text-white/85 transition hover:border-amber-200/50 hover:bg-white/10 sm:right-5 sm:top-5"
+              >
+                ×
+              </button>
+            </header>
 
-  <div className="min-w-0">
-    <h3 className="text-2xl sm:text-3xl font-semibold leading-tight truncate">{modalChar.name}</h3>
-    <p className="text-xs text-white/60">
-      {modalChar.gender || "Genre non renseigné"} • Joueur : {modalChar.ownerName}
-    </p>
-    <div className="mt-1 text-xs text-white/70 space-x-3">
-      {modalChar.age ? <span>Âge : {modalChar.age}</span> : null}
-      {modalChar.occupation ? <span>Occupation : {modalChar.occupation}</span> : null}
-    </div>
-  </div>
-</div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+              <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.85fr)]">
+                <div className="min-w-0 space-y-4">
+                  <section className="rounded-2xl border border-white/15 bg-black/25 p-4">
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Description et histoire</h3>
+                    {modalChar.bio?.trim() ? (
+                      <p className="whitespace-pre-wrap break-words text-sm leading-7 text-white/85">{modalChar.bio}</p>
+                    ) : (
+                      <p className="text-sm italic text-white/45">Aucune description renseignée.</p>
+                    )}
+                  </section>
 
-{/* Contenu : on ne garde PLUS la carte Avatar à gauche */}
-<div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-6">
-  {/* Colonne gauche : uniquement Compagnon */}
-<aside className="flex flex-col gap-4">
-  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-    
-    {/* Titre Compagnon */}
-    <div className="mb-3">
-      <div className="inline-flex items-center text-white text-sm font-bold bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-3 py-1">
-        {modalChar?.companion_name?.trim() || "Compagnon"}
-      </div>
-    </div>
+                  <section className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
+                    <h3 className="mb-4 font-serif text-lg text-amber-100">Traits de personnalité</h3>
+                    <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
+                      <div className="space-y-4">
+                        <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={modalChar.traits?.intro_extro} />
+                        <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={modalChar.traits?.egoiste_altruiste} />
+                        <Bipolar leftLabel="Prudent" rightLabel="Téméraire" value={modalChar.traits?.prudent_temer} />
+                        <Bipolar leftLabel="Réfléchi" rightLabel="Impulsif" value={modalChar.traits?.reflechi_impulsif} />
+                        <Bipolar leftLabel="Obéissant" rightLabel="Rebelle" value={modalChar.traits?.obeissant_rebelle} />
+                      </div>
+                      <div className="space-y-4">
+                        <Bipolar leftLabel="Méthodique" rightLabel="Chaotique" value={modalChar.traits?.methodique_chaotique} />
+                        <Bipolar leftLabel="Idéaliste" rightLabel="Cynique" value={modalChar.traits?.idealiste_cynique} />
+                        <Bipolar leftLabel="Résilient" rightLabel="Vulnérable" value={modalChar.traits?.resil_vulnerable} />
+                        <Bipolar leftLabel="Loyal" rightLabel="Opportuniste" value={modalChar.traits?.loyal_opportuniste} />
+                        <Bipolar leftLabel="Créatif" rightLabel="Pragmatique" value={modalChar.traits?.creatif_pragmatique} />
+                      </div>
+                    </div>
+                  </section>
+                </div>
 
-    {/* Avatar + texte */}
-    <div className="flex items-center gap-3">
-      <div className="relative h-16 w-16 rounded-lg overflow-hidden ring-1 ring-white/15 bg-white/5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={modalChar?.companion_avatar_url || "/images/profile-icon.png"}
-          alt={modalChar?.companion_name || "Compagnon"}
-          className="h-full w-full object-cover"
-        />
-      </div>
-      <div className="text-sm text-white/70">
-        Companion that walks with{" "}
-        <span className="text-white/90 font-medium">{modalChar?.name}</span>
-      </div>
-    </div>
+                <aside className="min-w-0 space-y-4">
+                  <section className="rounded-2xl border border-white/15 bg-black/25 p-4">
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Compagnon</h3>
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/30 bg-white/5">
+                        {modalChar.companion_avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={modalChar.companion_avatar_url} alt={modalChar.companion_name || 'Compagnon'} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-2xl text-amber-200/45" aria-hidden="true">✧</span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="break-words text-base font-semibold text-white/90">{modalChar.companion_name?.trim() || 'Non renseigné'}</p>
+                        <p className="mt-1 text-xs text-white/50">Compagnon du personnage</p>
+                        {modalChar.companion_description?.trim() && <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-white/70">{modalChar.companion_description}</p>}
+                      </div>
+                    </div>
+                  </section>
 
-  </div>
-</aside>
-        {/* Colonne droite : Description scrollable */}
-{/* Traits + Relations en deux colonnes */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div className="space-y-4">
-    <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={modalChar.traits?.intro_extro} />
-    <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={modalChar.traits?.egoiste_altruiste} />
-    <Bipolar leftLabel="Prudent" rightLabel="Téméraire" value={modalChar.traits?.prudent_temer} />
-    <Bipolar leftLabel="Réfléchi" rightLabel="Impulsif" value={modalChar.traits?.reflechi_impulsif} />
-    <Bipolar leftLabel="Obéissant" rightLabel="Rebelle" value={modalChar.traits?.obeissant_rebelle} />
-  </div>
-  <div className="space-y-4">
-    <Bipolar leftLabel="Méthodique" rightLabel="Chaotique" value={modalChar.traits?.methodique_chaotique} />
-    <Bipolar leftLabel="Idéaliste" rightLabel="Cynique" value={modalChar.traits?.idealiste_cynique} />
-    <Bipolar leftLabel="Résilient" rightLabel="Vulnérable" value={modalChar.traits?.resil_vulnerable} />
-    <Bipolar leftLabel="Loyal" rightLabel="Opportuniste" value={modalChar.traits?.loyal_opportuniste} />
-    <Bipolar leftLabel="Créatif" rightLabel="Pragmatique" value={modalChar.traits?.creatif_pragmatique} />
-  </div>
-</div>
+                  <section className="rounded-2xl border border-white/15 bg-black/25 p-4">
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Baguette magique</h3>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/30 bg-white/5">
+                        <span className="px-2 text-center text-[10px] text-white/40">Baguette</span>
+                        {displayExternalImage(modalChar.wand_image_url) && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={displayExternalImage(modalChar.wand_image_url)}
+                            alt="Baguette du personnage"
+                            referrerPolicy="no-referrer"
+                            onError={event => { event.currentTarget.style.display = 'none'; }}
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="break-words text-sm text-white/90">
+                          <span className="text-white/55">Composition : </span>
+                          {modalChar.wand_composition?.trim() || 'Non renseignée'}
+                        </p>
+                        <p className="break-words text-sm text-white/90">
+                          <span className="text-white/55">Taille : </span>
+                          {modalChar.wand_size?.trim() || 'Non renseignée'}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
 
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <h4 className="text-sm font-semibold mb-2">Relations</h4>
-          <RelationsList relations={modalChar.character_relationships} />
+                  <section className="rounded-2xl border border-white/15 bg-black/25 p-4">
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Carnet de relations</h3>
+                    <div className="max-h-64 overflow-y-auto overscroll-contain pr-1">
+                      <RelationsList relations={modalChar.character_relationships} />
+                    </div>
+                  </section>
+                </aside>
+              </div>
+            </div>
+
+            <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-amber-200/15 bg-[#201726] px-3 py-3 sm:px-5">
+              <span className="hidden text-xs text-white/45 sm:block">Piracy · Fiche personnage</span>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalChar(null)}
+                  className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/15"
+                >
+                  Fermer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/messages?to=${encodeURIComponent(modalChar.user_id)}`)}
+                  className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#251a2d] transition hover:bg-amber-200"
+                >
+                  Écrire en MP
+                </button>
+              </div>
+            </footer>
+          </article>
         </div>
-      </div>
-
-         <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-    <div className="mb-3 text-sm font-semibold text-white/80">Description</div>
-    <div className="custom-scroll pr-2 text-[0.97rem] leading-relaxed text-white/90">
-            {modalChar.bio ? (
-              <p className="whitespace-pre-wrap">{modalChar.bio}</p>
-            ) : (
-              <div className="text-white/50">Aucune bio.</div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      
-
-      {/* Actions */}
-      <div className="mt-6 flex justify-end gap-3">
-        <button
-          onClick={() => setModalChar(null)}
-          className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15"
-        >
-          Fermer
-        </button>
-        <button
-          onClick={() => router.push(`/messages?to=${encodeURIComponent(modalChar.user_id)}`)}
-          className="rounded-lg bg-violet-300 text-slate-900 font-medium px-4 py-2 hover:bg-violet-200"
-        >
-          Écrire en MP
-        </button>
-      </div>
-
-      {/* Scrollbar fine pour la description */}
-      <style jsx>{`
-         .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.15);
-          border-radius: 8px;
-        }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-
-        /* Tablette paysage : avatars plus petits */
-        @media (min-width: 1024px) and (max-width: 1279px) and (orientation: landscape) {
-          .members-grid .group[style] {
-            width: 96px !important;
-            height: 96px !important;
-          }
-        }
-
-        /* Mobile : encore plus petits */
-        @media (max-width: 640px) {
-          .members-grid .group[style] {
-            width: 90px !important;
-            height: 90px !important;
-          }
-        }
-      `}</style>
-    </div>
-  </div>
-)}
+      )}
 
     </main>
   );
@@ -423,8 +452,8 @@ function RelationsList({ relations }) {
             </div>
           )}
           <span className="truncate">{rel.other?.name || rel.other_character_id}</span>
-          <span className="text-white/50">·</span>
-          <span className="text-white/70">{relationLabel(rel.type)}</span>
+          <span className="text-amber-200/50">·</span>
+          <span className="min-w-0 break-words text-amber-100/75">{relationLabel(rel.type)}</span>
         </li>
       ))}
     </ul>
@@ -468,40 +497,6 @@ function TraitsSummary({ traits }) {
 }
 
 // --- À ajouter tout en bas de MembersPage (avant export default si tu as une exportation nommée, sinon juste à la fin du fichier) ---
-function Bipolar({ leftLabel, rightLabel, value=5, onChange, leftColor="#6ea8ff", rightColor="#f6d24a" }) {
-  const pct = (value / 10) * 100; // 0..100 → droite
-  const gradient = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${pct}%, ${rightColor} ${pct}%, ${rightColor} 100%)`;
-  return (
-    <div className="space-y-2 select-none">
-      <div className="flex justify-between text-white/70 text-sm">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
-      <div className="relative h-4 rounded-full border border-white/10 bg-white/5">
-        <div className="absolute inset-0 rounded-full" style={{ background: gradient }} />
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: `calc(${pct}% - 6px)` }}
-        >
-          <div className="w-3 h-3 rounded-full bg-white shadow" />
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={10}
-          step={1}
-          value={value}
-          onChange={(e) => onChange?.(Number(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          aria-label={`${leftLabel} ↔ ${rightLabel}`}
-          disabled
-        />
-      </div>
-    </div>
-  );
-}
-
-
 function relationLabel(type) {
   const map = {
     love_interest: "Love interest",
