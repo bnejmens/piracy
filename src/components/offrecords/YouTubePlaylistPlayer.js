@@ -57,9 +57,11 @@ export default function YouTubePlaylistPlayer({ playlistId, tracks }) {
   const hostRef = useRef(null)
   const playerRef = useRef(null)
   const [ready, setReady] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentVideoId, setCurrentVideoId] = useState(null)
+  const [shuffle, setShuffle] = useState(false)
   const [error, setError] = useState('')
-  const ids = tracks.map(t => t.video_id).filter(Boolean)
+  const playableTracks = tracks.filter(track => track.video_id)
+  const ids = playableTracks.map(track => track.video_id)
   const key = ids.join('|')
   const hasTracks = ids.length > 0
 
@@ -90,7 +92,8 @@ export default function YouTubePlaylistPlayer({ playlistId, tracks }) {
           onStateChange: event => {
             if (!mounted) return
             const index = event.target?.getPlaylistIndex?.()
-            if (typeof index === 'number' && index >= 0) setCurrentIndex(index)
+            const videoId = event.target?.getPlaylist?.()?.[index]
+            if (videoId) setCurrentVideoId(videoId)
           },
           onError: () => setError('Cette vidéo ne peut pas être lue ici. Essaie le titre suivant.'),
         },
@@ -111,17 +114,25 @@ export default function YouTubePlaylistPlayer({ playlistId, tracks }) {
     if (!ready || !playerRef.current) return
     if (ids.length) {
       playerRef.current.cuePlaylist?.({ list: ids, index: 0 })
-      setCurrentIndex(0)
+      setCurrentVideoId(ids[0])
+      setShuffle(false)
     } else {
       playerRef.current.stopVideo?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, ready])
 
-  const current = tracks[currentIndex]
-  const select = index => {
-    playerRef.current?.playVideoAt?.(index)
-    setCurrentIndex(index)
+  const currentIndex = Math.max(0, ids.indexOf(currentVideoId))
+  const current = playableTracks[currentIndex]
+  const select = videoId => {
+    const player = playerRef.current
+    const index = player?.getPlaylist?.()?.indexOf(videoId)
+    if (index >= 0) player.playVideoAt(index)
+  }
+
+  const toggleShuffle = () => {
+    playerRef.current.setShuffle(!shuffle)
+    setShuffle(!shuffle)
   }
 
   return (
@@ -145,14 +156,23 @@ export default function YouTubePlaylistPlayer({ playlistId, tracks }) {
             <button type="button" onClick={() => playerRef.current?.playVideo?.()} disabled={!ready} aria-label="Lecture" className="rounded-lg bg-amber-300 px-3 py-2 text-sm font-semibold text-[#251a2d] disabled:opacity-40">▶ Écouter</button>
             <button type="button" onClick={() => playerRef.current?.pauseVideo?.()} disabled={!ready} aria-label="Pause" className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm disabled:opacity-40">⏸</button>
             <button type="button" onClick={() => playerRef.current?.nextVideo?.()} disabled={!ready} aria-label="Titre suivant" className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm disabled:opacity-40">⏭</button>
+            <button
+              type="button"
+              onClick={toggleShuffle}
+              disabled={!ready || ids.length < 2}
+              aria-pressed={shuffle}
+              className={`rounded-lg border px-3 py-2 text-sm disabled:opacity-40 ${shuffle ? 'border-amber-300/50 bg-amber-200/20 text-amber-100' : 'border-white/20 bg-white/10'}`}
+            >
+              Aléatoire
+            </button>
             <span className="min-w-0 flex-1 truncate text-xs text-white/65">{current?.title || `Piste ${currentIndex + 1}`}</span>
           </div>
           <div className="max-h-60 space-y-1 overflow-y-auto overscroll-contain">
-            {tracks.map((t, i) => (
+            {playableTracks.map((t, i) => (
               <button
                 type="button"
                 key={t.id}
-                onClick={() => select(i)}
+                onClick={() => select(t.video_id)}
                 disabled={!ready}
                 className={`flex w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition disabled:opacity-60 ${i === currentIndex ? 'border-amber-300/35 bg-amber-200/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
               >
