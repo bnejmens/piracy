@@ -1,9 +1,7 @@
 'use client'
 
 // Échelle bipolaire identique en édition et en lecture de profil.
-// Deux moitiés toujours visibles : gauche violet, droite ivoire.
-// Le repère discret indique la position, sans transformer la portion
-// de la barre opposée en « progression » trompeuse.
+// Le repère et la séparation des couleurs partagent la même position.
 export default function PersonalityTraitScale({
   leftLabel, rightLabel, value = 5, onChange,
   leftColor = '#9064b9', rightColor = '#e4d4a9',
@@ -11,6 +9,7 @@ export default function PersonalityTraitScale({
   const numeric = Number(value ?? 5)
   const v = Number.isFinite(numeric) ? Math.max(0, Math.min(10, numeric)) : 5
   const pct = (v / 10) * 100
+  const markerPosition = `clamp(4px, ${pct}%, calc(100% - 4px))`
   const tendency = v < 5 ? leftLabel : v > 5 ? rightLabel : 'Équilibré'
   const description = `${leftLabel} — ${rightLabel} : ${tendency}, ${v}/10`
 
@@ -28,11 +27,11 @@ export default function PersonalityTraitScale({
       >
         <div
           className="absolute inset-0 rounded-full"
-          style={{ background: `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)` }}
+          style={{ background: `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} ${markerPosition}, ${rightColor} ${markerPosition}, ${rightColor} 100%)` }}
         />
         <div
           className="pointer-events-none absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#3d3048]/70 bg-[#b9a5c4] shadow-none"
-          style={{ left: `${Math.max(2, Math.min(98, pct))}%` }}
+          style={{ left: markerPosition }}
         />
         {onChange && (
           <input
