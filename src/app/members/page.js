@@ -374,16 +374,9 @@ const avatarNode = (m) => (
                           />
                         )}
                       </div>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="break-words text-sm text-white/90">
-                          <span className="text-white/55">Composition : </span>
-                          {modalChar.wand_composition?.trim() || 'Non renseignée'}
-                        </p>
-                        <p className="break-words text-sm text-white/90">
-                          <span className="text-white/55">Taille : </span>
-                          {modalChar.wand_size?.trim() || 'Non renseignée'}
-                        </p>
-                      </div>
+                      <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-white/90">
+                        {[modalChar.wand_composition?.trim(), modalChar.wand_size?.trim()].filter(Boolean).join('\n') || 'Aucune description renseignée.'}
+                      </p>
                     </div>
                   </section>
 
