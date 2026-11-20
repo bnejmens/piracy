@@ -26,6 +26,9 @@ export default function ProfilePage() {
   const [myChars, setMyChars] = useState([]); // {id,name,...}
   const [charId, setCharId] = useState("");
 
+  const activeCharRef = useRef(charId);
+  useEffect(() => { activeCharRef.current = charId; }, [charId]);
+
   const [form, setForm] = useState(baseForm());
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
@@ -122,8 +125,7 @@ setAllChars(all || []);
           companion_name: c.companion_name || "",
           companion_avatar_url: c.companion_avatar_url || "",
           companion_description: c.companion_description || "",
-          wand_composition: c.wand_composition || "",
-          wand_size: c.wand_size || "",
+          wand_description: [c.wand_composition?.trim(), c.wand_size?.trim()].filter(Boolean).join('\n'),
           wand_image_url: c.wand_image_url || "",
         });
         setImgBust(Date.now());
@@ -142,6 +144,22 @@ setAllChars(all || []);
   }, [charId]);
 
   const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const saveUploadedImage = async (field, url) => {
+    const { data, error } = await supabase.from('characters')
+      .update({ [field]: url })
+      .eq('id', charId)
+      .eq('user_id', me.id)
+      .select('id')
+      .single();
+    if (error) throw error;
+    setMyChars(list => list.map(c => c.id === data.id ? { ...c, [field]: url } : c));
+    if (activeCharRef.current === data.id) {
+      onChange(field, url);
+      setImgBust(Date.now());
+      setSavedMsg('Image enregistrée ✔');
+    }
+  };
+
   const onTrait = (k, v) => setForm(f => ({ ...f, traits: { ...f.traits, [k]: v } }));
 
   // Le nom se modifie directement dans l'encart Compagnon ; sortie de champ = enregistrement.
@@ -257,30 +275,27 @@ if ((form.companion_description ?? '').trim() !== (current.companion_description
   payload.companion_description = description || null;
 }
 
-// companion_avatar_url
-if ((form.companion_avatar_url ?? null) !== (current.companion_avatar_url ?? null)) {
-  payload.companion_avatar_url = (form.companion_avatar_url ?? '') === '' ? null : form.companion_avatar_url;
+// Les anciennes dimensions restent affichées jusqu'à la première édition du texte.
+const previousWandText = [current.wand_composition?.trim(), current.wand_size?.trim()].filter(Boolean).join('\n');
+const wandText = form.wand_description.trim();
+if (wandText !== previousWandText) {
+  payload.wand_composition = wandText || null;
+  payload.wand_size = null;
 }
 
-// avatar_url
-if ((form.avatar_url ?? null) !== (current.avatar_url ?? null)) {
-  payload.avatar_url = (form.avatar_url ?? '') === '' ? null : form.avatar_url;
-}
-
-// Baguette : composition, taille libre (ex. 28 cm / 11 pouces), image.
-for (const field of ['wand_composition', 'wand_size']) {
-  const next = (form[field] ?? '').trim();
-  const previous = (current[field] ?? '').trim();
-  if (next !== previous) payload[field] = next || null;
-}
-const wandUrl = (form.wand_image_url || '').trim();
-if (wandUrl && !displayExternalImage(wandUrl)) {
-  setSavedMsg('Image de baguette : indique une URL http:// ou https:// valide.');
-  setSaving(false);
-  return;
-}
-if (wandUrl !== (current.wand_image_url || '')) {
-  payload.wand_image_url = wandUrl || null;
+for (const [field, label] of [
+  ['avatar_url', 'Avatar'],
+  ['companion_avatar_url', 'Compagnon'],
+  ['wand_image_url', 'Baguette'],
+]) {
+  const url = (form[field] || '').trim();
+  if (url === (current[field] || '').trim()) continue;
+  if (url && !displayExternalImage(url)) {
+    setSavedMsg(`${label} : indique une URL http:// ou https:// valide.`);
+    setSaving(false);
+    return;
+  }
+  payload[field] = url || null;
 }
 
 // Rien à sauver ?
@@ -402,23 +417,6 @@ const canEdit = !!me?.id && ownsCurrentChar
                   className="min-h-[72px] w-full resize-y rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs leading-relaxed text-white outline-none placeholder:text-white/45 focus:border-amber-300/60"
                 />
               </div>
-              <AvatarUploader
-                key={`companion-${charId}`}
-                userId={me.id}
-                charId={charId}
-                prefix="companions"
-                label="Upload compagnon"
-                onUploaded={async (url) => {
-                  onChange("companion_avatar_url", url);
-                  setImgBust(Date.now());
-                  await supabase
-  .from('characters')
-  .update({ companion_avatar_url: url })
-  .eq('id', charId)
-  .eq('user_id', me.id)
-;
-                }}
-              />
             </div>
           </div>
         </aside>
@@ -467,26 +465,40 @@ const canEdit = !!me?.id && ownsCurrentChar
 </button>
 
             {savedMsg && <span className="text-green-300 text-sm">{savedMsg}</span>}
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <AvatarUploader
-                key={`main-${charId}`}
-                userId={me.id}
-                charId={charId}
-                onUploaded={async (url) => {
-                  onChange("avatar_url", url);
-                  setImgBust(Date.now());
-                  // autosave avatar
-                  await supabase
-  .from('characters')
-  .update({ avatar_url: url })
-  .eq('id', charId)
-  .eq('user_id', me.id)
-;
-                }}
-              />
-              <input value={form.avatar_url} onChange={(e)=>onChange("avatar_url", e.target.value)} placeholder="URL avatar" className="w-full min-w-0 max-w-full rounded-lg sm:w-64 bg-white/5 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none" />
-            </div>
           </div>
+          <section className="mt-5 space-y-3 border-t border-white/15 pt-4" aria-labelledby="character-images-title">
+            <h3 id="character-images-title" className="font-semibold text-white/90">Images du personnage</h3>
+            <p className="text-xs text-white/60">Colle un lien direct vers une image, puis clique sur Enregistrer.</p>
+            {[
+              ['avatar_url', 'Avatar', 'avatars'],
+              ['companion_avatar_url', 'Compagnon', 'companions'],
+              ['wand_image_url', 'Baguette', 'wands'],
+            ].map(([field, label, prefix]) => (
+              <div key={field} className="flex flex-wrap items-end gap-2">
+                <label className="min-w-0 flex-1 text-sm text-white/80">
+                  {label}
+                  <input
+                    type="url"
+                    value={form[field]}
+                    onChange={event => onChange(field, event.target.value)}
+                    disabled={!canEdit || saving}
+                    maxLength={2000}
+                    placeholder="https://…"
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-amber-300/50"
+                  />
+                </label>
+                <AvatarUploader
+                  key={`${field}-${charId}`}
+                  userId={me.id}
+                  charId={charId}
+                  prefix={prefix}
+                  label={`Importer · ${label}`}
+                  disabled={!canEdit || saving}
+                  onUploaded={url => saveUploadedImage(field, url)}
+                />
+              </div>
+            ))}
+          </section>
         </section>
 
         {/* Droite: Traits (haut) + Relations (bas) */}
@@ -545,68 +557,30 @@ const canEdit = !!me?.id && ownsCurrentChar
           {/* BAGUETTE */}
           <div className="rounded-2xl border border-white/15 bg-black/50 p-4 shadow-[0_18px_50px_rgba(0,0,0,.35)] backdrop-blur-xl">
             <h2 className="mb-3 text-lg font-semibold text-white/90">Baguette magique</h2>
-            <div className="space-y-3">
-              <Labeled label="Composition">
-                <input
-                  value={form.wand_composition}
-                  onChange={e => onChange('wand_composition', e.target.value)}
-                  disabled={!canEdit}
-                  maxLength={500}
-                  placeholder="Ex. bois de houx, plume de phénix"
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/40 focus:border-amber-300/60"
-                />
-              </Labeled>
-              <Labeled label="Taille">
-                <input
-                  value={form.wand_size}
-                  onChange={e => onChange('wand_size', e.target.value)}
-                  disabled={!canEdit}
-                  maxLength={80}
-                  placeholder="Ex. 28 cm ou 11 pouces"
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/40 focus:border-amber-300/60"
-                />
-              </Labeled>
-              <div className="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/30 bg-black/25">
-                  <span className="px-2 text-center text-[11px] text-white/45">Aperçu baguette</span>
-                  {displayExternalImage(form.wand_image_url) && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={form.wand_image_url}
-                      src={displayExternalImage(form.wand_image_url)}
-                      alt="Baguette du personnage"
-                      referrerPolicy="no-referrer"
-                      onError={e => { e.currentTarget.style.display = 'none'; }}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <label htmlFor="wand-image-url" className="mb-1 block text-sm text-white/80">URL de l&apos;image</label>
-                  <input
-                    id="wand-image-url"
-                    type="url"
-                    value={form.wand_image_url}
-                    onChange={e => onChange('wand_image_url', e.target.value)}
-                    disabled={!canEdit}
-                    maxLength={2000}
-                    placeholder="https://i.pinimg.com/..."
-                    className="w-full min-w-0 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-amber-300/50"
+            <div className="flex items-start gap-3">
+              <div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/30 bg-black/25">
+                <span className="px-2 text-center text-[11px] text-white/45">Aperçu baguette</span>
+                {displayExternalImage(form.wand_image_url) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={form.wand_image_url}
+                    src={displayExternalImage(form.wand_image_url)}
+                    alt="Baguette du personnage"
+                    referrerPolicy="no-referrer"
+                    onError={e => { e.currentTarget.style.display = 'none'; }}
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
-                  <p className="mt-2 text-xs leading-relaxed text-white/55">
-                    Copie le lien direct vers l&apos;image (Pinterest, Imgur…). Les liens de pages Pinterest ne sont pas des fichiers image.
-                    Aucun téléversement n&apos;est nécessaire.
-                  </p>
-                </div>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={saving || !canEdit}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15 disabled:opacity-50"
-              >
-                {saving ? 'Enregistrement…' : 'Enregistrer la baguette'}
-              </button>
+              <textarea
+                aria-label="Description de la baguette"
+                value={form.wand_description}
+                onChange={event => onChange('wand_description', event.target.value)}
+                disabled={!canEdit}
+                rows={4}
+                placeholder="Décris la baguette…"
+                className="min-w-0 flex-1 resize-y rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-amber-300/60"
+              />
             </div>
           </div>
         </section>
@@ -643,8 +617,7 @@ function baseForm() {
     companion_name: "",
     companion_avatar_url: "",
     companion_description: "",
-    wand_composition: "",
-    wand_size: "",
+    wand_description: "",
     wand_image_url: "",
   };
 }
@@ -728,21 +701,18 @@ function AvatarUploader({
   charId,
   onUploaded,
   prefix = "avatars",            // sous-dossier (ex: "companions")
-  label = "Uploader un avatar",  // texte du bouton
+  label,
+  disabled,
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState("");
 
   const onPick = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !userId || !charId) return;
+    if (!file || !userId || !charId || disabled || busy) return;
+    e.target.value = "";
     setBusy(true); setError("");
     try {
-      // Preview locale instantanée
-      const localURL = URL.createObjectURL(file);
-      setPreview(localURL);
-
       // Réduire la taille avant l'envoi : le navigateur génère un WebP optimisé.
       const optimized = await optimizeAvatar(file, { maxDimension: 512, quality: 0.82 });
       // Chaque upload crée un chemin unique : un cache long ne masque jamais un nouvel avatar.
@@ -769,15 +739,9 @@ function AvatarUploader({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {preview && (
-        <div className="rounded-full overflow-hidden border border-white/20" style={{ width: 72, height: 72 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="preview" className="w-full h-full object-cover" />
-        </div>
-      )}
       <label className="inline-flex max-w-full items-center justify-center whitespace-nowrap rounded-lg border border-white/20 bg-white/12 px-2.5 py-2 text-[11px] font-medium text-white hover:bg-white/18 sm:text-xs">
         {busy ? "Envoi…" : label}
-        <input type="file" accept="image/*" className="hidden" onChange={onPick} />
+        <input type="file" accept="image/*" className="hidden" disabled={disabled || busy} onChange={onPick} />
       </label>
       {error && <div className="text-red-300 text-xs">{error}</div>}
     </div>
