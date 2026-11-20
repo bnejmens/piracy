@@ -270,7 +270,7 @@ export default function OffRecordsPage() {
   }
 
   const toggleFavorite = async p => {
-    if (!session || !p.is_public || p.owner_id === session.user.id) return
+    if (!session || !p.is_public) return
     const exists = favSet.has(p.id)
     const { error } = exists
       ? await supabase.from('off_playlist_favorites').delete().eq('user_id', session.user.id).eq('playlist_id', p.id)
@@ -386,7 +386,7 @@ export default function OffRecordsPage() {
               ))}
               {!loading && !visible.length && (
                 <p className="rounded-xl border border-white/10 bg-black/15 p-4 text-sm leading-relaxed text-white/55">
-                  {tab === 'favorites' ? 'Aucun favori pour le moment. Découvre les playlists des autres joueurs.' : tab === 'mine' ? 'Tu n’as pas encore de playlist. Tu peux en créer une ci-dessus.' : 'Aucune playlist trouvée.'}
+                  {tab === 'favorites' ? 'Aucun favori pour le moment. Ajoute une playlist publique à tes favoris.' : tab === 'mine' ? 'Tu n’as pas encore de playlist. Tu peux en créer une ci-dessus.' : 'Aucune playlist trouvée.'}
                 </p>
               )}
             </div>
@@ -419,7 +419,7 @@ export default function OffRecordsPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {active.is_public && !isOwner && (
+                  {active.is_public && (
                     <button
                       type="button"
                       onClick={() => toggleFavorite(active)}

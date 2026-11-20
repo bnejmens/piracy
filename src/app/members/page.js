@@ -316,10 +316,12 @@ const avatarNode = (m) => (
                       <p className="text-sm italic text-white/45">Aucune description renseignée.</p>
                     )}
                   </section>
+                </div>
 
+                <aside className="min-w-0 space-y-4">
                   <section className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
                     <h3 className="mb-4 font-serif text-lg text-amber-100">Traits de personnalité</h3>
-                    <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
                       <div className="space-y-4">
                         <Bipolar leftLabel="Introverti" rightLabel="Extraverti" value={modalChar.traits?.intro_extro} />
                         <Bipolar leftLabel="Égoïste" rightLabel="Altruiste" value={modalChar.traits?.egoiste_altruiste} />
@@ -336,9 +338,7 @@ const avatarNode = (m) => (
                       </div>
                     </div>
                   </section>
-                </div>
 
-                <aside className="min-w-0 space-y-4">
                   <section className="rounded-2xl border border-white/15 bg-black/25 p-4">
                     <h3 className="mb-3 font-serif text-lg text-amber-100">Compagnon</h3>
                     <div className="flex min-w-0 items-center gap-4">
