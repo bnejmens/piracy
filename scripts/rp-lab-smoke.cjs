@@ -27,7 +27,7 @@ const { chromium } = require('playwright')
     assert.ok(total >= 4 && total <= 23, roll)
     await page.getByRole('textbox', { name: 'Formule' }).fill('999d20')
     await page.getByRole('button', { name: 'Lancer les dés' }).click()
-    assert.match(await page.getByRole('alert').textContent(), /formule/)
+    assert.match(await page.getByRole('alert').filter({ hasText: 'Entre une formule' }).textContent(), /formule/)
     console.log('Tiptap and dice passed')
 
     await page.getByRole('button', { name: 'Enquête interactive' }).click()
