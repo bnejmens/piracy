@@ -9,7 +9,12 @@ export async function optimizeAvatar(file, { maxDimension = 512, quality = 0.82 
     throw new Error("Image trop lourde (maximum 20 Mo avant optimisation).");
   }
 
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+  const extensions = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/avif": "avif",
+  };
   if (file.type === "image/gif") {
     // Garder l'animation sans transférer d'énormes GIF non compressés.
     if (file.size > 1024 * 1024) {
@@ -17,8 +22,8 @@ export async function optimizeAvatar(file, { maxDimension = 512, quality = 0.82 
     }
     return { file, extension: "gif" };
   }
-  if (!allowed.includes(file.type)) {
-    throw new Error("Format non pris en charge. Utilise JPG, PNG, WebP ou AVIF.");
+  if (!Object.hasOwn(extensions, file.type)) {
+    throw new Error("Format non pris en charge. Utilise JPG, PNG, GIF, WebP ou AVIF.");
   }
 
   const objectUrl = URL.createObjectURL(file);
@@ -43,21 +48,20 @@ export async function optimizeAvatar(file, { maxDimension = 512, quality = 0.82 
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (result) => result ? resolve(result) : reject(new Error("Conversion d'image impossible.")),
-        "image/webp",
-        quality
-      );
-    });
-    if (blob.type !== "image/webp") throw new Error("Le navigateur ne prend pas en charge la conversion WebP.");
+    const encode = (type) => new Promise(resolve => canvas.toBlob(resolve, type, quality));
+    let blob = await encode("image/webp");
 
-    // Ne jamais augmenter inutilement le poids d'une petite image déjà adaptée.
-    if (file.size <= blob.size && ratio === 1) {
-      const extension = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" }[file.type];
-      return { file, extension };
+    // Certains navigateurs renvoient du PNG lorsqu'ils ne savent pas encoder le WebP.
+    if (blob?.type !== "image/webp" && file.type === "image/jpeg") {
+      blob = (await encode("image/jpeg")) || blob;
     }
-    return { file: new File([blob], "avatar.webp", { type: "image/webp" }), extension: "webp" };
+    if (!blob) blob = await encode("image/png");
+
+    const extension = blob && Object.hasOwn(extensions, blob.type) ? extensions[blob.type] : null;
+    if (!extension || (ratio === 1 && file.size <= blob.size)) {
+      return { file, extension: extensions[file.type] };
+    }
+    return { file: new File([blob], `avatar.${extension}`, { type: blob.type }), extension };
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
