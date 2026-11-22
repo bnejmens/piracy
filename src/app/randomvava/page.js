@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import SiteTopbar from "@/components/SiteTopbar"
 import { supabase } from "@/lib/supabaseClient"
@@ -19,10 +19,10 @@ export default function RandomVavaPage() {
 
   // création de pool (par slug)
   const [slugInput, setSlugInput] = useState("")
-  const slug = useMemo(() => normalizeSlug(slugInput), [slugInput])
 
   // pool actif
   const [activeSlug, setActiveSlug] = useState(null)
+  const slug = activeSlug && slugInput === activeSlug ? activeSlug : normalizeSlug(slugInput)
   const [images, setImages] = useState([])
   const [loadingImages, setLoadingImages] = useState(false)
 
@@ -206,7 +206,7 @@ export default function RandomVavaPage() {
               <div className="text-xs text-white/60">Dossier: <code>/avatars/{slug || "…"}</code></div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-white/80">Images à uploader</label>
+              <label className="text-sm text-white/80">{slug ? `Ajouter des images à ${slug}` : "Images à importer"}</label>
               <input
                 ref={fileRef}
                 type="file"
@@ -238,9 +238,10 @@ export default function RandomVavaPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => { setActiveSlug(s); loadImages(s) }}
+                    onClick={() => { setActiveSlug(s); setSlugInput(s); loadImages(s) }}
                     className="min-w-0 flex-1 text-left"
                     aria-pressed={activeSlug === s}
+                    disabled={uploading}
                   >
                     <div className="truncate font-medium">{s}</div>
                     <div className="truncate text-xs text-white/70">/api/randimg/{s}</div>
