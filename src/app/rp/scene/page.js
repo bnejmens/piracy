@@ -1232,10 +1232,9 @@ onVimeo={() => {
                   )}
 
                   <PostHeader
-  authorId={p.author_id}
   authorCharacterId={p.author_character_id}
   createdAt={p.created_at}
-  onAvatarClick={() => openPosterCard(p.author_id, p.author_character_id)}
+  onAvatarClick={p.author_character_id ? () => openPosterCard(p.author_id, p.author_character_id) : undefined}
 />
 
                   {editingPostId === p.id ? (
@@ -1484,7 +1483,7 @@ function TopicParticipants({ topicId }) {
   )
 }
 
-function PostHeader({ authorId, authorCharacterId, createdAt, onAvatarClick }) {
+function PostHeader({ authorCharacterId, createdAt, onAvatarClick }) {
   const [display, setDisplay] = useState(null)
   useEffect(() => {
     let ok = true
@@ -1494,27 +1493,24 @@ function PostHeader({ authorId, authorCharacterId, createdAt, onAvatarClick }) {
           .from('characters').select('name, avatar_url').eq('id', authorCharacterId).maybeSingle()
         if (ok && ch) { setDisplay({ name: ch.name, avatar_url: ch.avatar_url }); return }
       }
-      const { data: p } = await supabase
-        .from('profiles').select('pseudo, avatar_url').eq('user_id', authorId).maybeSingle()
-      if (ok) {
-        const name = p?.pseudo?.trim() || 'Auteur'
-        setDisplay({ name, avatar_url: p?.avatar_url || null })
-      }
+      if (ok) setDisplay(null)
     }
     run(); return () => { ok = false }
-  }, [authorId, authorCharacterId])
+  }, [authorCharacterId])
 
-  const name = display?.name || 'Auteur'
+  const name = (authorCharacterId && display?.name) || 'Missing'
   const initial = (name[0] || '?').toUpperCase()
 
   return (
     <div className="flex items-center gap-3 mb-3">
       <button
+        type="button"
         onClick={onAvatarClick}
+        disabled={!display || !authorCharacterId}
         className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_8px_24px_rgba(0,0,0,.25)] focus:outline-none hover:ring-amber-300/60 transition"
-        title="Voir la fiche"
+        title={display && authorCharacterId ? "Voir la fiche" : undefined}
       >
-        {display?.avatar_url
+        {authorCharacterId && display?.avatar_url
           ? <img src={display.avatar_url} alt="" className="w-full h-full object-cover" />
           : <div className="grid place-items-center w-full h-full text-white/80 text-lg">{initial}</div>}
       </button>
