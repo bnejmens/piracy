@@ -36,6 +36,7 @@ export default function SiteTopbar({ title, rpView }) {
   const headerRef = useRef(null)
   const [quickMenuOpen, setQuickMenuOpen] = useState(false)
   const [characterMenuOpen, setCharacterMenuOpen] = useState(false)
+  const [signedIn, setSignedIn] = useState(null)
   const [characters, setCharacters] = useState([])
   const [activeCharacter, setActiveCharacter] = useState(null)
   const [newName, setNewName] = useState('')
@@ -45,6 +46,7 @@ export default function SiteTopbar({ title, rpView }) {
 
   const loadCharacters = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
+    setSignedIn(Boolean(session?.user?.id))
     if (!session?.user?.id) {
       setCharacters([])
       setActiveCharacter(null)
@@ -193,7 +195,7 @@ export default function SiteTopbar({ title, rpView }) {
 
         </div>
 
-        <div className="relative col-start-2 row-start-1 justify-self-end sm:ml-2">
+        {signedIn && <div className="relative col-start-2 row-start-1 justify-self-end sm:ml-2">
           <button
             type="button"
             onClick={() => {
@@ -266,7 +268,12 @@ export default function SiteTopbar({ title, rpView }) {
               </div>
             </>
           )}
-        </div>
+        </div>}
+        {signedIn === false && pathname !== '/auth' && pathname !== '/' && (
+          <Link href="/auth" className="col-start-2 row-start-1 rounded-lg px-2 py-2 text-xs text-amber-100 hover:bg-white/10 sm:text-sm">
+            Connexion
+          </Link>
+        )}
       </div>
     </header>
   )
