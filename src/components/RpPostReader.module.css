@@ -78,6 +78,7 @@
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
+  overflow-anchor: none;
   padding: clamp(0.8rem, 4vw, 3rem) max(0.75rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
 }
 
@@ -92,7 +93,24 @@
 }
 
 .page + .page { margin-block-start: clamp(1rem, 4vw, 2.5rem); }
-.page:last-child { min-height: 100%; }
+.page:last-of-type { min-height: 100%; }
+
+.pageControl {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+  color: #f1cb8c;
+  font-size: 0.875rem;
+}
+
+.pageControl button {
+  border: 1px solid #81635c;
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.85rem;
+}
+
+.pageControl button:disabled { opacity: 0.5; }
 
 .byline {
   border-bottom: 1px solid #614c54;
