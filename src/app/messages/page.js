@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
-import SoundTrigger from '@/components/audio/SoundTrigger'
 import SiteTopbar, { CHARACTER_EVENT } from '@/components/SiteTopbar'
 
 export default function MessagesPage() {
@@ -590,9 +589,6 @@ const createConversation = async () => {
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h2>
             {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG'}</p>}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <SoundTrigger inline />
           </div>
         </header>
 
