@@ -30,6 +30,8 @@ export default function ProfilePage() {
   useEffect(() => { activeCharRef.current = charId; }, [charId]);
 
   const [form, setForm] = useState(baseForm());
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
 
@@ -215,6 +217,27 @@ setAllChars(all || []);
     window.addEventListener('piracy:active-character-changed', onCharacterChanged);
     return () => window.removeEventListener('piracy:active-character-changed', onCharacterChanged);
   }, []);
+
+ const deleteCharacter = async () => {
+   const character = myChars.find(c => c.id === charId && c.user_id === me?.id);
+   if (!character || saving || deleting) return;
+   if (!window.confirm(`Supprimer définitivement « ${character.name} » ? Ses messages et ses posts RP seront conservés avec la mention Missing.`)) return;
+
+   setDeleting(true);
+   setDeleteError("");
+   const { error } = await supabase.from('characters')
+     .delete()
+     .eq('id', character.id)
+     .eq('user_id', me.id)
+     .select('id')
+     .single();
+   if (error) {
+     setDeleteError(error.message || 'La suppression a échoué.');
+     setDeleting(false);
+     return;
+   }
+   window.location.reload();
+ };
 
  const onSave = async () => {
   if (!charId) return
@@ -458,12 +481,23 @@ const canEdit = !!me?.id && ownsCurrentChar
 
 <button
   onClick={onSave}
-  disabled={saving || !charId}
+  disabled={saving || deleting || !charId}
   className="rounded-lg bg-white/10 border border-white/20 px-4 py-2 text-white hover:bg-white/15 disabled:opacity-50"
 >
   {saving ? "Enregistrement…" : "Enregistrer"}
 </button>
 
+            {canEdit && (
+              <button
+                type="button"
+                onClick={deleteCharacter}
+                disabled={saving || deleting}
+                className="rounded-lg border border-rose-300/30 px-4 py-2 text-sm text-rose-200 hover:bg-rose-300/10 disabled:opacity-50"
+              >
+                {deleting ? 'Suppression…' : 'Supprimer ce personnage'}
+              </button>
+            )}
+            {deleteError && <p role="alert" className="w-full text-sm text-rose-300">{deleteError}</p>}
             {savedMsg && <span className="text-green-300 text-sm">{savedMsg}</span>}
           </div>
           <section className="mt-5 space-y-3 border-t border-white/15 pt-4" aria-labelledby="character-images-title">

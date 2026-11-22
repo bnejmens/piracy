@@ -1232,10 +1232,9 @@ onVimeo={() => {
                   )}
 
                   <PostHeader
-  authorId={p.author_id}
   authorCharacterId={p.author_character_id}
   createdAt={p.created_at}
-  onAvatarClick={() => openPosterCard(p.author_id, p.author_character_id)}
+  onAvatarClick={p.author_character_id ? () => openPosterCard(p.author_id, p.author_character_id) : undefined}
 />
 
                   {editingPostId === p.id ? (
@@ -1414,16 +1413,12 @@ function TopicParticipants({ topicId }) {
       try {
         const { data: posts, error } = await supabase
           .from('rp_posts')
-          .select('author_character_id, author_id')
+          .select('author_character_id')
           .eq('topic_id', topicId)
         if (error) throw error
         if (!posts?.length) { if (ok) setList([]); return }
 
         const charIds = Array.from(new Set(posts.map(p => p.author_character_id).filter(Boolean)))
-        const authorsNeedingProfile = Array.from(new Set(
-          posts.filter(p => !p.author_character_id).map(p => p.author_id).filter(Boolean)
-        ))
-
         const charMap = new Map()
         if (charIds.length) {
           const { data: chars } = await supabase
@@ -1433,28 +1428,12 @@ function TopicParticipants({ topicId }) {
           }
         }
 
-        let profList = []
-        if (authorsNeedingProfile.length) {
-          const { data: profs } = await supabase
-            .from('profiles').select('user_id, pseudo, avatar_url').in('user_id', authorsNeedingProfile)
-          profList = (profs || []).map(p => ({
-            key: `user:${p.user_id}`,
-            label: p.pseudo?.trim() || 'Profil',
-            avatar: p.avatar_url || null,
-          }))
-        }
-
         const merged = []
         const seen = new Set()
         for (const p of posts) {
-          if (p.author_character_id && charMap.has(String(p.author_character_id))) {
-            const item = charMap.get(String(p.author_character_id))
-            if (!seen.has(item.key)) { merged.push(item); seen.add(item.key) }
-          } else {
-            const userKey = `user:${p.author_id}`
-            const prof = profList.find(x => x.key === userKey)
-            if (prof && !seen.has(prof.key)) { merged.push(prof); seen.add(prof.key) }
-          }
+          const item = charMap.get(String(p.author_character_id))
+            || { key: 'missing', label: 'Missing', avatar: null }
+          if (!seen.has(item.key)) { merged.push(item); seen.add(item.key) }
         }
 
         if (ok) setList(merged)
@@ -1484,7 +1463,7 @@ function TopicParticipants({ topicId }) {
   )
 }
 
-function PostHeader({ authorId, authorCharacterId, createdAt, onAvatarClick }) {
+function PostHeader({ authorCharacterId, createdAt, onAvatarClick }) {
   const [display, setDisplay] = useState(null)
   useEffect(() => {
     let ok = true
@@ -1494,27 +1473,24 @@ function PostHeader({ authorId, authorCharacterId, createdAt, onAvatarClick }) {
           .from('characters').select('name, avatar_url').eq('id', authorCharacterId).maybeSingle()
         if (ok && ch) { setDisplay({ name: ch.name, avatar_url: ch.avatar_url }); return }
       }
-      const { data: p } = await supabase
-        .from('profiles').select('pseudo, avatar_url').eq('user_id', authorId).maybeSingle()
-      if (ok) {
-        const name = p?.pseudo?.trim() || 'Auteur'
-        setDisplay({ name, avatar_url: p?.avatar_url || null })
-      }
+      if (ok) setDisplay(null)
     }
     run(); return () => { ok = false }
-  }, [authorId, authorCharacterId])
+  }, [authorCharacterId])
 
-  const name = display?.name || 'Auteur'
+  const name = (authorCharacterId && display?.name) || 'Missing'
   const initial = (name[0] || '?').toUpperCase()
 
   return (
     <div className="flex items-center gap-3 mb-3">
       <button
+        type="button"
         onClick={onAvatarClick}
+        disabled={!display || !authorCharacterId}
         className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_8px_24px_rgba(0,0,0,.25)] focus:outline-none hover:ring-amber-300/60 transition"
-        title="Voir la fiche"
+        title={display && authorCharacterId ? "Voir la fiche" : undefined}
       >
-        {display?.avatar_url
+        {authorCharacterId && display?.avatar_url
           ? <img src={display.avatar_url} alt="" className="w-full h-full object-cover" />
           : <div className="grid place-items-center w-full h-full text-white/80 text-lg">{initial}</div>}
       </button>
