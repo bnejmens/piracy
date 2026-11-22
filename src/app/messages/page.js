@@ -623,13 +623,15 @@ const createConversation = async () => {
             {!messages.length && <p className="py-8 text-center text-sm text-white/50">Début de la conversation</p>}
             {messages.map(m => {
               const mine = isMine(m)
-              const sender = m.sender_character_id ? charsById.get(String(m.sender_character_id)) : contactsByUser.get(m.sender_id)
+              const sender = m.sender_character_id ? charsById.get(String(m.sender_character_id)) : null
+              const missing = !m.sender_character_id
+              const senderName = missing ? 'Missing' : sender?.name
               return <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-                {!mine && <Avatar name={sender?.name} src={sender?.avatar_url} size="h-8 w-8" />}
-                <div className={`max-w-[80%] rounded-2xl px-3 py-2 shadow ${mine ? 'rounded-br-sm bg-sky-600/90 text-white' : 'rounded-bl-sm bg-amber-200 text-slate-950'}`}>
-                  {sender?.name && <div className={`mb-1 text-[10px] font-semibold ${mine ? 'text-sky-100' : 'text-amber-900'}`}>{sender.name}</div>}
+                {!mine && <Avatar name={senderName} src={sender?.avatar_url} size="h-8 w-8" />}
+                <div className={`max-w-[80%] rounded-2xl px-3 py-2 shadow ${mine ? 'rounded-br-sm bg-sky-600/90 text-white' : missing ? 'rounded-bl-sm bg-slate-600 text-white' : 'rounded-bl-sm bg-amber-200 text-slate-950'}`}>
+                  {senderName && <div className={`mb-1 text-[10px] font-semibold ${mine ? 'text-sky-100' : missing ? 'text-slate-200' : 'text-amber-900'}`}>{senderName}</div>}
                   <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>
-                  <div className={`mt-1 text-right text-[10px] ${mine ? 'text-white/60' : 'text-slate-700/60'}`}>{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div className={`mt-1 text-right text-[10px] ${mine || missing ? 'text-white/60' : 'text-slate-700/60'}`}>{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               </div>
             })}
