@@ -9,7 +9,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@dice-roller/rpg-dice-roller": "5.5.1",
+    "@excalidraw/excalidraw": "0.18.1",
     "@supabase/supabase-js": "^2.54.0",
+    "@tiptap/extension-image": "3.35.0",
+    "@tiptap/extension-text-style": "3.35.0",
+    "@tiptap/extension-youtube": "3.35.0",
+    "@tiptap/pm": "3.35.0",
+    "@tiptap/react": "3.35.0",
+    "@tiptap/starter-kit": "3.35.0",
+    "@xyflow/react": "13.0.2",
+    "inkjs": "2.4.0",
     "isomorphic-dompurify": "^2.26.0",
     "next": "^15.5.29",
     "react": "^19.2.8",
@@ -20,6 +30,7 @@
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
+    "playwright": "1.62.1",
     "tailwindcss": "^4"
   }
 }

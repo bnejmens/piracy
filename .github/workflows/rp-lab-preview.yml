@@ -1,0 +1,35 @@
+name: Test RP preview in Chromium
+on:
+  push:
+    branches: [preview/rp-toolkit-lab]
+permissions:
+  contents: read
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: preview-fixture-key
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Test the five RP tools
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3417 > /tmp/piracy-next.log 2>&1 &
+          trap 'cat /tmp/piracy-next.log' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3417/lab-rp > /dev/null; then
+              node scripts/rp-lab-smoke.cjs
+              exit $?
+            fi
+            sleep 2
+          done
+          exit 1
