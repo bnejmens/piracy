@@ -1,11 +1,12 @@
 name: Test RP preview in Chromium
 on:
-  push:
-    branches: [preview/rp-toolkit-lab]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
   smoke-test:
+    if: github.head_ref == 'preview/rp-toolkit-lab'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
