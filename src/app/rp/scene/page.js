@@ -140,6 +140,9 @@ function bbcodeToHtml(src) {
    // iframe
    'allow','allowfullscreen','frameborder','referrerpolicy','loading'
  ];
+const POSTS_PER_PAGE = 20
+const POST_COLUMNS = 'id, topic_id, author_id, author_character_id, content_raw, content_html, created_at'
+
 /* --------------------------- Page RP --------------------------- */
 export default function RPPage() {
   const router = useRouter()
@@ -160,30 +163,56 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+  const [postPage, setPostPage] = useState({ topicId: null, number: 1, total: 0 })
+  const [postsLoading, setPostsLoading] = useState(false)
+  const [postsError, setPostsError] = useState('')
   const postsRequest = useRef(0)
-  const [readerPostId, setReaderPostId] = useState(null)
+  const postsScroll = useRef(null)
+  const [reader, setReader] = useState(null)
   const [readerTextSize, setReaderTextSize] = useState(19)
   const readerTrigger = useRef(null)
-  const readerTopicId = readerPostId ? activeTopic?.id : null
-  const readerPosts = useMemo(() => {
-    if (!readerTopicId) return []
-    return posts.filter(post => post.topic_id === readerTopicId).map(post => ({
+
+  function prepareReaderPost(post) {
+    return {
       ...post,
       html: DOMPurify.sanitize(post.content_html || '', {
         ALLOWED_TAGS, ALLOWED_ATTR,
         ADD_TAGS: ['iframe'],
         ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'referrerpolicy', 'loading'],
       }),
-    }))
-  }, [readerTopicId, posts])
+    }
+  }
 
   function openPostReader(event, postId) {
     readerTrigger.current = event.currentTarget.closest('article')?.querySelector('[data-reader-trigger]')
-    setReaderPostId(postId)
+    setReader({
+      postId,
+      topicId: activeTopic.id,
+      posts: posts.map(prepareReaderPost),
+      hasPrevious: postPage.number > 1,
+      hasNext: postPage.number * POSTS_PER_PAGE < postPage.total,
+    })
+  }
+
+  async function loadReaderPosts(topicId, direction, boundary) {
+    const previous = direction === 'previous'
+    const op = previous ? 'lt' : 'gt'
+    const { created_at: time, id } = boundary
+    const { data, error } = await supabase.from('rp_posts')
+      .select(POST_COLUMNS)
+      .eq('topic_id', topicId)
+      .or(`created_at.${op}.${time},and(created_at.eq.${time},id.${op}.${id})`)
+      .order('created_at', { ascending: !previous })
+      .order('id', { ascending: !previous })
+      .limit(POSTS_PER_PAGE + 1)
+    if (error) throw error
+    const batch = data.slice(0, POSTS_PER_PAGE)
+    if (previous) batch.reverse()
+    return { posts: batch.map(prepareReaderPost), hasMore: data.length > POSTS_PER_PAGE }
   }
 
   function closePostReader() {
-    setReaderPostId(null)
+    setReader(null)
     readerTrigger.current?.focus({ preventScroll: true })
   }
   const [investigationState, setInvestigationState] = useState({ topicId: null, items: [], error: '' })
@@ -264,8 +293,6 @@ const [participantsIndex, setParticipantsIndex] = useState({})
   const [editingPostId, setEditingPostId] = useState(null)
   const [editingRaw, setEditingRaw] = useState('')
 
-  const endRef = useRef(null)
-  const scrollToEnd = () => endRef.current?.scrollIntoView({ behavior: 'smooth' })
 
 // --- fiche "profil posteur" (perso si dispo, sinon profil user)
 const [viewer, setViewer] = useState(null); // { type: 'char'|'user', data: {...} }
@@ -517,45 +544,43 @@ const loadTopics = async () => {
     const first = list.find(t => t.id === requested) || list[0]
 
     setActiveTopic(first)
-    await loadPosts(first.id)
+    await loadPosts(first.id, undefined, { toEnd: true })
   }
 }
 
 
-  const loadPosts = async (topicId) => {
+  const loadPosts = async (topicId, requestedPage, { toEnd = false } = {}) => {
     const request = ++postsRequest.current
-    const data = []
-    const pageSize = 300
-    for (let offset = 0; ; offset += pageSize) {
-      const { data: batch, error } = await supabase
-        .from('rp_posts')
-        .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
+    setPostsLoading(true)
+    setPostsError('')
+    try {
+      const { count, error: countError } = await supabase.from('rp_posts')
+        .select('id', { count: 'exact', head: true }).eq('topic_id', topicId)
+      if (request !== postsRequest.current) return
+      if (countError) throw countError
+      const total = count || 0
+      const lastPage = Math.max(1, Math.ceil(total / POSTS_PER_PAGE))
+      const number = Math.min(requestedPage ?? lastPage, lastPage)
+      const offset = (number - 1) * POSTS_PER_PAGE
+      const { data, error } = await supabase.from('rp_posts')
+        .select(POST_COLUMNS)
         .eq('topic_id', topicId)
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
-        .range(offset, offset + pageSize - 1)
+        .range(offset, offset + POSTS_PER_PAGE - 1)
       if (request !== postsRequest.current) return
-      if (error) { console.error(error); return }
-      data.push(...batch)
-      if (batch.length < pageSize) break
+      if (error) throw error
+      setPosts(data || [])
+      setPostPage({ topicId, number, total })
+      requestAnimationFrame(() => {
+        if (request !== postsRequest.current || !postsScroll.current) return
+        postsScroll.current.scrollTop = toEnd ? postsScroll.current.scrollHeight : 0
+      })
+    } catch (error) {
+      if (request === postsRequest.current) setPostsError(error.message || 'Impossible de charger les réponses.')
+    } finally {
+      if (request === postsRequest.current) setPostsLoading(false)
     }
-    setPosts(data)
-
-    // Charger les portraits par lots pour limiter la taille des requêtes.
-    const ids = [...new Set(data.map(post => post.author_character_id).filter(Boolean))]
-    const participants = []
-    for (let offset = 0; offset < ids.length; offset += pageSize) {
-      const { data: batch, error } = await supabase
-        .from('characters')
-        .select('id,name,avatar_url')
-        .in('id', ids.slice(offset, offset + pageSize))
-      if (request !== postsRequest.current) return
-      if (!error) participants.push(...batch)
-    }
-    setParticipantsIndex(current => ({ ...current, [topicId]: participants }))
-    setTimeout(() => {
-      if (request === postsRequest.current) scrollToEnd()
-    }, 0)
   }
 
   const createTopic = async () => {
@@ -574,6 +599,7 @@ const loadTopics = async () => {
 
   const publishPost = async () => {
     if (activeTopic?.is_archived) { alert('Ce RP est archivé et ne peut plus recevoir de messages.'); return; }
+    const postRequestAtPublish = postsRequest.current
     const chosenCharId = postAsCharId
     if (!raw.trim() || !activeTopic || !chosenCharId || !session) {
       alert("Choisis un personnage et un sujet, puis écris un message.")
@@ -605,7 +631,6 @@ const loadTopics = async () => {
       console.warn('Mismatch author_character_id after insert', { chosenCharId, data })
     }
 
-    setPosts(p => [...p, data])
     if (chosenCharId) {
       const { data: joinedCharacter } = await supabase
         .from('characters')
@@ -622,7 +647,9 @@ const loadTopics = async () => {
     }
     setRaw('')
     setPreviewOpen(false)
-    setTimeout(scrollToEnd, 0)
+    if (postRequestAtPublish === postsRequest.current) {
+      await loadPosts(data.topic_id, undefined, { toEnd: true })
+    }
   }
 
   /* ---------- EDIT / DELETE POST ---------- */
@@ -653,10 +680,11 @@ const loadTopics = async () => {
   const deletePost = async (postId) => {
     if (activeTopic?.is_archived) { alert('Ce RP est archivé et ses posts ne peuvent plus être supprimés.'); return; }
     if (!confirm('Supprimer ce post ?')) return
+    const postRequestAtDelete = postsRequest.current
     const { error } = await supabase.from('rp_posts').delete().eq('id', postId)
     if (error) { alert(error.message); return }
     setPosts(ps => ps.filter(p => p.id !== postId))
-    if (activeTopic?.id) await loadPosts(activeTopic.id)
+    if (activeTopic?.id && postRequestAtDelete === postsRequest.current) await loadPosts(activeTopic.id, postPage.number)
   }
 
   /* ---------- EDIT / DELETE TOPIC ---------- */
@@ -754,7 +782,7 @@ const loadTopics = async () => {
       `/rp/scene?topic=${encodeURIComponent(topic.id)}`
     )
 
-    await loadPosts(topic.id)
+    await loadPosts(topic.id, undefined, { toEnd: true })
   }
 
   /* ---------- RENDER ---------- */
@@ -1252,9 +1280,20 @@ onVimeo={() => {
           <header className="sticky top-0 z-10 px-4 py-3 border-b border-white/10 text-white/90 font-medium bg-white/10 bg-[#32263f]/80 backdrop-blur-sm">
             {activeTopic ? activeTopic.title : 'Posts'}
           </header>
+          {activeTopic?.id === postPage.topicId && postPage.total > POSTS_PER_PAGE && (
+            <nav aria-label="Pagination des réponses" className="flex shrink-0 items-center justify-center gap-3 border-b border-white/10 px-2 py-1 text-xs sm:text-sm">
+              <button type="button" disabled={postsLoading || postPage.number <= 1}
+                onClick={() => loadPosts(activeTopic.id, postPage.number - 1)}
+                className="min-h-10 rounded-lg px-2 text-amber-100 hover:bg-white/10 disabled:opacity-40">← Précédente</button>
+              <span aria-live="polite">Page {postPage.number} / {Math.ceil(postPage.total / POSTS_PER_PAGE)}</span>
+              <button type="button" disabled={postsLoading || postPage.number * POSTS_PER_PAGE >= postPage.total}
+                onClick={() => loadPosts(activeTopic.id, postPage.number + 1)}
+                className="min-h-10 rounded-lg px-2 text-amber-100 hover:bg-white/10 disabled:opacity-40">Suivante →</button>
+            </nav>
+          )}
 
-          <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto p-2 sm:p-4">
-            {activeTopic && posts.map(p => {
+          <div ref={postsScroll} className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto p-2 sm:p-4">
+            {activeTopic?.id === postPage.topicId && posts.map(p => {
               const mine = p.author_id === session?.user?.id
               return (
                 <div key={p.id} className="min-w-0 space-y-2">
@@ -1346,16 +1385,22 @@ onVimeo={() => {
             {activeTopic && investigationState.topicId === activeTopic.id && investigationState.error && (
               <p className="text-xs text-rose-200" role="status">Les enquêtes sont momentanément indisponibles.</p>
             )}
-            {activeTopic && !posts.length && (
+            {activeTopic && !postsLoading && !postsError && postPage.topicId === activeTopic.id && !posts.length && (
               <div className="text-white/60 text-sm">Pas encore de posts.</div>
             )}
-            <div ref={endRef} />
+            {postsLoading && <p role="status" className="text-sm text-white/60">Chargement des réponses…</p>}
+            {activeTopic && postsError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-rose-200">
+              {postsError}
+              <button type="button" className="underline" onClick={() => loadPosts(activeTopic.id, postPage.topicId === activeTopic.id ? postPage.number : undefined)}>Réessayer</button>
+            </div>}
           </div>
         </section>
       </div>
 
-{readerPosts.some(post => post.id === readerPostId) && (
-  <RpPostReader key={readerPostId} title={activeTopic?.title} posts={readerPosts} startPostId={readerPostId}
+{reader && reader.topicId === activeTopic?.id && (
+  <RpPostReader key={reader.postId} title={activeTopic?.title} initialPosts={reader.posts}
+    startPostId={reader.postId} hasPrevious={reader.hasPrevious} hasNext={reader.hasNext}
+    loadPosts={(direction, boundary) => loadReaderPosts(reader.topicId, direction, boundary)}
     renderByline={post => <PostHeader authorCharacterId={post.author_character_id} createdAt={post.created_at} />}
     textSize={readerTextSize} onTextSizeChange={setReaderTextSize} onClose={closePostReader} />
 )}
