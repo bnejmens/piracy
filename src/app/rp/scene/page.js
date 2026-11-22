@@ -1413,16 +1413,12 @@ function TopicParticipants({ topicId }) {
       try {
         const { data: posts, error } = await supabase
           .from('rp_posts')
-          .select('author_character_id, author_id')
+          .select('author_character_id')
           .eq('topic_id', topicId)
         if (error) throw error
         if (!posts?.length) { if (ok) setList([]); return }
 
         const charIds = Array.from(new Set(posts.map(p => p.author_character_id).filter(Boolean)))
-        const authorsNeedingProfile = Array.from(new Set(
-          posts.filter(p => !p.author_character_id).map(p => p.author_id).filter(Boolean)
-        ))
-
         const charMap = new Map()
         if (charIds.length) {
           const { data: chars } = await supabase
@@ -1432,28 +1428,12 @@ function TopicParticipants({ topicId }) {
           }
         }
 
-        let profList = []
-        if (authorsNeedingProfile.length) {
-          const { data: profs } = await supabase
-            .from('profiles').select('user_id, pseudo, avatar_url').in('user_id', authorsNeedingProfile)
-          profList = (profs || []).map(p => ({
-            key: `user:${p.user_id}`,
-            label: p.pseudo?.trim() || 'Profil',
-            avatar: p.avatar_url || null,
-          }))
-        }
-
         const merged = []
         const seen = new Set()
         for (const p of posts) {
-          if (p.author_character_id && charMap.has(String(p.author_character_id))) {
-            const item = charMap.get(String(p.author_character_id))
-            if (!seen.has(item.key)) { merged.push(item); seen.add(item.key) }
-          } else {
-            const userKey = `user:${p.author_id}`
-            const prof = profList.find(x => x.key === userKey)
-            if (prof && !seen.has(prof.key)) { merged.push(prof); seen.add(prof.key) }
-          }
+          const item = charMap.get(String(p.author_character_id))
+            || { key: 'missing', label: 'Missing', avatar: null }
+          if (!seen.has(item.key)) { merged.push(item); seen.add(item.key) }
         }
 
         if (ok) setList(merged)
