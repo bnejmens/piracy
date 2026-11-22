@@ -87,7 +87,6 @@ export default function RpInvestigation({ investigation, postId, canPropose, arc
       <header className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="break-words font-serif text-lg text-amber-100">{investigation?.title || 'Proposer une enquête'}</h3>
-          {investigation && <p className="break-words text-xs text-white/65">Enquête menée par {investigation.gmName}</p>}
         </div>
         {investigation && !published && (
           <span className="rounded-full bg-amber-200/10 px-2.5 py-1 text-xs text-amber-100">

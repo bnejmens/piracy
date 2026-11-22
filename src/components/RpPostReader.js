@@ -1,17 +1,21 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
+import SoundTrigger from './audio/SoundTrigger'
 import styles from './RpPostReader.module.css'
 
-export default function RpPostReader({ title, html, children, textSize, onTextSizeChange, onClose }) {
+export default function RpPostReader({ title, posts, startPostId, renderByline, textSize, onTextSizeChange, onClose }) {
   const dialogRef = useRef(null)
   const closeRef = useRef(null)
+  const scrollRef = useRef(null)
+  const startRef = useRef(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = dialogRef.current
     if (!dialog.open) dialog.showModal()
     closeRef.current?.focus({ preventScroll: true })
-  }, [])
+    if (startRef.current) scrollRef.current.scrollTop = startRef.current.offsetTop - scrollRef.current.firstElementChild.offsetTop
+  }, [startPostId])
 
   return (
     <dialog ref={dialogRef} aria-labelledby="rp-reader-title" onClose={onClose} className={styles.reader}>
@@ -23,16 +27,18 @@ export default function RpPostReader({ title, html, children, textSize, onTextSi
               disabled={textSize <= 17} onClick={() => onTextSizeChange(textSize - 2)}>A−</button>
             <button type="button" aria-label="Agrandir le texte" title="Agrandir le texte"
               disabled={textSize >= 27} onClick={() => onTextSizeChange(textSize + 2)}>A+</button>
+            <span className={styles.ambience}><SoundTrigger inline /></span>
             <button ref={closeRef} type="button" onClick={() => dialogRef.current.close()}>Fermer</button>
           </div>
         </div>
       </div>
-      <div className={styles.scroll}>
-        <article className={styles.page}>
-          <div className={styles.byline}>{children}</div>
-          <div className={styles.content} style={{ '--reader-text-size': `${textSize}px` }}
-            dangerouslySetInnerHTML={{ __html: html }} />
-        </article>
+      <div ref={scrollRef} className={styles.scroll} style={{ '--reader-text-size': `${textSize}px` }}>
+        {posts.map(post => (
+          <article key={post.id} ref={post.id === startPostId ? startRef : undefined} className={styles.page}>
+            <div className={styles.byline}>{renderByline(post)}</div>
+            <div className={styles.content} dangerouslySetInnerHTML={{ __html: post.html }} />
+          </article>
+        ))}
       </div>
     </dialog>
   )

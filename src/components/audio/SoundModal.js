@@ -1,10 +1,11 @@
 
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAudio } from './AudioProvider'
 
 export default function SoundModal() {
+  const dialogRef = useRef(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Tous')
   const {
@@ -48,14 +49,21 @@ export default function SoundModal() {
   const activeSounds = sounds.filter(sound => mix[sound.src]?.active)
   const activeCount = activeSounds.length
 
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (isOpen && dialog && !dialog.open) dialog.showModal()
+  }, [isOpen])
+
   if (!isOpen) return null
+  const close = () => dialogRef.current?.close()
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center p-3 sm:p-6">
+    <dialog ref={dialogRef} aria-labelledby="sound-modal-title" onClose={() => setIsOpen(false)}
+      className="fixed inset-0 m-0 h-dvh w-full max-h-none max-w-none place-items-center bg-transparent p-3 open:grid backdrop:bg-transparent sm:p-6">
 
       <div
         className="absolute inset-0 bg-black/65 backdrop-blur-sm"
-        onClick={() => setIsOpen(false)}
+        onClick={close}
       />
 
       <section className="relative z-10 flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-amber-200/25 bg-[#21192c]/95 text-[#f9e9d0] shadow-2xl">
@@ -66,7 +74,7 @@ export default function SoundModal() {
               Le Monde Magique
             </p>
 
-            <h2 className="mt-1 font-serif text-xl text-amber-100 sm:text-2xl">
+            <h2 id="sound-modal-title" className="mt-1 font-serif text-xl text-amber-100 sm:text-2xl">
               Ambiances sonores
             </h2>
 
@@ -77,7 +85,7 @@ export default function SoundModal() {
 
           <button
             type="button"
-            onClick={() => setIsOpen(false)}
+            onClick={close}
             className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm hover:bg-white/15"
           >
             Fermer
@@ -319,6 +327,6 @@ export default function SoundModal() {
           </p>
         </div>
       </section>
-    </div>
+    </dialog>
   )
 }
