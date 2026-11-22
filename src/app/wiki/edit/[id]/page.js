@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
+import SiteTopbar from "@/components/SiteTopbar"
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { seedTree } from '../../categories'
@@ -272,9 +273,9 @@ async function reloadTree() {
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/40 via-slate-900/25 to-slate-950/50" />
 
+      <SiteTopbar title="Modifier la carte" />
       <div className="relative z-10 mx-auto max-w-6xl p-3 sm:p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-white text-2xl font-semibold">Modifier la carte</h1>
+        <div className="mb-5 flex flex-wrap items-center justify-end gap-3">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <button onClick={()=>router.back()} className="rounded-lg bg-white/10 hover:bg-white/15 px-4 py-2 border border-white/20 text-white">Retour</button>
             <button onClick={save} disabled={!canEdit} className="rounded-lg bg-emerald-500/90 hover:bg-emerald-500 px-4 py-2 text-white disabled:opacity-50">Enregistrer</button>

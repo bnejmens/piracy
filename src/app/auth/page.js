@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import SiteTopbar from "@/components/SiteTopbar"
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -149,7 +150,8 @@ export default function AuthPage() {
   };
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden">
+    <main className="relative flex min-h-dvh flex-col overflow-x-hidden">
+      <SiteTopbar title="Connexion" />
       {/* Fond direct, identique à la page d'accueil */}
       <div
         aria-hidden="true"
@@ -159,7 +161,7 @@ export default function AuthPage() {
       <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
 
       {/* Carte */}
-      <div className="relative z-20 flex min-h-dvh items-center justify-center px-3 py-6 sm:p-4">
+      <div className="relative z-20 flex flex-1 items-center justify-center px-3 py-6 sm:p-4">
         <div className="w-full max-w-md rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl ring-1 ring-white/10 shadow-[0_20px_80px_rgba(0,0,0,.45)]">
           <div className="pointer-events-none h-1 rounded-t-2xl bg-cyan-300/60" />
          

@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import SiteTopbar from "@/components/SiteTopbar"
 import { supabase } from '../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
@@ -63,7 +64,8 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden">
+    <main className="relative flex min-h-dvh flex-col overflow-x-hidden">
+      <SiteTopbar title="Piracy" />
       {/* Fond servi directement par le navigateur, sans optimisation Next.js */}
       <div
         aria-hidden="true"
@@ -73,7 +75,7 @@ export default function AuthPage() {
       <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/70" />
 
       {/* CONTENU AU PREMIER PLAN */}
-      <div className="relative z-20 flex min-h-dvh items-center justify-center px-3 py-6 sm:p-4">
+      <div className="relative z-20 flex flex-1 items-center justify-center px-3 py-6 sm:p-4">
         {checkingSession ? (
           <p className="text-sm text-slate-100">Vérification de la connexion…</p>
         ) : (

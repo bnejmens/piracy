@@ -1,7 +1,10 @@
+import SiteTopbar from "@/components/SiteTopbar"
 
 export default function VerificationEmailPage() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-slate-900 p-3 text-slate-100 sm:p-4">
+    <main className="flex min-h-dvh flex-col bg-slate-900 text-slate-100">
+      <SiteTopbar title="Vérification de l’adresse e-mail" />
+      <div className="flex flex-1 items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white/10 p-4 text-center shadow-2xl backdrop-blur-xl sm:p-8">
 
         <div className="text-5xl mb-6">✉️</div>
@@ -34,6 +37,7 @@ export default function VerificationEmailPage() {
           Retour à la connexion
         </a>
 
+      </div>
       </div>
     </main>
   );

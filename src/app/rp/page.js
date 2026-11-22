@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import SiteTopbar from '@/components/SiteTopbar'
 import { supabase } from '@/lib/supabaseClient'
 
 const BANNERS = {
@@ -67,21 +67,25 @@ function ParticipantAvatars({ ids, profiles }) {
   )
 }
 
-const navButton = 'rounded-lg px-3 py-2 text-sm text-amber-50/90 transition hover:bg-white/10'
 
 export default function RPPage() {
+  return <Suspense fallback={<SiteTopbar title="Le Monde Magique" />}><RPDirectory /></Suspense>
+}
+
+function RPDirectory() {
   const router = useRouter()
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
-  const [character, setCharacter] = useState(null)
   const [zones, setZones] = useState([])
   const [locations, setLocations] = useState([])
   const [topics, setTopics] = useState([])
   const [posts, setPosts] = useState([])
   const [participantProfiles, setParticipantProfiles] = useState({})
-  const [view, setView] = useState('zones') // zones | location | mine | others
-  const [locationId, setLocationId] = useState(null)
-  const [menuOpen, setMenuOpen] = useState(null)
+  const searchParams = useSearchParams()
+  const requestedView = searchParams.get('view')
+  const requestedLocation = searchParams.get('location')
+  const locationId = locations.some(place => place.id === requestedLocation) ? requestedLocation : null
+  const view = requestedView === 'mine' || requestedView === 'others' ? requestedView : locationId ? 'location' : 'zones'
   const [showArchived, setShowArchived] = useState(false)
   const [creating, setCreating] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
@@ -159,46 +163,9 @@ if (characterIds.length) {
 }
 setParticipantProfiles(portraits)
 
-// Ouvrir directement une sous-zone depuis le lecteur RP
-const requestedLocationId = new URLSearchParams(
-  window.location.search
-).get('location')
-
-if (
-  requestedLocationId &&
-  (locationsR.data || []).some(
-    location => location.id === requestedLocationId
-  )
-) {
-  setLocationId(requestedLocationId)
-  setView('location')
-} else {
-  setLocationId(null)
-  setView('zones')
-}
     setTopics(topicsR.data || [])
     setPosts(postsR.data || [])
     setProfile(profileR.data || null)
-
-    // Le personnage affiché doit appartenir au compte connecté.
-    // Certaines interfaces enregistrent le choix avec is_active, d'autres
-    // conservent le pointeur dans profiles.active_character_id.
-    const { data: ownedCharacters, error: charsError } = await supabase
-      .from('characters')
-      .select('id,user_id,name,avatar_url,is_active')
-      .eq('user_id', uid)
-    if (charsError) throw new Error(charsError.message)
-
-    const owned = ownedCharacters || []
-    const pointer = owned.find(c => c.id === profileR.data?.active_character_id)
-    const flagged = owned.filter(c => c.is_active === true)
-    // Si un seul personnage est indiqué actif, c'est le choix effectif.
-    // Sinon, on utilise le pointeur du profil s'il est valide.
-    const current = flagged.length === 1
-      ? flagged[0]
-      : (pointer || flagged[0] || null)
-    setCharacter(current)
-
   }, [])
 
   useEffect(() => {
@@ -254,46 +221,15 @@ if (
 
   // Chaque sous-zone dispose de sa propre URL partageable. La navigation interne
   // met aussi l'adresse à jour pour que F5 et les favoris ouvrent le bon lieu.
-  function updateLocationUrl(id = null) {
-    const url = new URL(window.location.href)
-    if (id) url.searchParams.set('location', id)
-    else url.searchParams.delete('location')
-    window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
-  }
-
   function goHome() {
     setShowArchived(false)
-    updateLocationUrl()
-    setView('zones'); setLocationId(null); setMenuOpen(null)
-  }
-  function showList(next) {
-    updateLocationUrl()
-    setView(next); setLocationId(null); setMenuOpen(null)
+    router.push('/rp', { scroll: false })
   }
   function openLocation(id) {
     setShowArchived(false)
-    updateLocationUrl(id)
-    setLocationId(id); setView('location'); setMenuOpen(null)
+    router.push(`/rp?location=${encodeURIComponent(id)}`, { scroll: false })
   }
   function openTopic(id) { router.push(`/rp/scene?topic=${encodeURIComponent(id)}`) }
-
-  // Rétablit la bonne sous-zone avec les boutons Précédent / Suivant.
-  useEffect(() => {
-    const onPopState = () => {
-      const requested = new URLSearchParams(window.location.search).get('location')
-      if (requested && locations.some(place => place.id === requested)) {
-        setLocationId(requested)
-        setView('location')
-      } else {
-        setLocationId(null)
-        setView('zones')
-      }
-      setMenuOpen(null)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [locations])
-
 
 // Chargement seulement à l'ouverture de la création de RP.
 useEffect(() => {
@@ -353,7 +289,6 @@ function toggleInvite(characterId) {
 }
 
   function openCreate(id = null) {
-    setMenuOpen(null)
     const loc = id ? locationById.get(id) : selectedLocation
     setDraftLocationId(loc?.id || '')
     setDraftZoneId(loc?.zone_id || '')
@@ -457,7 +392,7 @@ async function createTopic(e) {
     )
   }
 
-  const pageTitle = view === 'mine' ? 'Mes RP' : view === 'others' ? 'Autres aventures' : selectedLocation?.name
+  const pageTitle = view === 'mine' ? 'Mes RP' : view === 'others' ? 'Autres histoires' : selectedLocation?.name
 
   return (
     <main className={`relative flex flex-col bg-[#100e17] text-[#f7e8d0] ${view === 'location' ? 'min-h-dvh md:h-dvh md:overflow-hidden' : 'min-h-screen'}`}>
@@ -487,71 +422,12 @@ async function createTopic(e) {
 
 
 
-      <header className="relative z-30 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1650px] flex-wrap items-center gap-2 px-4 py-3 md:px-8">
-          <button onClick={goHome} className="mr-auto font-serif text-xl text-amber-100 hover:text-amber-300">
-            Le Monde Magique
-          </button>
-
-          <div className="relative">
-            <button onClick={() => setMenuOpen(x => x === 'rp' ? null : 'rp')} aria-expanded={menuOpen === 'rp'} className={navButton}>
-              Mes RP ▾
-            </button>
-            {menuOpen === 'rp' && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
-                <button onClick={() => showList('mine')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Mes participations</button>
-                <button onClick={() => showList('others')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Autres aventures</button>
-              </div>
-            )}
-          </div>
-
-          <button onClick={() => openCreate()} className="rounded-lg border border-amber-300/55 bg-amber-300/15 px-3 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/25">
-            + Nouveau RP
-          </button>
-
-          <div className="relative">
-            <button onClick={() => setMenuOpen(x => x === 'access' ? null : 'access')} aria-expanded={menuOpen === 'access'} className={navButton}>
-              Accès rapides ▾
-            </button>
-            {menuOpen === 'access' && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
-                <Link href="/messages" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Messagerie</Link>
-                <Link href="/profile" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Mon profil</Link>
-                <Link href="/members" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Membres</Link>
-                <a href="/wiki" target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Wiki & chronologie ↗</a>
-                <Link href="/dashboard" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Tableau de bord</Link>
-              </div>
-            )}
-          </div>
-
-          <div className="relative">
-            <button onClick={() => setMenuOpen(x => x === 'character' ? null : 'character')} aria-expanded={menuOpen === 'character'}
-              className="flex items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1.5 pl-1.5 pr-3 text-sm text-amber-100 transition hover:bg-white/10">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-300/40 bg-[#40344b]">
-                {character?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={character.avatar_url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                ) : <span className="font-serif text-lg">{(character?.name || '?').charAt(0)}</span>}
-              </span>
-              <span className="max-w-[140px] truncate font-medium">{character?.name || 'Aucun personnage actif'}</span>
-              <span aria-hidden="true">▾</span>
-            </button>
-            {menuOpen === 'character' && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-amber-200/25 bg-[#271d31] p-4 shadow-2xl">
-                <div className="text-xs uppercase tracking-widest text-amber-200/60">Personnage actif</div>
-                <div className="mt-2 font-serif text-xl text-amber-100">{character?.name || 'Aucun personnage sélectionné'}</div>
-                <div className="mt-1 text-xs text-white/55">Compte : {profile?.pseudo || 'Joueur'}</div>
-                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-amber-200/15 pt-3 text-center">
-                  <div><div className="font-serif text-xl text-amber-100">{myTopics.length}</div><div className="text-xs text-white/55">Mes RP</div></div>
-                  <div><div className="font-serif text-xl text-amber-100">{topics.length}</div><div className="text-xs text-white/55">Tous les RP</div></div>
-                </div>
-                <button onClick={() => showList('mine')} className="mt-3 block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">Mes participations</button>
-                <Link href="/profile" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10">Voir mon profil</Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <SiteTopbar title="Le Monde Magique" rpView={view} />
+      <div className="relative z-20 flex shrink-0 justify-end border-b border-amber-200/10 bg-[#17111f]/75 px-3 py-2 sm:px-6">
+        <button onClick={() => openCreate()} className="rounded-lg border border-amber-300/55 bg-amber-300/15 px-3 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/25">
+          + Nouveau RP
+        </button>
+      </div>
 
 {/* Background de la sous-zone sélectionnée */}
 {view === 'location' && selectedLocation?.image_url && (

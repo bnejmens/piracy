@@ -9,6 +9,7 @@ import DOMPurify from 'isomorphic-dompurify'
 import { supabase } from '@/lib/supabaseClient'
 import YouTubePlaylistPlayer from '@/components/offrecords/YouTubePlaylistPlayer'
 import Bipolar from '@/components/PersonalityTraitScale'
+import SiteTopbar, { CHARACTER_EVENT } from '@/components/SiteTopbar'
 import RpInvestigation from '@/components/RpInvestigation'
 
  // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
@@ -150,7 +151,6 @@ export default function RPPage() {
   const [myIdentities, setMyIdentities] = useState([])
 
   // Persos du compte
-  const [myChars, setMyChars] = useState([])
   const [postAsCharId, setPostAsCharId] = useState(null)
 
   // Sujets & posts
@@ -371,22 +371,14 @@ async function openPosterCard(authorId, authorCharacterId) {
     setSoundtrackEditorOpen(false)
   }
 
-  // Source de vérité = me.active_character_id ; fallback = premier perso actif
-  // Utiliser automatiquement le personnage actif du compte
-useEffect(() => {
-  if (!myChars.length) {
-    setPostAsCharId(null)
-    return
-  }
+  useEffect(() => {
+    const onCharacterChanged = event => {
+      if (event.detail?.characterId) setPostAsCharId(event.detail.characterId)
+    }
+    window.addEventListener(CHARACTER_EVENT, onCharacterChanged)
+    return () => window.removeEventListener(CHARACTER_EVENT, onCharacterChanged)
+  }, [])
 
-  const currentCharacter = myChars.find(
-    c => String(c.id) === String(me?.active_character_id)
-  )
-
-  setPostAsCharId(
-    currentCharacter?.id || myChars[0].id
-  )
-}, [myChars, me?.active_character_id])
   // Boot
   useEffect(() => {
     const run = async () => {
@@ -410,10 +402,9 @@ useEffect(() => {
         .from('characters')
         .select('id, name, avatar_url, is_active')
         .eq('user_id', session.user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-      setMyChars(chars || [])
-      setPostAsCharId(myProfile?.active_character_id || (chars?.[0]?.id ?? null))
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+      setPostAsCharId(chars?.find(c => c.is_active)?.id || chars?.find(c => c.id === myProfile?.active_character_id)?.id || chars?.[0]?.id || null)
 
       await loadTopics()
     }
@@ -750,18 +741,9 @@ const loadTopics = async () => {
     />
   )}
 
-  {/* Barre de navigation */}
-  <header className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 px-3 py-3 shadow-lg backdrop-blur-xl sm:px-6">
-
-    <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2">
-
-      <button
-        onClick={() => router.push('/rp')}
-        className="mr-auto font-serif text-xl text-amber-100 hover:text-amber-300"
-      >
-        Le Monde Magique
-      </button>
-
+  <SiteTopbar title="Scènes RP" />
+  <div className="relative z-30 shrink-0 border-b border-amber-200/15 bg-[#17111f]/85 px-3 py-2 sm:px-6">
+    <div className="mx-auto flex max-w-[1650px] flex-wrap items-center gap-2">
       <button
         onClick={() => {
   setSceneMenuOpen(v => !v)
@@ -857,22 +839,6 @@ const loadTopics = async () => {
 </div>
 
 
-
-        <button onClick={() => router.push('/messages')} className="rounded-lg px-3 py-2 hover:bg-white/10">
-          Messagerie
-        </button>
-
-        <button onClick={() => router.push('/profile')} className="rounded-lg px-3 py-2 hover:bg-white/10">
-          Profil
-        </button>
-
-        <a href="/wiki" target="_blank" rel="noopener noreferrer" className="rounded-lg px-3 py-2 hover:bg-white/10">
-          Wiki ↗
-        </a>
-
-        <button onClick={() => router.push('/dashboard')} className="rounded-lg px-3 py-2 hover:bg-white/10">
-          Tableau de bord
-        </button>
 
       </nav>
     </div>
@@ -993,15 +959,15 @@ const loadTopics = async () => {
         </div>
       </div>
     )}
-  </header>
+  </div>
 
   {/* Titre et localisation */}
   <div className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-amber-200/10 bg-[#15111d]/70 px-4 py-3 lg:px-6">
     <div className="min-w-0">
 
-      <h1 className="truncate font-serif text-lg text-amber-100 sm:text-2xl">
+      <h2 className="truncate font-serif text-lg text-amber-100 sm:text-2xl">
         {activeTopic?.title || 'Lecture RP'}
-      </h1>
+      </h2>
       {activeTopic?.is_archived && <span className="mt-1 inline-flex rounded-full border border-amber-200/25 bg-amber-200/10 px-2 py-0.5 text-[11px] text-amber-100">Archivé · Lecture seule</span>}
 
       <p className="truncate text-xs text-amber-200/65">

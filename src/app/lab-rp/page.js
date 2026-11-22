@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
+import SiteTopbar from '@/components/SiteTopbar'
 import './lab.css'
 
 const Writing = dynamic(() => import('./writing'), { ssr: false })
@@ -19,6 +20,8 @@ const tabs = [
 export default function LabPage() {
   const [tab, setTab] = useState('writing')
   return (
+    <>
+    <SiteTopbar title="Aperçu RP" />
     <main className="rp-lab">
       <header>
         <h1>Les archives de Poudlard</h1>
@@ -34,5 +37,6 @@ export default function LabPage() {
       {tab === 'adventure' && <section><Adventure /></section>}
       {tab === 'relations' && <section><Relations /></section>}
     </main>
+    </>
   )
 }
