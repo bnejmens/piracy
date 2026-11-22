@@ -9,6 +9,7 @@ import DOMPurify from 'isomorphic-dompurify'
 import { supabase } from '@/lib/supabaseClient'
 import YouTubePlaylistPlayer from '@/components/offrecords/YouTubePlaylistPlayer'
 import Bipolar from '@/components/PersonalityTraitScale'
+import RpInvestigation from '@/components/RpInvestigation'
 
  // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
  const IFRAME_HOST_OK = /(^|\.)((youtube\.com)|(youtube-nocookie\.com)|(youtu\.be)|(player\.vimeo\.com))$/i;
@@ -158,6 +159,55 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+  const [investigationState, setInvestigationState] = useState({ topicId: null, items: [], error: '' })
+  const investigationRequest = useRef(0)
+  const investigationWrites = useRef(0)
+  const investigationTopicId = activeTopic?.id
+  const investigationUserId = session?.user?.id
+  const investigations = investigationState.topicId === investigationTopicId ? investigationState.items : []
+  const investigationsByPost = new Map(investigations.filter(item => item.postId).map(item => [item.postId, item]))
+
+  useEffect(() => {
+    if (!investigationTopicId || !investigationUserId) return
+    let active = true
+
+    const refresh = async () => {
+      if (investigationWrites.current) return
+      const request = ++investigationRequest.current
+      const { data, error } = await supabase.rpc('rp_investigation_action', { p_topic: investigationTopicId })
+      if (!active || request !== investigationRequest.current) return
+      setInvestigationState(previous => ({
+        topicId: investigationTopicId,
+        items: error && previous.topicId === investigationTopicId ? previous.items : data || [],
+        error: error?.message || '',
+      }))
+    }
+
+    refresh()
+    const timer = window.setInterval(() => { if (!document.hidden) refresh() }, 15000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [investigationTopicId, investigationUserId])
+
+  const actOnInvestigation = async (action, payload) => {
+    ++investigationRequest.current
+    ++investigationWrites.current
+    try {
+      const { data, error } = await supabase.rpc('rp_investigation_action', {
+        p_topic: investigationTopicId, p_action: action, p_data: payload,
+      })
+      if (error) throw error
+      setInvestigationState(previous => previous.topicId === investigationTopicId
+        ? { topicId: investigationTopicId, items: data || [], error: '' }
+        : previous)
+    } finally {
+      --investigationWrites.current
+    }
+  }
   const [soundtrack, setSoundtrack] = useState(null)
   const [soundtrackOpen, setSoundtrackOpen] = useState(false)
   const [soundtrackTracks, setSoundtrackTracks] = useState([])
@@ -1208,7 +1258,8 @@ onVimeo={() => {
             {activeTopic && posts.map(p => {
               const mine = p.author_id === session?.user?.id
               return (
-                <article key={p.id}
+                <div key={p.id} className="min-w-0 space-y-2">
+                <article
                          className="relative rounded-2xl border px-4 py-3"
                          style={frost(mine ? GLASS.cardMine : GLASS.cardOther)}>
 
@@ -1267,8 +1318,23 @@ onVimeo={() => {
                     />
                   )}
                 </article>
+                <RpInvestigation
+                  postId={p.id}
+                  investigation={investigationsByPost.get(p.id)}
+                  canPropose={mine && !activeTopic.is_archived && investigationState.topicId === activeTopic.id && !investigationState.error}
+                  archived={activeTopic.is_archived}
+                  onAction={actOnInvestigation}
+                />
+                </div>
               )
             })}
+            {investigations.filter(item => !item.postId).map(item => (
+              <RpInvestigation key={item.id} investigation={item}
+                archived={activeTopic?.is_archived} onAction={actOnInvestigation} />
+            ))}
+            {activeTopic && investigationState.topicId === activeTopic.id && investigationState.error && (
+              <p className="text-xs text-rose-200" role="status">Les enquêtes sont momentanément indisponibles.</p>
+            )}
             {activeTopic && !posts.length && (
               <div className="text-white/60 text-sm">Pas encore de posts.</div>
             )}
