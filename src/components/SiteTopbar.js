@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import SoundTrigger from '@/components/audio/SoundTrigger'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -195,7 +196,9 @@ export default function SiteTopbar({ title, rpView }) {
 
         </div>
 
-        {signedIn && <div className="relative col-start-2 row-start-1 justify-self-end sm:ml-2">
+        <div className="col-start-2 row-start-1 flex items-center justify-self-end gap-2 sm:ml-2">
+          <SoundTrigger inline onOpen={closeMenus} />
+          {signedIn && <div className="relative">
           <button
             type="button"
             onClick={() => {
@@ -274,6 +277,7 @@ export default function SiteTopbar({ title, rpView }) {
             Connexion
           </Link>
         )}
+        </div>
       </div>
     </header>
   )

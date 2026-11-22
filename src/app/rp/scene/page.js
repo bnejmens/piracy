@@ -11,6 +11,7 @@ import YouTubePlaylistPlayer from '@/components/offrecords/YouTubePlaylistPlayer
 import Bipolar from '@/components/PersonalityTraitScale'
 import SiteTopbar, { CHARACTER_EVENT } from '@/components/SiteTopbar'
 import RpInvestigation from '@/components/RpInvestigation'
+import RpPostReader from '@/components/RpPostReader'
 
  // Autoriser uniquement les iframes de Youtube/Vimeo (et durcir leurs attributs)
  const IFRAME_HOST_OK = /(^|\.)((youtube\.com)|(youtube-nocookie\.com)|(youtu\.be)|(player\.vimeo\.com))$/i;
@@ -159,6 +160,20 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+  const [readerPostId, setReaderPostId] = useState(null)
+  const [readerTextSize, setReaderTextSize] = useState(19)
+  const readerTrigger = useRef(null)
+  const readerPost = posts.find(post => post.id === readerPostId && post.topic_id === activeTopic?.id)
+
+  function openPostReader(event, postId) {
+    readerTrigger.current = event.currentTarget.closest('article')?.querySelector('[data-reader-trigger]')
+    setReaderPostId(postId)
+  }
+
+  function closePostReader() {
+    setReaderPostId(null)
+    readerTrigger.current?.focus({ preventScroll: true })
+  }
   const [investigationState, setInvestigationState] = useState({ topicId: null, items: [], error: '' })
   const investigationRequest = useRef(0)
   const investigationWrites = useRef(0)
@@ -1278,10 +1293,22 @@ onVimeo={() => {
                       </div>
                     </div>
                   ) : (
-                    <div
-                      className="rp-body prose prose-invert min-w-0 max-w-none break-words prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
-                      dangerouslySetInnerHTML={{ __html: p.content_html }}
-                    />
+                    <>
+                      <div
+                        className="rp-body prose prose-invert min-w-0 max-w-none cursor-zoom-in break-words prose-headings:mt-4 prose-p:my-2 prose-li:my-1 prose-img:rounded-lg prose-hr:border-white/20"
+                        onClick={event => {
+                          if (event.target.closest('a, button, input, select, textarea, iframe, video, audio, [contenteditable], [role="button"]')) return
+                          if (window.getSelection()?.toString()) return
+                          openPostReader(event, p.id)
+                        }}
+                        dangerouslySetInnerHTML={{ __html: p.content_html }}
+                      />
+                      <button type="button" data-reader-trigger aria-haspopup="dialog"
+                        onClick={event => openPostReader(event, p.id)}
+                        className="mt-3 rounded-lg border border-amber-200/25 px-3 py-2 text-xs text-amber-100 hover:bg-amber-200/10">
+                        Lire en grand
+                      </button>
+                    </>
                   )}
                 </article>
                 <RpInvestigation
@@ -1308,6 +1335,18 @@ onVimeo={() => {
           </div>
         </section>
       </div>
+
+{readerPost && (
+  <RpPostReader key={readerPost.id} title={activeTopic?.title}
+    html={DOMPurify.sanitize(readerPost.content_html || '', {
+      ALLOWED_TAGS, ALLOWED_ATTR,
+      ADD_TAGS: ['iframe'],
+      ADD_ATTR: ['allow','allowfullscreen','frameborder','referrerpolicy','loading'],
+    })}
+    textSize={readerTextSize} onTextSizeChange={setReaderTextSize} onClose={closePostReader}>
+    <PostHeader authorCharacterId={readerPost.author_character_id} createdAt={readerPost.created_at} />
+  </RpPostReader>
+)}
 
 {viewer && (
   <ProfileModal viewer={viewer} onClose={() => setViewer(null)} />
@@ -1518,9 +1557,9 @@ function PostHeader({ authorCharacterId, createdAt, onAvatarClick }) {
       <button
         type="button"
         onClick={onAvatarClick}
-        disabled={!display || !authorCharacterId}
+        disabled={!display || !authorCharacterId || !onAvatarClick}
         className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white/25 bg-white/10 shadow-[0_8px_24px_rgba(0,0,0,.25)] focus:outline-none hover:ring-amber-300/60 transition"
-        title={display && authorCharacterId ? "Voir la fiche" : undefined}
+        title={display && authorCharacterId && onAvatarClick ? "Voir la fiche" : undefined}
       >
         {authorCharacterId && display?.avatar_url
           ? <img src={display.avatar_url} alt="" className="w-full h-full object-cover" />
