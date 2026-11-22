@@ -160,6 +160,7 @@ export default function RPPage() {
   const [topicsPage, setTopicsPage] = useState(1)
   const [activeTopic, setActiveTopic] = useState(null)
   const [posts, setPosts] = useState([])
+  const postsRequest = useRef(0)
   const [readerPostId, setReaderPostId] = useState(null)
   const [readerTextSize, setReaderTextSize] = useState(19)
   const readerTrigger = useRef(null)
@@ -522,6 +523,7 @@ const loadTopics = async () => {
 
 
   const loadPosts = async (topicId) => {
+    const request = ++postsRequest.current
     const data = []
     const pageSize = 300
     for (let offset = 0; ; offset += pageSize) {
@@ -532,30 +534,28 @@ const loadTopics = async () => {
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
         .range(offset, offset + pageSize - 1)
+      if (request !== postsRequest.current) return
       if (error) { console.error(error); return }
       data.push(...batch)
       if (batch.length < pageSize) break
     }
     setPosts(data)
 
-    // Rafraîchir les avatars du topic courant, y compris après un nouveau post.
-    const ids = [...new Set((data || []).map(post => post.author_character_id).filter(Boolean))]
-    if (ids.length) {
-      const { data: participants, error: participantError } = await supabase
+    // Charger les portraits par lots pour limiter la taille des requêtes.
+    const ids = [...new Set(data.map(post => post.author_character_id).filter(Boolean))]
+    const participants = []
+    for (let offset = 0; offset < ids.length; offset += pageSize) {
+      const { data: batch, error } = await supabase
         .from('characters')
         .select('id,name,avatar_url')
-        .in('id', ids)
-      if (!participantError) {
-        setParticipantsIndex(current => ({
-          ...current,
-          [topicId]: participants || [],
-        }))
-      }
-    } else {
-      setParticipantsIndex(current => ({ ...current, [topicId]: [] }))
+        .in('id', ids.slice(offset, offset + pageSize))
+      if (request !== postsRequest.current) return
+      if (!error) participants.push(...batch)
     }
-
-    setTimeout(scrollToEnd, 0)
+    setParticipantsIndex(current => ({ ...current, [topicId]: participants }))
+    setTimeout(() => {
+      if (request === postsRequest.current) scrollToEnd()
+    }, 0)
   }
 
   const createTopic = async () => {
@@ -680,7 +680,7 @@ const loadTopics = async () => {
     const { error } = await supabase.from('rp_topics').delete().eq('id', t.id)
     if (error) { alert(error.message); return }
     setTopics(ts => ts.filter(x => x.id !== t.id))
-    if (activeTopic?.id === t.id) { setActiveTopic(null); setPosts([]) }
+    if (activeTopic?.id === t.id) { ++postsRequest.current; setActiveTopic(null); setPosts([]) }
   }
 
   /* ---------- OUTILS ---------- */
