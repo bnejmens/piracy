@@ -522,14 +522,21 @@ const loadTopics = async () => {
 
 
   const loadPosts = async (topicId) => {
-    const { data, error } = await supabase
-      .from('rp_posts')
-      .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
-      .eq('topic_id', topicId)
-      .order('created_at', { ascending: true })
-      .limit(300)
-    if (error) { console.error(error); return }
-    setPosts(data || [])
+    const data = []
+    const pageSize = 300
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: batch, error } = await supabase
+        .from('rp_posts')
+        .select('id, topic_id, author_id, author_character_id, content_raw, content_html, created_at')
+        .eq('topic_id', topicId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      if (error) { console.error(error); return }
+      data.push(...batch)
+      if (batch.length < pageSize) break
+    }
+    setPosts(data)
 
     // Rafraîchir les avatars du topic courant, y compris après un nouveau post.
     const ids = [...new Set((data || []).map(post => post.author_character_id).filter(Boolean))]
