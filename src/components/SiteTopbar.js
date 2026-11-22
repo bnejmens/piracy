@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-const CHARACTER_EVENT = 'piracy:active-character-changed'
+export const CHARACTER_EVENT = 'piracy:active-character-changed'
 
 const QUICK_LINKS = [
   { href: '/rp', label: 'Le Monde Magique (RP)' },
@@ -23,7 +23,7 @@ function CharacterPortrait({ character, size = 'h-9 w-9' }) {
     <span className={`grid ${size} shrink-0 place-items-center overflow-hidden rounded-full bg-amber-200/15 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/25`}>
       {character?.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={character.avatar_url} alt="" className="h-full w-full object-cover" />
+        <img src={character.avatar_url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
       ) : (
         (character?.name?.[0] || '?').toUpperCase()
       )}
@@ -31,8 +31,9 @@ function CharacterPortrait({ character, size = 'h-9 w-9' }) {
   )
 }
 
-export default function SiteTopbar({ title }) {
+export default function SiteTopbar({ title, rpView }) {
   const pathname = usePathname()
+  const headerRef = useRef(null)
   const [quickMenuOpen, setQuickMenuOpen] = useState(false)
   const [characterMenuOpen, setCharacterMenuOpen] = useState(false)
   const [characters, setCharacters] = useState([])
@@ -64,7 +65,9 @@ export default function SiteTopbar({ title }) {
 
     const all = data || []
     setCharacters(all)
-    setActiveCharacter(all.find(c => c.is_active) || all[0] || null)
+    const current = all.find(c => c.is_active) || all[0] || null
+    setActiveCharacter(current)
+    return current
   }, [])
 
   useEffect(() => {
@@ -74,6 +77,28 @@ export default function SiteTopbar({ title }) {
     window.addEventListener(CHARACTER_EVENT, loadCharacters)
     return () => window.removeEventListener(CHARACTER_EVENT, loadCharacters)
   }, [pathname, loadCharacters])
+
+  useEffect(() => {
+    if (!quickMenuOpen && !characterMenuOpen) return
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') {
+        setQuickMenuOpen(false)
+        setCharacterMenuOpen(false)
+      }
+    }
+    const closeOnOutsideClick = event => {
+      if (!headerRef.current?.contains(event.target)) {
+        setQuickMenuOpen(false)
+        setCharacterMenuOpen(false)
+      }
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+    }
+  }, [quickMenuOpen, characterMenuOpen])
 
   const selectCharacter = async (characterId) => {
     if (!characterId || switchingId || creating) return
@@ -89,9 +114,9 @@ export default function SiteTopbar({ title }) {
     }
 
     setCharacterMenuOpen(false)
-    await loadCharacters()
+    const character = await loadCharacters()
     window.dispatchEvent(new CustomEvent(CHARACTER_EVENT, {
-      detail: { characterId },
+      detail: { characterId, character },
     }))
   }
 
@@ -112,9 +137,9 @@ export default function SiteTopbar({ title }) {
 
     setNewName('')
     setCharacterMenuOpen(false)
-    await loadCharacters()
+    const character = await loadCharacters()
     window.dispatchEvent(new CustomEvent(CHARACTER_EVENT, {
-      detail: { characterId },
+      detail: { characterId, character },
     }))
   }
 
@@ -124,43 +149,51 @@ export default function SiteTopbar({ title }) {
   }
 
   return (
-    <header className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 shadow-lg backdrop-blur-xl">
+    <header ref={headerRef} className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 shadow-lg backdrop-blur-xl">
       <div className="mx-auto grid min-h-[64px] max-w-[1650px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-3 py-2 sm:flex sm:flex-wrap sm:gap-2 sm:px-4 sm:py-3 md:px-8">
         <h1 className="col-start-1 row-start-1 min-w-0 truncate font-serif text-lg text-amber-100 sm:mr-auto sm:text-2xl">
           {title}
         </h1>
-        <Link href="/rp" className="col-start-1 row-start-2 justify-self-start rounded-lg px-3 py-2 text-sm text-amber-50/90 transition hover:bg-white/10">
-          Le Monde Magique
-        </Link>
+        <div className="col-span-2 row-start-2 flex min-w-0 flex-wrap items-center gap-1">
+          {[
+            { view: 'mine', label: 'Mes RP' },
+            { view: 'others', label: 'Autres histoires' },
+          ].map(link => (
+            <Link key={link.view} href={`/rp?view=${link.view}`} scroll={false} onClick={closeMenus}
+              aria-current={rpView === link.view ? 'page' : undefined}
+              className="inline-flex min-h-10 items-center rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 aria-[current=page]:bg-amber-200/15 aria-[current=page]:text-amber-100 sm:px-3 sm:text-sm">
+              {link.label}
+            </Link>
+          ))}
+          <div className="ml-auto sm:relative">
+            <button
+              type="button"
+              onClick={() => {
+                setQuickMenuOpen(value => !value)
+                setCharacterMenuOpen(false)
+              }}
+              aria-expanded={quickMenuOpen}
+              aria-haspopup="true"
+              className="rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 sm:px-3 sm:text-sm"
+            >
+              Accès rapides ▾
+            </button>
+            {quickMenuOpen && (
+              <>
+                <nav aria-label="Accès rapides" className="absolute right-3 top-full z-50 mt-2 max-h-[65dvh] w-60 sm:right-0 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
+                  {QUICK_LINKS.filter(link => link.href !== pathname || link.href === '/rp').map(link => (
+                    <Link key={link.href} href={link.href} onClick={closeMenus} className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </>
+            )}
+          </div>
 
-        <div className="relative col-start-2 row-start-2 justify-self-end">
-          <button
-            type="button"
-            onClick={() => {
-              setQuickMenuOpen(value => !value)
-              setCharacterMenuOpen(false)
-            }}
-            aria-expanded={quickMenuOpen}
-            aria-haspopup="true"
-            className="rounded-lg px-3 py-2 text-sm text-amber-50/90 transition hover:bg-white/10"
-          >
-            Accès rapides ▾
-          </button>
-          {quickMenuOpen && (
-            <>
-              <button type="button" aria-label="Fermer les accès rapides" className="fixed inset-0 z-40 cursor-default" onClick={closeMenus} />
-              <nav aria-label="Accès rapides" className="absolute right-0 top-full z-50 mt-2 max-h-[70dvh] w-60 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
-                {QUICK_LINKS.filter(link => link.href !== pathname).map(link => (
-                  <Link key={link.href} href={link.href} onClick={closeMenus} className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-            </>
-          )}
         </div>
 
-        <div className="relative col-start-2 row-start-1 justify-self-end sm:ml-auto">
+        <div className="relative col-start-2 row-start-1 justify-self-end sm:ml-2">
           <button
             type="button"
             onClick={() => {
@@ -184,7 +217,6 @@ export default function SiteTopbar({ title }) {
 
           {characterMenuOpen && (
             <>
-              <button type="button" aria-label="Fermer le choix du personnage" className="fixed inset-0 z-40 cursor-default" onClick={closeMenus} />
               <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(75dvh,550px)] w-[min(90vw,340px)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/25 bg-[#271d31] p-3 text-amber-50 shadow-2xl">
                 <h2 className="mb-2 font-serif text-lg text-amber-100">Mes personnages</h2>
                 <div className="space-y-1">

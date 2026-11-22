@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import SoundTrigger from '@/components/audio/SoundTrigger'
+import SiteTopbar, { CHARACTER_EVENT } from '@/components/SiteTopbar'
 
 export default function MessagesPage() {
   const router = useRouter()
@@ -105,6 +106,19 @@ export default function MessagesPage() {
       setCurrentSpeakerId(myChars.find(ch => ch.id === me?.active_character_id)?.id || myChars[0].id)
     }
   }, [myChars, currentSpeakerId])
+
+  useEffect(() => {
+    const onCharacterChanged = event => {
+      const { characterId, character } = event.detail || {}
+      if (!characterId) return
+      setCurrentSpeakerId(characterId)
+      if (character?.id === characterId) {
+        setMyChars(current => [{ ...character, user_id: session?.user?.id }, ...current.filter(item => item.id !== characterId)])
+      }
+    }
+    window.addEventListener(CHARACTER_EVENT, onCharacterChanged)
+    return () => window.removeEventListener(CHARACTER_EVENT, onCharacterChanged)
+  }, [session?.user?.id])
 
   /* ==================== LOADERS ==================== */
   const loadConversations = async () => {
@@ -563,23 +577,22 @@ const createConversation = async () => {
   const filteredConvos = convos.filter(c => (c.title || infoForConv(c).label).toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-slate-950 px-0 py-0 text-white sm:px-4 sm:py-6">
+    <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0 bg-cover bg-center opacity-45" style={{ backgroundImage: "url('/images/msg-bg.webp')" }} />
       <div className="absolute inset-0 bg-slate-950/35" />
-      <section className="relative z-10 flex h-[100dvh] min-h-0 w-full max-w-[490px] flex-col overflow-hidden border border-white/15 bg-slate-950/90 shadow-[0_20px_90px_rgba(0,0,0,.65)] backdrop-blur-xl sm:h-[min(850px,94dvh)] sm:rounded-[32px] sm:border-[5px] sm:border-slate-700">
+      <SiteTopbar title="Messagerie" />
+      <div className="relative flex min-h-0 flex-1 justify-center sm:p-4">
+      <section className="relative z-10 flex min-h-0 w-full max-w-[490px] flex-col overflow-hidden border border-white/15 bg-slate-950/90 shadow-[0_20px_90px_rgba(0,0,0,.65)] backdrop-blur-xl sm:rounded-[32px] sm:border-[5px] sm:border-slate-700">
         <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-white/5 px-4 py-3">
           {screen === 'chat' ? (
             <button type="button" aria-label="Retour aux conversations" onClick={() => { setScreen('conversations'); setKeyboardOpen(false) }} className="rounded-full p-2 hover:bg-white/10">←</button>
           ) : <span className="text-lg text-amber-300">✦</span>}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h1>
+            <h2 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h2>
             {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG'}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <SoundTrigger inline />
-            <div className="rounded-full border border-amber-200/25 p-0.5" title={activeCharacter ? `Personnage actif : ${activeCharacter.name}` : 'Personnage actif'}>
-              <Avatar name={activeCharacter?.name || me?.pseudo || 'Joueur'} src={activeCharacter?.avatar_url || null} size="h-10 w-10" />
-            </div>
           </div>
         </header>
 
@@ -655,9 +668,9 @@ const createConversation = async () => {
           {navButton('Conversations', 'conversations')}
           {navButton('Contacts', 'contacts')}
           {navButton('Nouveau +', 'compose')}
-          <button type="button" onClick={() => router.push('/dashboard')} className="flex-1 py-3 text-xs text-white/60 hover:text-white sm:text-sm">Accueil</button>
         </nav>
       </section>
+      </div>
     </main>
   )
 }

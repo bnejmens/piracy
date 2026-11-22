@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import SiteTopbar from '@/components/SiteTopbar'
 import { supabase } from '@/lib/supabaseClient'
 
 function cx(...c){return c.filter(Boolean).join(' ')}
@@ -180,8 +181,8 @@ export default function AdminHub() {
     return (
       <main className="min-h-screen text-white">
         <Bg />
+        <SiteTopbar title="Administration" />
         <div className="mx-auto max-w-6xl px-3 py-5 sm:p-6">
-          <Topbar />
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-6">
             Connecte-toi pour accéder au tableau d’administration.
           </div>
@@ -193,8 +194,8 @@ export default function AdminHub() {
     return (
       <main className="min-h-screen text-white">
         <Bg />
+        <SiteTopbar title="Administration" />
         <div className="mx-auto max-w-6xl px-3 py-5 sm:p-6">
-          <Topbar />
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-6">
             Accès réservé aux administrateurs.
           </div>
@@ -206,8 +207,8 @@ export default function AdminHub() {
   return (
     <main className="min-h-screen text-white">
       <Bg />
+        <SiteTopbar title="Administration" />
       <div className="mx-auto max-w-6xl px-3 py-5 sm:p-6">
-        <Topbar />
 
         {/* Onglets + recherche */}
         <div className="mt-4 flex flex-wrap gap-2">
@@ -419,16 +420,6 @@ export default function AdminHub() {
   )
 }
 
-function Topbar() {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="min-w-0 text-xl font-semibold sm:text-2xl">Tableau d’administration</h1>
-      <Link href="/dashboard" className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15">
-        ← Retour
-      </Link>
-    </div>
-  )
-}
 
 function Bg() {
   return (
