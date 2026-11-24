@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import SiteTopbar, { CHARACTER_EVENT } from '@/components/SiteTopbar'
 
+const EMOJIS = '😀 😃 😄 😁 😆 😂 🤣 😊 🙂 🙃 😉 😍 🥰 😘 😋 😎 🤩 🥳 😇 🤔 🤭 🤫 😏 😒 🙄 😬 😴 🥺 😢 😭 😱 😳 😤 😡 🤯 🤗 😅 😮 👍 👎 👌 ✌️ 🙌 🙏 👏 👋 🤝 💪 ❤️ 🩷 💛 💙 💜 🖤 💔 ✨ ⭐ 🔥 🎉 💯 ✅ ❌ 👀 💬 ☕ 🍕 🎁 🎵 🫶 🤍 🌙 🌸'.split(' ')
+
 export default function MessagesPage() {
   const router = useRouter()
 
@@ -28,6 +30,10 @@ export default function MessagesPage() {
   const [sending, setSending] = useState(false)
   const [screen, setScreen] = useState('conversations')
   const [search, setSearch] = useState('')
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState('')
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [caps, setCaps] = useState(false)
   const inputRef = useRef(null)
@@ -37,7 +43,6 @@ export default function MessagesPage() {
 
   // Index auxiliaires
   const [lastMsgByConv, setLastMsgByConv] = useState({})
-  const [speakersByConv, setSpeakersByConv] = useState({})
   const [participantsByConv, setParticipantsByConv] = useState({})
   const [charCache, setCharCache] = useState({})
 
@@ -53,6 +58,10 @@ export default function MessagesPage() {
 
   // Utils
   const endRef = useRef(null)
+  const closeComposerTools = () => {
+    setEmojiOpen(false)
+    setKeyboardOpen(false)
+  }
   const scrollToBottom = () =>
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   const short = (s, n = 48) => (s?.length > n ? s.slice(0, n) + '…' : s || '')
@@ -135,30 +144,23 @@ export default function MessagesPage() {
     if (!ids.length) {
       setLastMsgByConv({})
       setParticipantsByConv({})
-      setSpeakersByConv({})
       return
     }
 
     // Derniers messages
     const { data: msgs, error: e2 } = await supabase
       .from('messages')
-      .select('conversation_id, sender_id, sender_character_id, content, created_at')
+      .select('id, conversation_id, content, created_at')
       .in('conversation_id', ids)
       .order('conversation_id', { ascending: true })
       .order('created_at', { ascending: false })
     if (e2) throw e2
 
     const map = {}
-    const speakers = {}
     for (const m of msgs) {
-      if (m.sender_id && m.sender_character_id) {
-        const byUser = speakers[m.conversation_id] ||= {}
-        byUser[m.sender_id] ??= String(m.sender_character_id)
-      }
-      if (!map[m.conversation_id]) map[m.conversation_id] = { content: m.content, created_at: m.created_at }
+      if (!map[m.conversation_id]) map[m.conversation_id] = { id: m.id, content: m.content, created_at: m.created_at }
     }
     setLastMsgByConv(map)
-    setSpeakersByConv(speakers)
 
     // Participants des groupes
     const { data: parts, error: e3 } = await supabase
@@ -233,11 +235,13 @@ export default function MessagesPage() {
   const openConversation = async (conv) => {
     setActiveConv(conv)
     setScreen('chat')
-    setKeyboardOpen(false)
+    closeComposerTools()
+    setEditing(null)
+    setEditError('')
     setMessages([])
     const { data, error } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
+      .select('id, conversation_id, sender_id, sender_character_id, content, created_at, edited_at')
       .eq('conversation_id', conv.id)
       .order('created_at', { ascending: true })
       .limit(500)
@@ -254,16 +258,16 @@ export default function MessagesPage() {
     if (!session?.user?.id || !conversationId || !myCharId) {
       throw new Error('Sélectionne un personnage actif pour envoyer un message.')
     }
-    // La clé primaire Supabase est (conversation_id, user_id, character_id).
-    const { data: existing, error: lookupError } = await supabase
+    const { data: memberships, error: lookupError } = await supabase
       .from('conversation_participants')
       .select('character_id')
       .eq('conversation_id', conversationId)
       .eq('user_id', session.user.id)
-      .eq('character_id', myCharId)
-      .maybeSingle()
     if (lookupError) throw lookupError
-    if (existing) return
+    if (memberships.some(member => member.character_id === myCharId)) return
+    if (memberships.length) {
+      throw new Error('Sélectionne le personnage qui participe à cette conversation.')
+    }
 
     const { data: conv, error: convError } = await supabase
       .from('conversations')
@@ -296,7 +300,7 @@ export default function MessagesPage() {
       const { data, error } = await supabase
         .from('messages')
         .insert(payload)
-        .select('id, conversation_id, sender_id, sender_character_id, content, created_at')
+        .select('id, conversation_id, sender_id, sender_character_id, content, created_at, edited_at')
         .single()
       if (error) throw error
 
@@ -503,6 +507,42 @@ const createConversation = async () => {
   }
 
   /* ==================== TÉLÉPHONE ==================== */
+  const insertEmoji = emoji => {
+    const field = inputRef.current
+    const start = field?.selectionStart ?? input.length
+    const end = field?.selectionEnd ?? start
+    setInput(value => value.slice(0, start) + emoji + value.slice(end))
+    requestAnimationFrame(() => inputRef.current?.setSelectionRange(start + emoji.length, start + emoji.length))
+  }
+
+  const saveMessageEdit = async event => {
+    event.preventDefault()
+    const content = editing?.content.trim()
+    const original = messages.find(message => message.id === editing?.id)
+    if (!content || savingEdit || !original || !isMine(original) || original.sender_id !== session?.user?.id) return
+    if (content === original.content) { setEditing(null); return }
+    setSavingEdit(true)
+    setEditError('')
+    try {
+      const { data, error } = await supabase.from('messages')
+        .update({ content })
+        .eq('id', original.id)
+        .eq('sender_character_id', original.sender_character_id)
+        .select('id, content, edited_at')
+        .single()
+      if (error) throw error
+      setMessages(current => current.map(message => message.id === data.id ? { ...message, ...data } : message))
+      setLastMsgByConv(current => current[original.conversation_id]?.id === data.id
+        ? { ...current, [original.conversation_id]: { ...current[original.conversation_id], content: data.content } }
+        : current)
+      setEditing(current => current?.id === data.id ? null : current)
+    } catch (error) {
+      setEditError(error.message || 'Impossible de modifier ce message.')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const pressKey = (key) => {
     if (key === 'shift') { setCaps(v => !v); return }
     if (key === 'backspace') { setInput(v => v.slice(0, -1)); return }
@@ -527,17 +567,7 @@ const createConversation = async () => {
       conv.direct_key.slice(2).split('_').filter(Boolean).forEach(id => ids.add(String(id)))
     }
 
-    const characters = [...ids].map(id => charsById.get(id)).filter(Boolean)
-    const portraitsByPlayer = new Map()
-    for (const character of characters) {
-      const key = character.user_id || character.id
-      const preferred = speakersByConv[conv.id]?.[character.user_id]
-        || (character.user_id === session?.user?.id ? currentSpeakerId : null)
-      if (!portraitsByPlayer.has(key) || String(character.id) === String(preferred)) {
-        portraitsByPlayer.set(key, character)
-      }
-    }
-    const portraits = [...portraitsByPlayer.values()]
+    const portraits = [...ids].map(id => charsById.get(id)).filter(Boolean)
     portraits.sort((a, b) =>
       Number(a.user_id === session?.user?.id) - Number(b.user_id === session?.user?.id))
 
@@ -580,7 +610,7 @@ const createConversation = async () => {
   }
 
   const navButton = (label, target) => (
-    <button type="button" onClick={() => { setScreen(target); setKeyboardOpen(false) }}
+    <button type="button" onClick={() => { setScreen(target); closeComposerTools() }}
       className={`flex-1 py-3 text-xs sm:text-sm transition ${screen === target ? 'text-amber-300' : 'text-white/60 hover:text-white'}`}>
       {label}
     </button>
@@ -602,7 +632,7 @@ const createConversation = async () => {
       <section className="relative z-10 flex min-h-0 w-full max-w-[490px] flex-col overflow-hidden border border-white/15 bg-slate-950/90 shadow-[0_20px_90px_rgba(0,0,0,.65)] backdrop-blur-xl sm:rounded-[32px] sm:border-[5px] sm:border-slate-700">
         <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-white/5 px-4 py-3">
           {screen === 'chat' ? (
-            <button type="button" aria-label="Retour aux conversations" onClick={() => { setScreen('conversations'); setKeyboardOpen(false) }} className="rounded-full p-2 hover:bg-white/10">←</button>
+            <button type="button" aria-label="Retour aux conversations" onClick={() => { setScreen('conversations'); closeComposerTools() }} className="rounded-full p-2 hover:bg-white/10">←</button>
           ) : <span className="text-lg text-amber-300">✦</span>}
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h2>
@@ -653,12 +683,32 @@ const createConversation = async () => {
               const sender = m.sender_character_id ? charsById.get(String(m.sender_character_id)) : null
               const missing = !m.sender_character_id
               const senderName = missing ? 'Missing' : sender?.name
+              const editable = mine && m.sender_id === session?.user?.id
+              const editingThis = editable && editing?.id === m.id
               return <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
                 {!mine && <Avatar name={senderName} src={sender?.avatar_url} size="h-8 w-8" />}
-                <div className={`max-w-[80%] rounded-2xl px-3 py-2 shadow ${mine ? 'rounded-br-sm bg-sky-600/90 text-white' : missing ? 'rounded-bl-sm bg-slate-600 text-white' : 'rounded-bl-sm bg-amber-200 text-slate-950'}`}>
+                <div className="min-w-0 max-w-[80%]">
+                  {editable && !editingThis && (
+                    <button type="button" disabled={savingEdit}
+                      onClick={() => { setEditing({ id: m.id, content: m.content }); setEditError('') }}
+                      className="ml-auto block px-1 pb-0.5 text-[11px] text-sky-200/80 hover:underline">Modifier</button>
+                  )}
+                <div className={`rounded-2xl px-3 py-2 shadow ${mine ? 'rounded-br-sm bg-sky-600/90 text-white' : missing ? 'rounded-bl-sm bg-slate-600 text-white' : 'rounded-bl-sm bg-amber-200 text-slate-950'}`}>
                   {senderName && <div className={`mb-1 text-[10px] font-semibold ${mine ? 'text-sky-100' : missing ? 'text-slate-200' : 'text-amber-900'}`}>{senderName}</div>}
-                  <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>
-                  <div className={`mt-1 text-right text-[10px] ${mine || missing ? 'text-white/60' : 'text-slate-700/60'}`}>{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  {editingThis ? (
+                    <form onSubmit={saveMessageEdit} className="space-y-2">
+                      <textarea autoFocus aria-label="Modifier le message" value={editing.content}
+                        onChange={event => setEditing({ id: m.id, content: event.target.value })}
+                        className="block min-h-20 w-full min-w-0 resize-y rounded-lg bg-black/25 p-2 text-sm outline-amber-200" />
+                      <div className="flex flex-wrap justify-end gap-3 text-xs">
+                        <button type="button" disabled={savingEdit} onClick={() => setEditing(null)}>Annuler</button>
+                        <button type="submit" disabled={savingEdit || !editing.content.trim()} className="font-semibold disabled:opacity-50">Enregistrer</button>
+                      </div>
+                      {editError && <p role="alert" className="text-xs text-rose-100">{editError}</p>}
+                    </form>
+                  ) : <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>}
+                  <div className={`mt-1 text-right text-[10px] ${mine || missing ? 'text-white/60' : 'text-slate-700/60'}`}>{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{m.edited_at && ' · Modifié'}</div>
+                </div>
                 </div>
               </div>
             })}
@@ -669,9 +719,22 @@ const createConversation = async () => {
         {screen === 'chat' && <div className="shrink-0 border-t border-white/10 bg-slate-900/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-3">
           <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-2">
             <textarea ref={inputRef} rows={1} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage() } }} placeholder="Écrire un message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm outline-none placeholder:text-white/40" />
-            <button type="button" onClick={() => setKeyboardOpen(v => !v)} aria-label="Afficher ou masquer le clavier visuel" className="rounded-xl border border-white/15 px-3 py-3 text-sm hover:bg-white/10">⌨</button>
+            <button type="button" onClick={() => { setKeyboardOpen(v => !v); setEmojiOpen(false) }} aria-label="Afficher ou masquer le clavier visuel" className="rounded-xl border border-white/15 px-3 py-3 text-sm hover:bg-white/10">⌨</button>
+            <button type="button" onClick={() => { setEmojiOpen(open => !open); setKeyboardOpen(false) }}
+              aria-label="Émojis" aria-expanded={emojiOpen} aria-controls="message-emojis"
+              className="rounded-xl border border-white/15 px-2.5 py-3 text-sm hover:bg-white/10">☺</button>
             <button type="submit" disabled={sending || !input.trim()} className="rounded-xl bg-amber-300 px-3 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40">➤</button>
           </form>
+          {emojiOpen && (
+            <div id="message-emojis" aria-label="Émojis classiques" className="mt-2 max-h-[26dvh] overflow-y-auto rounded-xl border border-white/10 bg-slate-800/70 p-2">
+              <div className="grid grid-cols-6 gap-1 min-[375px]:grid-cols-8">
+                {EMOJIS.map(emoji => (
+                  <button type="button" key={emoji} onMouseDown={event => event.preventDefault()} onClick={() => insertEmoji(emoji)}
+                    className="grid h-9 place-items-center rounded-md text-xl hover:bg-white/10">{emoji}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {keyboardOpen && <div className="mt-3 max-h-[32dvh] space-y-1.5 overflow-y-auto select-none" onMouseDown={e => e.preventDefault()}>
             {['1234567890', 'azertyuiop', 'qsdfghjklm', 'wxcvbn'].map((row, i) => <div key={i} className="flex justify-center gap-1">{Array.from(row).map(k => <button key={k} type="button" onClick={() => pressKey(k)} className="h-10 min-w-0 flex-1 rounded-md bg-slate-700 text-sm font-medium active:bg-amber-400 active:text-slate-950">{caps ? k.toUpperCase() : k}</button>)}</div>)}
             <div className="flex gap-1"><button type="button" onClick={() => pressKey('.')} className="rounded-md bg-slate-700 px-2 py-2 text-xs">.</button><button type="button" onClick={() => pressKey(',')} className="rounded-md bg-slate-700 px-2 py-2 text-xs">,</button><button type="button" onClick={() => pressKey('shift')} className="rounded-md bg-slate-700 px-3 py-2 text-xs">⇧</button><button type="button" onClick={() => pressKey('space')} className="flex-1 rounded-md bg-slate-700 py-2 text-xs">Espace</button><button type="button" onClick={() => pressKey('backspace')} className="rounded-md bg-slate-700 px-3 py-2 text-xs">⌫</button><button type="button" onClick={() => pressKey('enter')} className="rounded-md bg-slate-700 px-3 py-2 text-xs">↵</button></div>
