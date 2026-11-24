@@ -575,12 +575,12 @@ const createConversation = async () => {
     portraits.sort((a, b) =>
       Number(a.user_id === session?.user?.id) - Number(b.user_id === session?.user?.id))
 
-    // Pour un échange à deux, l'avatar du correspondant est le plus utile.
-    return conv.is_group ? portraits : portraits.slice(0, 1)
+    return portraits
   }
 
   const ConversationPortrait = ({ conv }) => {
-    const people = portraitsForConversation(conv)
+    const portraits = portraitsForConversation(conv)
+    const people = conv.is_group ? portraits : portraits.slice(0, 1)
     if (!people.length) {
       return (
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-amber-200/25 bg-amber-200/10 text-xl text-amber-200/70" aria-label="Conversation sans portrait">
@@ -624,6 +624,9 @@ const createConversation = async () => {
 
   const activeInfo = activeConv ? infoForConv(activeConv) : null
   const activeCharacter = myChars.find(c => String(c.id) === String(currentSpeakerId)) || myChars[0] || null
+  const otherParticipants = screen === 'chat' && activeConv
+    ? portraitsForConversation(activeConv).filter(person => String(person.id) !== String(activeCharacter?.id))
+    : []
   const filteredContacts = displayContacts.filter(c => c.is_character && c.user_id !== session?.user?.id && c.name?.toLowerCase().includes(search.toLowerCase()))
   const filteredConvos = convos.filter(c => (c.title || infoForConv(c).label).toLowerCase().includes(search.toLowerCase()))
 
@@ -639,7 +642,22 @@ const createConversation = async () => {
             <button type="button" aria-label="Retour aux conversations" onClick={() => { setScreen('conversations'); closeComposerTools() }} className="rounded-full p-2 hover:bg-white/10">←</button>
           ) : <span className="text-lg text-amber-300">✦</span>}
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h2>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h2 className="min-w-0 truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h2>
+              {otherParticipants.length > 0 && (
+                <ul aria-label="Autres participants" tabIndex={otherParticipants.length > 3 ? 0 : undefined}
+                  className="flex max-w-[44%] shrink-0 gap-1.5 overflow-x-auto overscroll-x-contain p-1">
+                  {otherParticipants.map(person => (
+                    <li key={person.id} title={person.name} className="shrink-0">
+                      <span className="sr-only">{person.name}</span>
+                      <div aria-hidden="true">
+                        <Avatar name={person.name} src={person.avatar_url} size="h-7 w-7" />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG'}</p>}
           </div>
         </header>

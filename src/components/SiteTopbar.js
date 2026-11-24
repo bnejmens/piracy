@@ -152,7 +152,7 @@ export default function SiteTopbar({ title, rpView }) {
   }
 
   return (
-    <header ref={headerRef} className="relative z-40 shrink-0 border-b border-amber-200/20 bg-[#17111f]/95 shadow-lg backdrop-blur-xl">
+    <header ref={headerRef} className="relative z-40 shrink-0 border-b border-amber-200/30 bg-[#211527] bg-[linear-gradient(105deg,#201529_0%,#332039_56%,#281924_100%)] shadow-lg backdrop-blur-xl">
       <div className="mx-auto grid min-h-[64px] max-w-[1650px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-3 py-2 sm:flex sm:flex-wrap sm:gap-2 sm:px-4 sm:py-3 md:px-8">
         <h1 className="col-start-1 row-start-1 min-w-0 truncate font-serif text-lg text-amber-100 sm:mr-auto sm:text-2xl">
           {title}
@@ -183,7 +183,7 @@ export default function SiteTopbar({ title, rpView }) {
             </button>
             {quickMenuOpen && (
               <>
-                <nav aria-label="Accès rapides" className="absolute right-3 top-full z-50 mt-2 max-h-[65dvh] w-60 sm:right-0 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#271d31] p-2 shadow-2xl">
+                <nav aria-label="Accès rapides" className="absolute right-3 top-full z-50 mt-2 max-h-[65dvh] w-60 sm:right-0 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#302037] p-2 shadow-2xl">
                   {QUICK_LINKS.filter(link => link.href !== pathname || link.href === '/rp').map(link => (
                     <Link key={link.href} href={link.href} onClick={closeMenus} className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
                       {link.label}
@@ -222,7 +222,7 @@ export default function SiteTopbar({ title, rpView }) {
 
           {characterMenuOpen && (
             <>
-              <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(75dvh,550px)] w-[min(90vw,340px)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/25 bg-[#271d31] p-3 text-amber-50 shadow-2xl">
+              <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(75dvh,550px)] w-[min(90vw,340px)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/25 bg-[#302037] p-3 text-amber-50 shadow-2xl">
                 <h2 className="mb-2 font-serif text-lg text-amber-100">Mes personnages</h2>
                 <div className="space-y-1">
                   {characters.map(character => (
