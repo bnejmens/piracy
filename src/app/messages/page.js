@@ -37,6 +37,7 @@ export default function MessagesPage() {
 
   // Index auxiliaires
   const [lastMsgByConv, setLastMsgByConv] = useState({})
+  const [speakersByConv, setSpeakersByConv] = useState({})
   const [participantsByConv, setParticipantsByConv] = useState({})
   const [charCache, setCharCache] = useState({})
 
@@ -134,23 +135,30 @@ export default function MessagesPage() {
     if (!ids.length) {
       setLastMsgByConv({})
       setParticipantsByConv({})
+      setSpeakersByConv({})
       return
     }
 
     // Derniers messages
     const { data: msgs, error: e2 } = await supabase
       .from('messages')
-      .select('conversation_id, content, created_at')
+      .select('conversation_id, sender_id, sender_character_id, content, created_at')
       .in('conversation_id', ids)
       .order('conversation_id', { ascending: true })
       .order('created_at', { ascending: false })
     if (e2) throw e2
 
     const map = {}
+    const speakers = {}
     for (const m of msgs) {
+      if (m.sender_id && m.sender_character_id) {
+        const byUser = speakers[m.conversation_id] ||= {}
+        byUser[m.sender_id] ??= String(m.sender_character_id)
+      }
       if (!map[m.conversation_id]) map[m.conversation_id] = { content: m.content, created_at: m.created_at }
     }
     setLastMsgByConv(map)
+    setSpeakersByConv(speakers)
 
     // Participants des groupes
     const { data: parts, error: e3 } = await supabase
@@ -519,7 +527,17 @@ const createConversation = async () => {
       conv.direct_key.slice(2).split('_').filter(Boolean).forEach(id => ids.add(String(id)))
     }
 
-    const portraits = [...ids].map(id => charsById.get(id)).filter(Boolean)
+    const characters = [...ids].map(id => charsById.get(id)).filter(Boolean)
+    const portraitsByPlayer = new Map()
+    for (const character of characters) {
+      const key = character.user_id || character.id
+      const preferred = speakersByConv[conv.id]?.[character.user_id]
+        || (character.user_id === session?.user?.id ? currentSpeakerId : null)
+      if (!portraitsByPlayer.has(key) || String(character.id) === String(preferred)) {
+        portraitsByPlayer.set(key, character)
+      }
+    }
+    const portraits = [...portraitsByPlayer.values()]
     portraits.sort((a, b) =>
       Number(a.user_id === session?.user?.id) - Number(b.user_id === session?.user?.id))
 
