@@ -4,10 +4,14 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { supabase } from '../../lib/supabaseClient'
 import SiteTopbar, { CHARACTER_EVENT } from '@/components/SiteTopbar'
 
-const EMOJIS = '😀 😃 😄 😁 😆 😂 🤣 😊 🙂 🙃 😉 😍 🥰 😘 😋 😎 🤩 🥳 😇 🤔 🤭 🤫 😏 😒 🙄 😬 😴 🥺 😢 😭 😱 😳 😤 😡 🤯 🤗 😅 😮 👍 👎 👌 ✌️ 🙌 🙏 👏 👋 🤝 💪 ❤️ 🩷 💛 💙 💜 🖤 💔 ✨ ⭐ 🔥 🎉 💯 ✅ ❌ 👀 💬 ☕ 🍕 🎁 🎵 🫶 🤍 🌙 🌸'.split(' ')
+const MessageEmojiPicker = dynamic(() => import('@/components/MessageEmojiPicker'), {
+  ssr: false,
+  loading: () => <p role="status" className="p-3 text-sm text-white/70">Chargement des émojis…</p>,
+})
 
 export default function MessagesPage() {
   const router = useRouter()
@@ -720,19 +724,14 @@ const createConversation = async () => {
           <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-2">
             <textarea ref={inputRef} rows={1} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage() } }} placeholder="Écrire un message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm outline-none placeholder:text-white/40" />
             <button type="button" onClick={() => { setKeyboardOpen(v => !v); setEmojiOpen(false) }} aria-label="Afficher ou masquer le clavier visuel" className="rounded-xl border border-white/15 px-3 py-3 text-sm hover:bg-white/10">⌨</button>
-            <button type="button" onClick={() => { setEmojiOpen(open => !open); setKeyboardOpen(false) }}
+            <button type="button" onClick={() => { inputRef.current?.blur(); setEmojiOpen(open => !open); setKeyboardOpen(false) }}
               aria-label="Émojis" aria-expanded={emojiOpen} aria-controls="message-emojis"
               className="rounded-xl border border-white/15 px-2.5 py-3 text-sm hover:bg-white/10">☺</button>
             <button type="submit" disabled={sending || !input.trim()} className="rounded-xl bg-amber-300 px-3 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40">➤</button>
           </form>
           {emojiOpen && (
-            <div id="message-emojis" aria-label="Émojis classiques" className="mt-2 max-h-[26dvh] overflow-y-auto rounded-xl border border-white/10 bg-slate-800/70 p-2">
-              <div className="grid grid-cols-6 gap-1 min-[375px]:grid-cols-8">
-                {EMOJIS.map(emoji => (
-                  <button type="button" key={emoji} onMouseDown={event => event.preventDefault()} onClick={() => insertEmoji(emoji)}
-                    className="grid h-9 place-items-center rounded-md text-xl hover:bg-white/10">{emoji}</button>
-                ))}
-              </div>
+            <div id="message-emojis" aria-label="Banque d’émojis" className="mt-2 min-w-0 rounded-xl border border-white/10 bg-slate-800">
+              <MessageEmojiPicker onSelect={insertEmoji} />
             </div>
           )}
           {keyboardOpen && <div className="mt-3 max-h-[32dvh] space-y-1.5 overflow-y-auto select-none" onMouseDown={e => e.preventDefault()}>

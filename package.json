@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@dice-roller/rpg-dice-roller": "5.5.1",
+    "@emoji-mart/data": "1.2.1",
     "@excalidraw/excalidraw": "0.18.1",
     "@supabase/supabase-js": "^2.54.0",
     "@tiptap/extension-image": "3.35.0",
@@ -19,6 +20,8 @@
     "@tiptap/react": "3.35.0",
     "@tiptap/starter-kit": "3.35.0",
     "@xyflow/react": "13.0.2",
+    "emoji-mart": "5.6.0",
+    "emojibase-data": "18.0.0",
     "inkjs": "2.4.0",
     "isomorphic-dompurify": "^2.26.0",
     "next": "^15.5.29",
