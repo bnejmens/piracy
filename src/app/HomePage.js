@@ -76,13 +76,14 @@ export default function HomePage() {
       {/* CONTENU AU PREMIER PLAN */}
       <div className="relative z-20 flex flex-1 flex-col items-center justify-center gap-5 px-3 py-6 sm:p-4">
         <section aria-labelledby="always-intro" className="w-full max-w-md rounded-2xl border border-amber-200/20 bg-slate-950/75 p-4 text-slate-100 sm:p-6">
-          <h2 id="always-intro" className="font-serif text-xl text-amber-100 sm:text-2xl">Forum RP Harry Potter francophone</h2>
+          <h2 id="always-intro" className="font-serif text-xl text-amber-100 sm:text-2xl">Le monde sorcier en 2026</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-200">
-            En 2026, les technologies moldues bousculent le Secret magique. Crée ton personnage et écris à plusieurs dans un monde sorcier qui change, de Poudlard à Londres en passant par Godric’s Hollow.
+            Always est un forum RP Harry Potter francophone où les technologies moldues bousculent le Secret magique. De Poudlard à Londres en passant par Godric’s Hollow, crée ton personnage et écris son histoire à plusieurs.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-slate-200">
-            Always est un forum de jeu de rôle écrit pour une petite communauté. Projet de fans indépendant.
+            Mène des enquêtes interactives, partage tes indices et retrouve les personnages et les lieux dans le wiki. Les ambiances sonores accompagnent l’écriture et la lecture des scènes.
           </p>
+          <p className="mt-3 text-xs text-slate-300">Projet de fans indépendant, à taille humaine.</p>
         </section>
         {checkingSession ? (
           <p className="text-sm text-slate-100">Vérification de la connexion…</p>
