@@ -8,6 +8,7 @@ export const metadata = {
   title,
   description,
   alternates: { canonical: url },
+  verification: { google: 'T7mIq2TAZchLTsRwrw4q02VZxKRQ0mYlo0Acnhi2r7I' },
   openGraph: { title, description, url, siteName: 'Always', locale: 'fr_FR', type: 'website' },
 }
 
