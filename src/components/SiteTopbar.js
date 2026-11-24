@@ -152,7 +152,7 @@ export default function SiteTopbar({ title, rpView }) {
   }
 
   return (
-    <header ref={headerRef} className="relative z-40 shrink-0 border-b border-amber-200/30 bg-[#211527] bg-[linear-gradient(105deg,#201529_0%,#332039_56%,#281924_100%)] shadow-lg backdrop-blur-xl">
+    <header ref={headerRef} className="relative z-40 shrink-0 border-b border-amber-200/30 bg-[#0d0a10] shadow-lg backdrop-blur-xl">
       <div className="mx-auto grid min-h-[64px] max-w-[1650px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-3 py-2 sm:flex sm:flex-wrap sm:gap-2 sm:px-4 sm:py-3 md:px-8">
         <h1 className="col-start-1 row-start-1 min-w-0 truncate font-serif text-lg text-amber-100 sm:mr-auto sm:text-2xl">
           {title}
