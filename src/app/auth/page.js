@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import SiteTopbar from "@/components/SiteTopbar"
+import AlwaysLoginHeading from "@/components/AlwaysLoginHeading"
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -151,7 +151,6 @@ export default function AuthPage() {
 
   return (
     <main className="relative flex min-h-dvh flex-col overflow-x-hidden">
-      <SiteTopbar title="Connexion" />
       {/* Fond direct, identique à la page d'accueil */}
       <div
         aria-hidden="true"
@@ -167,16 +166,7 @@ export default function AuthPage() {
          
 <div className="p-4 text-slate-100 sm:p-8">
 
-  {/* TITRE DU FORUM */}
-  <div className="text-center mb-7">
-    <h1 className="text-2xl font-semibold tracking-[0.18em] text-amber-100 sm:text-3xl">
-      ⭒ ALWAYS ⭒
-    </h1>
-
-    <p className="mt-3 text-sm italic text-slate-200/80">
-      After all this time?
-    </p>
-  </div>
+  <AlwaysLoginHeading centered />
 
   {/* ONGLETS CONNEXION / INSCRIPTION */}
   <div className="flex justify-center gap-2 mb-6">
