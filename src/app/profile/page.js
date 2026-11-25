@@ -628,12 +628,8 @@ const canEdit = !!me?.id && ownsCurrentChar
             <h2 className="mb-2 text-lg font-semibold text-white/90">
               <label htmlFor="character-rp-search">Recherche</label>
             </h2>
-            <p id="character-rp-search-help" className="mb-3 text-sm text-white/65">
-              Décris les liens ou les RP que tu aimerais jouer. Le texte apparaîtra sur ta fiche dans Membres après enregistrement.
-            </p>
             <textarea
               id="character-rp-search"
-              aria-describedby="character-rp-search-help"
               value={form.rp_search}
               onChange={event => onChange('rp_search', event.target.value)}
               disabled={!canEdit}
