@@ -1,7 +1,8 @@
 
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -112,7 +113,10 @@ async function getPendingInvitations(userId) {
   })
 }
 
-export default function NotificationsWidget() {
+export default function NotificationsWidget({ menu = false, onOpen, returnFocusRef }) {
+  const triggerRef = useRef(null)
+  const dialogRef = useRef(null)
+  const closeButtonRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -236,6 +240,20 @@ export default function NotificationsWidget() {
     }
   }, [open, load])
 
+  useEffect(() => {
+    if (!open) return
+    const dialog = dialogRef.current
+    if (dialog && !dialog.open) dialog.showModal()
+    closeButtonRef.current?.focus()
+  }, [open])
+
+  const close = () => {
+    dialogRef.current?.close()
+    setOpen(false)
+    const focusTarget = returnFocusRef ?? triggerRef
+    focusTarget.current?.focus()
+  }
+
   // Vérification périodique des nouveautés
   useEffect(() => {
     void fetchUnreadCount()
@@ -335,7 +353,7 @@ export default function NotificationsWidget() {
           <span>
             <strong>{n.actor_name || 'Un personnage'}</strong>
             {' '}a posté dans{' '}
-            <Link href={n.href || '/rp'} className="underline">
+            <Link href={n.href || '/rp'} onNavigate={close} className="underline">
               {n.context_title}
             </Link>
           </span>
@@ -350,7 +368,7 @@ export default function NotificationsWidget() {
           <span>
             <strong>{n.actor_name || 'Un personnage'}</strong>
             {' '}a écrit dans{' '}
-            <Link href={n.href || '/messages'} className="underline">
+            <Link href={n.href || '/messages'} onNavigate={close} className="underline">
               {n.context_title}
             </Link>
           </span>
@@ -366,7 +384,7 @@ export default function NotificationsWidget() {
             <strong>{n.actor_name || 'Un personnage'}</strong>
             {' '}a ajouté{' '}
             <strong>{n.context_title}</strong> dans le lore{' '}
-            <Link href={n.href || '/wiki'} className="underline">
+            <Link href={n.href || '/wiki'} onNavigate={close} className="underline">
               (ouvrir)
             </Link>
           </span>
@@ -381,7 +399,7 @@ export default function NotificationsWidget() {
           <span>
             <strong>{n.actor_name || 'Un personnage'}</strong>
             {' '}vient de rejoindre le monde magique —{' '}
-            <Link href={n.href || '/members'} className="underline">
+            <Link href={n.href || '/members'} onNavigate={close} className="underline">
               voir les membres
             </Link>
           </span>
@@ -394,7 +412,7 @@ export default function NotificationsWidget() {
       <div className="flex flex-col">
         <span>
           {n.context_title || n.type} —{' '}
-          <Link href={n.href || '/dashboard'} className="underline">
+          <Link href={n.href || '/dashboard'} onNavigate={close} className="underline">
             ouvrir
           </Link>
         </span>
@@ -409,22 +427,27 @@ export default function NotificationsWidget() {
 
   return (
     <>
-      {/* Bouton Notifications du dashboard */}
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(true)}
-        className={`relative rounded-xl border px-3 py-2 text-white ${
-          hasNew
-            ? 'border-amber-300/50 bg-amber-400/20 ring-2 ring-amber-300/50'
-            : 'border-white/20 bg-white/10 hover:bg-white/15'
-        }`}
+        onClick={() => {
+          setOpen(true)
+          onOpen?.()
+        }}
+        className={menu
+          ? 'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-amber-50 hover:bg-white/10'
+          : `relative rounded-xl border px-3 py-2 text-white ${
+              hasNew
+                ? 'border-amber-300/50 bg-amber-400/20 ring-2 ring-amber-300/50'
+                : 'border-white/20 bg-white/10 hover:bg-white/15'
+            }`}
         aria-label={
           `Ouvrir les notifications${
             hasNew ? ` (${displayCount})` : ''
           }`
         }
       >
-        🔔 Notifications
+        {menu ? 'Notifications' : '🔔 Notifications'}
 
         {hasNew && (
           <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
@@ -434,15 +457,20 @@ export default function NotificationsWidget() {
       </button>
 
       {/* Fenêtre des notifications */}
-      {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-3 backdrop-blur-sm sm:p-5"
-          onClick={() => setOpen(false)}
+      {open && createPortal(
+        <dialog
+          ref={dialogRef}
+          aria-label="Notifications"
+          className="m-auto max-h-none w-[calc(100%_-_1.5rem)] max-w-[820px] overflow-visible bg-transparent p-0 backdrop:bg-black/65 backdrop:backdrop-blur-sm sm:w-[calc(100%_-_2.5rem)]"
+          onClick={event => {
+            if (event.target === event.currentTarget) close()
+          }}
+          onCancel={event => {
+            event.preventDefault()
+            close()
+          }}
         >
-          <div
-            className="flex max-h-[90dvh] w-full max-w-[820px] flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-[#1d1728]/95 text-amber-50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-[#1d1728]/95 text-amber-50 shadow-2xl">
             {/* En-tête */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/15 p-4 sm:p-6">
               <h3 className="font-serif text-xl text-amber-100">
@@ -460,8 +488,9 @@ export default function NotificationsWidget() {
                 </button>
 
                 <button
+                  ref={closeButtonRef}
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={close}
                   className="rounded-lg border border-amber-200/20 bg-white/10 px-3 py-2 text-xs hover:bg-white/15 sm:text-sm"
                 >
                   Fermer
@@ -585,6 +614,7 @@ export default function NotificationsWidget() {
                         href={`/rp/scene?topic=${encodeURIComponent(
                           acceptedTopic.id
                         )}`}
+                        onNavigate={close}
                         className="mt-2 inline-block text-sm font-semibold text-amber-300 underline"
                       >
                         Ouvrir « {acceptedTopic.title} » →
@@ -633,7 +663,8 @@ export default function NotificationsWidget() {
               )}
             </div>
           </div>
-        </div>
+        </dialog>,
+        document.body
       )}
     </>
   )
