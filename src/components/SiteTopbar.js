@@ -35,8 +35,7 @@ function CharacterPortrait({ character, size = 'h-9 w-9' }) {
 export default function SiteTopbar({ title, rpView }) {
   const pathname = usePathname()
   const headerRef = useRef(null)
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false)
-  const [characterMenuOpen, setCharacterMenuOpen] = useState(false)
+  const [openMenu, setOpenMenu] = useState(null)
   const [signedIn, setSignedIn] = useState(null)
   const [characters, setCharacters] = useState([])
   const [activeCharacter, setActiveCharacter] = useState(null)
@@ -74,25 +73,22 @@ export default function SiteTopbar({ title, rpView }) {
   }, [])
 
   useEffect(() => {
-    setQuickMenuOpen(false)
-    setCharacterMenuOpen(false)
+    setOpenMenu(null)
     loadCharacters()
     window.addEventListener(CHARACTER_EVENT, loadCharacters)
     return () => window.removeEventListener(CHARACTER_EVENT, loadCharacters)
   }, [pathname, loadCharacters])
 
   useEffect(() => {
-    if (!quickMenuOpen && !characterMenuOpen) return
+    if (!openMenu) return
     const closeOnEscape = event => {
       if (event.key === 'Escape') {
-        setQuickMenuOpen(false)
-        setCharacterMenuOpen(false)
+        setOpenMenu(null)
       }
     }
     const closeOnOutsideClick = event => {
       if (!headerRef.current?.contains(event.target)) {
-        setQuickMenuOpen(false)
-        setCharacterMenuOpen(false)
+        setOpenMenu(null)
       }
     }
     window.addEventListener('keydown', closeOnEscape)
@@ -101,7 +97,7 @@ export default function SiteTopbar({ title, rpView }) {
       window.removeEventListener('keydown', closeOnEscape)
       document.removeEventListener('pointerdown', closeOnOutsideClick)
     }
-  }, [quickMenuOpen, characterMenuOpen])
+  }, [openMenu])
 
   const selectCharacter = async (characterId) => {
     if (!characterId || switchingId || creating) return
@@ -116,7 +112,7 @@ export default function SiteTopbar({ title, rpView }) {
       return
     }
 
-    setCharacterMenuOpen(false)
+    setOpenMenu(null)
     const character = await loadCharacters()
     window.dispatchEvent(new CustomEvent(CHARACTER_EVENT, {
       detail: { characterId, character },
@@ -139,17 +135,15 @@ export default function SiteTopbar({ title, rpView }) {
     }
 
     setNewName('')
-    setCharacterMenuOpen(false)
+    setOpenMenu(null)
     const character = await loadCharacters()
     window.dispatchEvent(new CustomEvent(CHARACTER_EVENT, {
       detail: { characterId, character },
     }))
   }
 
-  const closeMenus = () => {
-    setQuickMenuOpen(false)
-    setCharacterMenuOpen(false)
-  }
+  const closeMenus = () => setOpenMenu(null)
+  const toggleMenu = menu => setOpenMenu(current => current === menu ? null : menu)
 
   return (
     <header ref={headerRef} className="relative z-40 shrink-0 border-b border-amber-200/30 bg-[#0d0a10] shadow-lg backdrop-blur-xl">
@@ -168,38 +162,53 @@ export default function SiteTopbar({ title, rpView }) {
               {link.label}
             </Link>
           ))}
-          <a href="http://www.root-top.com/topsite/obsession27/in.php?ID=27814"
-            target="_blank" rel="noopener" onClick={closeMenus}
-            aria-label="Voter pour Always sur Root-Top (nouvel onglet)"
-            className="inline-flex min-h-10 items-center rounded-lg px-2 py-2 text-xs font-medium text-amber-200 transition hover:bg-amber-200/10 sm:px-3 sm:text-sm">
-            Voter
-          </a>
-          <div className="ml-auto sm:relative">
-            <button
-              type="button"
-              onClick={() => {
-                setQuickMenuOpen(value => !value)
-                setCharacterMenuOpen(false)
-              }}
-              aria-expanded={quickMenuOpen}
-              aria-haspopup="true"
-              className="rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 sm:px-3 sm:text-sm"
-            >
-              Accès rapides ▾
-            </button>
-            {quickMenuOpen && (
-              <>
-                <nav aria-label="Accès rapides" className="absolute right-3 top-full z-50 mt-2 max-h-[65dvh] w-60 sm:right-0 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#302037] p-2 shadow-2xl">
-                  {QUICK_LINKS.filter(link => link.href !== pathname || link.href === '/rp').map(link => (
-                    <Link key={link.href} href={link.href} onClick={closeMenus} className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
-                      {link.label}
-                    </Link>
-                  ))}
+          <div className="ml-auto flex items-center gap-1">
+            <div className="sm:relative">
+              <button
+                type="button"
+                onClick={() => toggleMenu('hrp')}
+                aria-expanded={openMenu === 'hrp'}
+                className="rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 sm:px-3 sm:text-sm"
+              >
+                HRP <span aria-hidden="true">▾</span>
+              </button>
+              {openMenu === 'hrp' && (
+                <nav aria-label="HRP" className="absolute right-3 top-full z-50 mt-2 w-56 rounded-xl border border-amber-200/25 bg-[#302037] p-2 shadow-2xl sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+                  <a href="https://discord.gg/u4TaQnaq5q" target="_blank" rel="noopener" onClick={closeMenus}
+                    className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
+                    Rejoindre le Discord
+                  </a>
+                  <a href="http://www.root-top.com/topsite/obsession27/in.php?ID=27814" target="_blank" rel="noopener" onClick={closeMenus}
+                    aria-label="Voter pour Always sur Root-Top (nouvel onglet)"
+                    className="block rounded-lg px-3 py-2 text-sm text-amber-200 hover:bg-white/10">
+                    Voter pour Always
+                  </a>
                 </nav>
-              </>
-            )}
+              )}
+            </div>
+            <div className="sm:relative">
+              <button
+                type="button"
+                onClick={() => toggleMenu('quick')}
+                aria-expanded={openMenu === 'quick'}
+                aria-haspopup="true"
+                className="rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 sm:px-3 sm:text-sm"
+              >
+                Accès rapides ▾
+              </button>
+              {openMenu === 'quick' && (
+                <>
+                  <nav aria-label="Accès rapides" className="absolute right-3 top-full z-50 mt-2 max-h-[65dvh] w-60 sm:right-0 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#302037] p-2 shadow-2xl">
+                    {QUICK_LINKS.filter(link => link.href !== pathname || link.href === '/rp').map(link => (
+                      <Link key={link.href} href={link.href} onClick={closeMenus} className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                </>
+              )}
+            </div>
           </div>
-
         </div>
 
         <div className="col-start-2 row-start-1 flex items-center justify-self-end gap-2 sm:ml-2">
@@ -208,12 +217,11 @@ export default function SiteTopbar({ title, rpView }) {
           <button
             type="button"
             onClick={() => {
-              setCharacterMenuOpen(value => !value)
-              setQuickMenuOpen(false)
+              toggleMenu('character')
               setErrorMessage('')
             }}
             aria-label={activeCharacter ? `Changer de personnage (actuel : ${activeCharacter.name})` : 'Choisir ou créer un personnage'}
-            aria-expanded={characterMenuOpen}
+            aria-expanded={openMenu === 'character'}
             aria-haspopup="true"
             title="Changer de personnage ou en créer un"
             className="flex shrink-0 items-center gap-2 rounded-full border border-amber-200/25 bg-white/5 py-1 pl-1 pr-2.5 transition hover:border-amber-200/50 hover:bg-white/10 sm:pr-3"
@@ -226,7 +234,7 @@ export default function SiteTopbar({ title, rpView }) {
             <span className="text-xs text-amber-100/75" aria-hidden="true">▾</span>
           </button>
 
-          {characterMenuOpen && (
+          {openMenu === 'character' && (
             <>
               <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(75dvh,550px)] w-[min(90vw,340px)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-200/25 bg-[#302037] p-3 text-amber-50 shadow-2xl">
                 <h2 className="mb-2 font-serif text-lg text-amber-100">Mes personnages</h2>
