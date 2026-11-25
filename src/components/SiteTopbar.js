@@ -168,6 +168,12 @@ export default function SiteTopbar({ title, rpView }) {
               {link.label}
             </Link>
           ))}
+          <a href="http://www.root-top.com/topsite/obsession27/in.php?ID=27814"
+            target="_blank" rel="noopener" onClick={closeMenus}
+            aria-label="Voter pour Always sur Root-Top (nouvel onglet)"
+            className="inline-flex min-h-10 items-center rounded-lg px-2 py-2 text-xs font-medium text-amber-200 transition hover:bg-amber-200/10 sm:px-3 sm:text-sm">
+            Voter
+          </a>
           <div className="ml-auto sm:relative">
             <button
               type="button"
