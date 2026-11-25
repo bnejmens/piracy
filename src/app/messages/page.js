@@ -634,7 +634,11 @@ const createConversation = async () => {
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0 bg-cover bg-center opacity-45" style={{ backgroundImage: "url('/images/msg-bg.webp')" }} />
       <div className="absolute inset-0 bg-slate-950/35" />
-      <SiteTopbar title="Messagerie" />
+      <SiteTopbar title="Messagerie" onOpenMessages={() => {
+        setScreen('conversations')
+        setSearch('')
+        closeComposerTools()
+      }} />
       <div className="relative flex min-h-0 flex-1 justify-center sm:p-4">
       <section className="relative z-10 flex min-h-0 w-full max-w-[490px] flex-col overflow-hidden border border-white/15 bg-slate-950/90 shadow-[0_20px_90px_rgba(0,0,0,.65)] backdrop-blur-xl sm:rounded-[32px] sm:border-[5px] sm:border-slate-700">
         <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-white/5 px-4 py-3">

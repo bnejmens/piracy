@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import NotificationsWidget from '@/components/NotificationsWidget'
 import SoundTrigger from '@/components/audio/SoundTrigger'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -10,7 +11,6 @@ export const CHARACTER_EVENT = 'piracy:active-character-changed'
 
 const QUICK_LINKS = [
   { href: '/rp', label: 'Le Monde Magique (RP)' },
-  { href: '/messages', label: 'Messagerie' },
   { href: '/profile', label: 'Mon profil' },
   { href: '/members', label: 'Membres' },
   { href: '/randomvava', label: 'Random Vava' },
@@ -32,9 +32,10 @@ function CharacterPortrait({ character, size = 'h-9 w-9' }) {
   )
 }
 
-export default function SiteTopbar({ title, rpView }) {
+export default function SiteTopbar({ title, rpView, onOpenMessages }) {
   const pathname = usePathname()
   const headerRef = useRef(null)
+  const rpButtonRef = useRef(null)
   const [openMenu, setOpenMenu] = useState(null)
   const [signedIn, setSignedIn] = useState(null)
   const [characters, setCharacters] = useState([])
@@ -152,17 +153,40 @@ export default function SiteTopbar({ title, rpView }) {
           {title}
         </h1>
         <div className="col-span-2 row-start-2 flex min-w-0 flex-wrap items-center gap-1">
-          {[
-            { view: 'mine', label: 'Mes RP' },
-            { view: 'others', label: 'Autres histoires' },
-          ].map(link => (
-            <Link key={link.view} href={`/rp?view=${link.view}`} scroll={false} onClick={closeMenus}
-              aria-current={rpView === link.view ? 'page' : undefined}
-              className="inline-flex min-h-10 items-center rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 aria-[current=page]:bg-amber-200/15 aria-[current=page]:text-amber-100 sm:px-3 sm:text-sm">
-              {link.label}
-            </Link>
-          ))}
           <div className="ml-auto flex items-center gap-1">
+            <div className="sm:relative">
+              <button
+                ref={rpButtonRef}
+                type="button"
+                onClick={() => toggleMenu('rp')}
+                aria-expanded={openMenu === 'rp'}
+                className="rounded-lg px-2 py-2 text-xs text-amber-50/90 transition hover:bg-white/10 sm:px-3 sm:text-sm"
+              >
+                RP <span aria-hidden="true">▾</span>
+              </button>
+              <nav aria-label="RP" hidden={openMenu !== 'rp'}
+                className="absolute right-3 top-full z-50 mt-2 w-48 rounded-xl border border-amber-200/25 bg-[#302037] p-2 shadow-2xl sm:left-0 sm:right-auto">
+                {[
+                  { view: 'mine', label: 'Mes RP' },
+                  { view: 'others', label: 'Autres histoires' },
+                ].map(link => (
+                  <Link key={link.view} href={`/rp?view=${link.view}`} scroll={false} onClick={closeMenus}
+                    aria-current={rpView === link.view ? 'page' : undefined}
+                    className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10 aria-[current=page]:bg-amber-200/15 aria-[current=page]:text-amber-100">
+                    {link.label}
+                  </Link>
+                ))}
+                {signedIn && <NotificationsWidget menu onOpen={closeMenus} returnFocusRef={rpButtonRef} />}
+                <Link href="/messages" onClick={closeMenus}
+                  onNavigate={onOpenMessages ? event => {
+                    event.preventDefault()
+                    onOpenMessages()
+                  } : undefined}
+                  className="block rounded-lg px-3 py-2 text-sm text-amber-50 hover:bg-white/10">
+                  Mes messages reçus
+                </Link>
+              </nav>
+            </div>
             <div className="sm:relative">
               <button
                 type="button"
