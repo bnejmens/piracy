@@ -81,7 +81,7 @@ const toEnumOrNull = (v, allowed) => {
       // Mes personnages
       const { data: chars } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url")
+        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url, rp_search")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       setMyChars(chars || []);
@@ -111,7 +111,7 @@ setAllChars(all || []);
     (async () => {
       const { data: c } = await supabase
         .from("characters")
-        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url")
+        .select("id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url, rp_search")
         .eq("id", charId)
         .maybeSingle();
       if (c && !cancelled) {
@@ -129,6 +129,7 @@ setAllChars(all || []);
           companion_description: c.companion_description || "",
           wand_description: [c.wand_composition?.trim(), c.wand_size?.trim()].filter(Boolean).join('\n'),
           wand_image_url: c.wand_image_url || "",
+          rp_search: c.rp_search ?? "",
         });
         setImgBust(Date.now());
       }
@@ -207,7 +208,7 @@ setAllChars(all || []);
       if (!session) return;
       const { data, error } = await supabase
         .from('characters')
-        .select('id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url')
+        .select('id, user_id, name, bio, avatar_url, orientation, is_active, age, occupation, traits, companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url, rp_search')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
       if (error) { setSavedMsg(error.message); return; }
@@ -304,6 +305,11 @@ const wandText = form.wand_description.trim();
 if (wandText !== previousWandText) {
   payload.wand_composition = wandText || null;
   payload.wand_size = null;
+}
+
+const searchText = form.rp_search.trim();
+if (searchText !== (current.rp_search ?? '').trim()) {
+  payload.rp_search = searchText || null;
 }
 
 for (const [field, label] of [
@@ -617,6 +623,25 @@ const canEdit = !!me?.id && ownsCurrentChar
               />
             </div>
           </div>
+
+          <section className="rounded-2xl border border-white/15 bg-black/50 p-4 shadow-[0_18px_50px_rgba(0,0,0,.35)] backdrop-blur-xl">
+            <h2 className="mb-2 text-lg font-semibold text-white/90">
+              <label htmlFor="character-rp-search">Recherche</label>
+            </h2>
+            <p id="character-rp-search-help" className="mb-3 text-sm text-white/65">
+              Décris les liens ou les RP que tu aimerais jouer. Le texte apparaîtra sur ta fiche dans Membres après enregistrement.
+            </p>
+            <textarea
+              id="character-rp-search"
+              aria-describedby="character-rp-search-help"
+              value={form.rp_search}
+              onChange={event => onChange('rp_search', event.target.value)}
+              disabled={!canEdit}
+              rows={5}
+              placeholder="Ex. Une rivalité à Poudlard, un allié pour une enquête…"
+              className="w-full resize-y rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-amber-300/60"
+            />
+          </section>
         </section>
       </div>
     </main>
@@ -653,6 +678,7 @@ function baseForm() {
     companion_description: "",
     wand_description: "",
     wand_image_url: "",
+    rp_search: "",
   };
 }
 

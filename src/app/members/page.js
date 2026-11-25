@@ -37,7 +37,7 @@ export default function MembersPage() {
   .select(`
     id, user_id, name, orientation, avatar_url, bio, created_at,
     age, occupation, traits, is_active, is_archived,
-    companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url,
+    companion_name, companion_avatar_url, companion_description, wand_composition, wand_size, wand_image_url, rp_search,
     character_relationships:character_relationships!character_id (
       id, type, other_character_id,
       other:other_character_id ( id, name, avatar_url )
@@ -378,6 +378,15 @@ const avatarNode = (m) => (
                         {[modalChar.wand_composition?.trim(), modalChar.wand_size?.trim()].filter(Boolean).join('\n') || 'Aucune description renseignée.'}
                       </p>
                     </div>
+                  </section>
+
+                  <section className="min-w-0 rounded-2xl border border-white/15 bg-black/25 p-4">
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Recherche</h3>
+                    {modalChar.rp_search?.trim() ? (
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-white/90">{modalChar.rp_search}</p>
+                    ) : (
+                      <p className="text-sm italic text-white/45">Aucune recherche renseignée.</p>
+                    )}
                   </section>
 
                   <section className="rounded-2xl border border-white/15 bg-black/25 p-4">
