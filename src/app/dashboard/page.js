@@ -196,7 +196,7 @@ export default function DashboardPage() {
 
       {/* BG */}
       <div className="absolute inset-0 -z-20">
-        <Image src="/images/dashboard-bg.webp" alt="" fill priority className="object-cover" />
+        <Image src="/images/dashboard-lounge.webp" alt="" fill priority className="object-cover" />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
