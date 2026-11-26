@@ -1,0 +1,29 @@
+.background {
+  object-fit: cover;
+}
+
+.controls {
+  --ring-radius: var(--compact-ring-radius);
+  --icon-size: var(--compact-icon-size);
+  --portrait-size: var(--compact-portrait-size);
+}
+
+@media (min-width: 1024px) and (min-height: 640px) {
+  .dashboard {
+    /* One pixel of the 1672 × 941 image after object-fit: cover. */
+    --image-pixel: max(calc(100vw / 1672), calc(100dvh / 941));
+    /* The window is centred near (836, 377) in the original image. */
+    --window-y: clamp(34dvh, calc(35dvh + 47.65 * var(--image-pixel)), 48dvh);
+  }
+
+  .background {
+    object-position: center 35%;
+  }
+
+  .controls {
+    top: calc(var(--window-y) - 50dvh);
+    --icon-size: clamp(48px, calc(78 * var(--image-pixel)), 120px);
+    --ring-radius: min(calc(220 * var(--image-pixel)), calc(var(--window-y) - var(--icon-size) / 2 - 18px));
+    --portrait-size: min(calc(200 * var(--image-pixel)), var(--ring-radius));
+  }
+}

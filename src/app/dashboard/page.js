@@ -9,6 +9,7 @@ import useCharacterSubscriptions from '@/hooks/useCharacterSubscriptions'
 import NotificationsWidget from '@/components/NotificationsWidget'
 import SoundTrigger from '@/components/audio/SoundTrigger'
 import MaraudersPresence from '@/components/MaraudersPresence'
+import styles from './Dashboard.module.css'
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
@@ -71,9 +72,9 @@ export default function DashboardPage() {
     const N = actions.length
     return actions.map((a, i) => {
       const angle = (2 * Math.PI * i) / N - Math.PI / 2
-      return { ...a, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
+      return { ...a, x: Math.cos(angle), y: Math.sin(angle) }
     })
-  }, [actions, radius])
+  }, [actions])
 
   useEffect(() => {
   const onResize = () => {
@@ -175,7 +176,7 @@ export default function DashboardPage() {
         : 'text-white'
 
   return (
-    <main className="fixed inset-0 overflow-hidden">
+    <main className={`fixed inset-0 overflow-hidden ${styles.dashboard}`}>
 
       {/* Nom + bouton changement perso */}
       <div className="absolute left-3 top-3 z-40 flex max-w-[calc(100vw-155px)] flex-wrap items-center gap-1 sm:left-8 sm:top-6 sm:max-w-none"> 
@@ -196,7 +197,7 @@ export default function DashboardPage() {
 
       {/* BG */}
       <div className="absolute inset-0 -z-20">
-        <Image src="/images/dashboard-lounge.webp" alt="" fill priority className="object-cover" />
+        <Image src="/images/dashboard-window.webp" alt="" fill priority className={styles.background} />
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-slate-900/25 to-slate-950/60" />
 
@@ -227,12 +228,16 @@ export default function DashboardPage() {
         <div className="absolute inset-0 grid place-items-center text-rose-200">Profil introuvable</div>
       ) : (
         <div className="absolute inset-0 grid place-items-center">
-          <div className="relative">
+          <div className={`relative ${styles.controls}`} style={{
+            '--compact-ring-radius': `${radius}px`,
+            '--compact-icon-size': `${iconSize}px`,
+            '--compact-portrait-size': `${centerSize}px`,
+          }}>
 
             {/* Avatar central */}
 <div
   className="group relative rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto"
-  style={{ width: centerSize, height: centerSize }}
+  style={{ width: 'var(--portrait-size)', height: 'var(--portrait-size)' }}
 >
   {displayAvatar
     ? <img src={displayAvatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -324,7 +329,12 @@ export default function DashboardPage() {
                       if (a.key === 'rp') setHasNewRP(false)
                     }}
                     className="pointer-events-auto group absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
-                    style={{ left:`calc(50% + ${a.x}px)`, top:`calc(50% + ${a.y}px)`, width:iconSize, height:iconSize }}
+                    style={{
+                      left: `calc(50% + var(--ring-radius) * ${a.x})`,
+                      top: `calc(50% + var(--ring-radius) * ${a.y})`,
+                      width: 'var(--icon-size)',
+                      height: 'var(--icon-size)',
+                    }}
                     aria-label={a.label}
                   >
                     <div className="relative w-full h-full overflow-hidden rounded-full border border-white/45 bg-white/6 backdrop-blur-sm p-2 transition">
