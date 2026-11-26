@@ -436,14 +436,14 @@ const canEdit = !!me?.id && ownsCurrentChar
                 <label htmlFor="companion-description" className="mb-1 block text-center text-xs text-white/70">Description</label>
                 <textarea
                   id="companion-description"
-                  rows={3}
-                  maxLength={500}
+                  rows={6}
+                  maxLength={1500}
                   value={form.companion_description}
                   onChange={e => onChange('companion_description', e.target.value)}
                   onBlur={saveCompanionDescription}
                   disabled={!canEdit}
                   placeholder="Espèce, tempérament, particularités…"
-                  className="min-h-[72px] w-full resize-y rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs leading-relaxed text-white outline-none placeholder:text-white/45 focus:border-amber-300/60"
+                  className="w-full resize-y rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs leading-relaxed text-white outline-none placeholder:text-white/45 focus:border-amber-300/60"
                 />
               </div>
             </div>
