@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import useCharacterSubscriptions from '@/hooks/useCharacterSubscriptions'
 import NotificationsWidget from '@/components/NotificationsWidget'
+import SoundTrigger from '@/components/audio/SoundTrigger'
 import MaraudersPresence from '@/components/MaraudersPresence'
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
@@ -202,18 +203,20 @@ export default function DashboardPage() {
       {/* Carte du Maraudeur : présences sur le fond, sans bloquer les clics */}
       <MaraudersPresence />
 
-    {/* Logout + Notifications (empilés en haut à droite) */}
-<div className="absolute right-3 top-3 z-40 flex flex-col items-end gap-2 sm:right-8 sm:top-6">
-  <button
-    onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
-    className="rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-md hover:bg-white/20 focus:outline-none"
-  >
-    Se déconnecter
-  </button>
+      <div className="absolute right-3 top-3 z-40 flex flex-col items-end gap-2 sm:right-8 sm:top-6">
+        <button
+          type="button"
+          onClick={async () => { await supabase.auth.signOut(); router.push('/auth') }}
+          className="rounded-full border border-white/25 bg-white/25 backdrop-blur-md px-3 py-1.5 text-white/90 text-md hover:bg-white/20 focus:outline-none"
+        >
+          Se déconnecter
+        </button>
 
-  {/* Bouton Notifications – s'affiche juste en dessous */}
-  <NotificationsWidget />
-</div>
+        <div className="flex items-center gap-2">
+          <SoundTrigger />
+          <NotificationsWidget />
+        </div>
+      </div>
 
       {/* Content */}
       {loading ? (

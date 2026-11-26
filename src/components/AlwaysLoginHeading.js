@@ -31,7 +31,7 @@ export default function AlwaysLoginHeading({ centered = false }) {
             ⭒ ALWAYS ⭒
           </button>
         </h1>
-        <SoundTrigger inline onOpen={closeDescription} />
+        <SoundTrigger onOpen={closeDescription} />
         <div id={descriptionId} hidden={!visible} className="absolute inset-x-0 top-full z-30 pt-1 text-left">
           <section className="max-h-[55dvh] overflow-y-auto rounded-xl border border-amber-200/30 bg-slate-950 p-4 text-sm leading-relaxed text-slate-200 shadow-2xl">
             <h2 className="font-serif text-lg text-amber-100">Le monde sorcier en 2026</h2>

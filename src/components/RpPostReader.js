@@ -95,7 +95,7 @@ export default function RpPostReader({ title, initialPosts, startPostId, hasPrev
               disabled={textSize <= 17} onClick={() => onTextSizeChange(textSize - 2)}>A−</button>
             <button type="button" aria-label="Agrandir le texte" title="Agrandir le texte"
               disabled={textSize >= 27} onClick={() => onTextSizeChange(textSize + 2)}>A+</button>
-            <span className={styles.ambience}><SoundTrigger inline /></span>
+            <span className={styles.ambience}><SoundTrigger /></span>
             <button ref={closeRef} type="button" onClick={() => dialogRef.current.close()}>Fermer</button>
           </div>
         </div>

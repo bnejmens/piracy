@@ -236,7 +236,7 @@ export default function SiteTopbar({ title, rpView, onOpenMessages }) {
         </div>
 
         <div className="col-start-2 row-start-1 flex items-center justify-self-end gap-2 sm:ml-2">
-          <SoundTrigger inline onOpen={closeMenus} />
+          <SoundTrigger onOpen={closeMenus} />
           {signedIn && <div className="relative">
           <button
             type="button"

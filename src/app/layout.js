@@ -4,7 +4,6 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 
 import AudioProvider from "@/components/audio/AudioProvider"
-import SoundTrigger from "@/components/audio/SoundTrigger"
 import SoundModal from "@/components/audio/SoundModal"
 import FXGate from "@/components/FXGate"
 import PresenceHeartbeat from "@/components/PresenceHeartbeat"
@@ -31,7 +30,6 @@ export default function RootLayout({ children }) {
         <div className="relative z-10">
           <AudioProvider>
             {children}
-            <SoundTrigger />
             <SoundModal />
           </AudioProvider>
         </div>
