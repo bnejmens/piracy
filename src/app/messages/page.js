@@ -13,6 +13,24 @@ const MessageEmojiPicker = dynamic(() => import('@/components/MessageEmojiPicker
   loading: () => <p role="status" className="p-3 text-sm text-white/70">Chargement des émojis…</p>,
 })
 
+function messageSides(messages, preferredRightId) {
+  let previousSender = null
+  let right = true
+  let preferredSide
+  const sides = messages.map(message => {
+    if (!message.sender_character_id) return null
+
+    const sender = String(message.sender_character_id)
+    if (previousSender !== null && previousSender !== sender) right = !right
+    previousSender = sender
+    if (sender === preferredRightId && preferredSide === undefined) preferredSide = right
+    return right
+  })
+
+  // Orient the exchange around the active character's first turn, when present.
+  return preferredSide === false ? sides.map(side => side === null ? null : !side) : sides
+}
+
 export default function MessagesPage() {
   const router = useRouter()
 
@@ -622,6 +640,10 @@ const createConversation = async () => {
   if (loading) return <main className="min-h-svh bg-slate-950 p-6 text-white">Chargement…</main>
   if (error) return <main className="min-h-svh bg-slate-950 p-6 text-rose-300">Erreur : {error}</main>
 
+  const bubbleSides = useMemo(
+    () => messageSides(messages, currentSpeakerId ? String(currentSpeakerId) : null),
+    [messages, currentSpeakerId],
+  )
   const activeInfo = activeConv ? infoForConv(activeConv) : null
   const activeCharacter = myChars.find(c => String(c.id) === String(currentSpeakerId)) || myChars[0] || null
   const otherParticipants = screen === 'chat' && activeConv
@@ -704,23 +726,27 @@ const createConversation = async () => {
 
           {screen === 'chat' && <div className="flex min-h-full min-w-0 flex-col justify-end gap-3 p-3 sm:p-4">
             {!messages.length && <p className="py-8 text-center text-sm text-white/50">Début de la conversation</p>}
-            {messages.map(m => {
+            {messages.map((m, index) => {
+              const right = bubbleSides[index] === true
               const mine = isMine(m)
               const sender = m.sender_character_id ? charsById.get(String(m.sender_character_id)) : null
               const missing = !m.sender_character_id
               const senderName = missing ? 'Missing' : sender?.name
               const editable = mine && m.sender_id === session?.user?.id
               const editingThis = editable && editing?.id === m.id
-              return <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-                {!mine && <Avatar name={senderName} src={sender?.avatar_url} size="h-8 w-8" />}
+              const bubbleColor = missing ? 'bg-slate-600 text-white'
+                : right ? (mine ? 'bg-sky-600/90 text-white' : 'bg-blue-700/90 text-white')
+                : 'bg-amber-200 text-slate-950'
+              return <div key={m.id} className={`flex items-end gap-2 ${right ? 'flex-row-reverse' : ''}`}>
+                {(!mine || !right) && <Avatar name={senderName} src={sender?.avatar_url} size="h-8 w-8" />}
                 <div className="min-w-0 max-w-[80%]">
                   {editable && !editingThis && (
                     <button type="button" disabled={savingEdit}
                       onClick={() => { setEditing({ id: m.id, content: m.content }); setEditError('') }}
-                      className="ml-auto block px-1 pb-0.5 text-[11px] text-sky-200/80 hover:underline">Modifier</button>
+                      className={`block px-1 pb-0.5 text-[11px] text-sky-200/80 hover:underline ${right ? 'ml-auto' : ''}`}>Modifier</button>
                   )}
-                <div className={`rounded-2xl px-3 py-2 shadow ${mine ? 'rounded-br-sm bg-sky-600/90 text-white' : missing ? 'rounded-bl-sm bg-slate-600 text-white' : 'rounded-bl-sm bg-amber-200 text-slate-950'}`}>
-                  {senderName && <div className={`mb-1 text-[10px] font-semibold ${mine ? 'text-sky-100' : missing ? 'text-slate-200' : 'text-amber-900'}`}>{senderName}</div>}
+                <div className={`rounded-2xl px-3 py-2 shadow ${right ? 'rounded-br-sm' : 'rounded-bl-sm'} ${bubbleColor}`}>
+                  {senderName && <div className={`mb-1 text-[10px] font-semibold ${missing ? 'text-slate-200' : right ? 'text-sky-100' : 'text-amber-900'}`}>{senderName}</div>}
                   {editingThis ? (
                     <form onSubmit={saveMessageEdit} className="space-y-2">
                       <textarea autoFocus aria-label="Modifier le message" value={editing.content}
@@ -733,7 +759,7 @@ const createConversation = async () => {
                       {editError && <p role="alert" className="text-xs text-rose-100">{editError}</p>}
                     </form>
                   ) : <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>}
-                  <div className={`mt-1 text-right text-[10px] ${mine || missing ? 'text-white/60' : 'text-slate-700/60'}`}>{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{m.edited_at && ' · Modifié'}</div>
+                  <div className={`mt-1 text-right text-[10px] ${right || missing ? 'text-white/60' : 'text-slate-700/60'}`}>{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{m.edited_at && ' · Modifié'}</div>
                 </div>
                 </div>
               </div>
