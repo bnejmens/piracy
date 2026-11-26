@@ -670,7 +670,7 @@ const createConversation = async () => {
           ) : <span className="text-lg text-amber-300">✦</span>}
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2.5">
-              <h2 className="min-w-0 truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messages'}</h2>
+              <h2 className="min-w-0 truncate text-base font-semibold">{screen === 'chat' ? (activeInfo?.label || activeConv?.title || 'Discussion') : screen === 'compose' ? 'Nouveau message' : screen === 'contacts' ? 'Contacts' : 'Messagerie'}</h2>
               {otherParticipants.length > 0 && (
                 <ul aria-label="Autres participants" tabIndex={otherParticipants.length > 3 ? 0 : undefined}
                   className="flex max-w-[44%] shrink-0 gap-1.5 overflow-x-auto overscroll-x-contain p-1">
@@ -685,7 +685,7 @@ const createConversation = async () => {
                 </ul>
               )}
             </div>
-            {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{me?.pseudo?.trim() || activeCharacter?.name || 'Téléphone RPG'}</p>}
+            {screen !== 'chat' && <p className="truncate text-[11px] text-white/50">{activeCharacter?.name?.trim() || 'Aucun personnage actif'}</p>}
           </div>
         </header>
 

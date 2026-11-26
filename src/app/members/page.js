@@ -8,6 +8,7 @@ import SiteTopbar from "@/components/SiteTopbar";
 import { displayExternalImage } from "@/lib/displayExternalImage";
 import Bipolar from "@/components/PersonalityTraitScale";
 import portraitStyles from './MemberPortrait.module.css';
+import CharacterScenes from './CharacterScenes';
 
 export default function MembersPage() {
   const router = useRouter();
@@ -320,6 +321,7 @@ const avatarNode = (m) => (
                       <p className="text-sm italic text-white/45">Aucune description renseignée.</p>
                     )}
                   </section>
+                  <CharacterScenes key={modalChar.id} characterId={modalChar.id} />
                 </div>
 
                 <aside className="min-w-0 space-y-4">
@@ -404,7 +406,6 @@ const avatarNode = (m) => (
             </div>
 
             <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-amber-200/15 bg-[#201726] px-3 py-3 sm:px-5">
-              <span className="hidden text-xs text-white/45 sm:block">Piracy · Fiche personnage</span>
               <div className="ml-auto flex flex-wrap gap-2">
                 <button
                   type="button"
