@@ -24,6 +24,7 @@
     top: calc(var(--window-y) - 50dvh);
     --icon-size: clamp(48px, calc(78 * var(--image-pixel)), 120px);
     --ring-radius: min(calc(220 * var(--image-pixel)), calc(var(--window-y) - var(--icon-size) / 2 - 18px));
-    --portrait-size: min(calc(200 * var(--image-pixel)), var(--ring-radius));
+    /* Match the inner pane while leaving space for the surrounding shortcuts. */
+    --portrait-size: min(calc(234 * var(--image-pixel)), calc(2 * var(--ring-radius) - var(--icon-size) - 20px));
   }
 }
