@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import SiteTopbar from "@/components/SiteTopbar";
 import { displayExternalImage } from "@/lib/displayExternalImage";
 import Bipolar from "@/components/PersonalityTraitScale";
+import portraitStyles from './MemberPortrait.module.css';
 
 export default function MembersPage() {
   const router = useRouter();
@@ -249,7 +250,7 @@ const avatarNode = (m) => (
       {/* Fiche personnage — mêmes teintes prune, ivoire et or que le Profil. */}
       {modalChar && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#090610]/85 p-2 backdrop-blur-md sm:p-5"
+          className={`fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#090610]/85 p-2 backdrop-blur-md sm:p-5 ${portraitStyles.sheet}`}
           onMouseDown={event => { if (event.target === event.currentTarget) setModalChar(null); }}
         >
           <article
@@ -260,19 +261,22 @@ const avatarNode = (m) => (
           >
             <header className="relative shrink-0 border-b border-amber-200/20 bg-gradient-to-r from-[#3b2948] via-[#271b32] to-[#19131f] p-3 pr-12 sm:p-5 sm:pr-14">
               <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-                <div className="grid h-[84px] w-[84px] shrink-0 place-items-center overflow-hidden rounded-full border-2 border-amber-200/50 bg-black/25 ring-4 ring-white/5 sm:h-[120px] sm:w-[120px]">
-                  {modalChar.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={modalChar.avatar_url}
-                      alt={`Portrait de ${modalChar.name}`}
-                      referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="font-serif text-3xl text-amber-100">{modalChar.name?.[0]?.toUpperCase() || '?'}</span>
-                  )}
-                </div>
+                {modalChar.avatar_url ? (
+                  <a
+                    href={modalChar.avatar_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Ouvrir le portrait de ${modalChar.name} (nouvel onglet)`}
+                    className={`h-[84px] w-[84px] shrink-0 cursor-zoom-in overflow-hidden rounded-full border-2 border-amber-200/50 bg-black/25 ring-4 ring-white/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200 sm:h-[120px] sm:w-[120px] ${portraitStyles.trigger}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={modalChar.avatar_url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                  </a>
+                ) : (
+                  <div className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full border-2 border-amber-200/50 bg-black/25 font-serif text-3xl text-amber-100 ring-4 ring-white/5 sm:h-[120px] sm:w-[120px]">
+                    {modalChar.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="mb-1 text-[11px] uppercase tracking-[0.17em] text-amber-200/75">Fiche de personnage</p>
                   <h2 id="member-profile-title" className="break-words font-serif text-xl font-semibold leading-tight text-amber-50 sm:text-3xl">{modalChar.name}</h2>
@@ -419,6 +423,12 @@ const avatarNode = (m) => (
               </div>
             </footer>
           </article>
+          {modalChar.avatar_url && (
+            <div className={portraitStyles.preview} aria-hidden="true">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={modalChar.avatar_url} alt="" referrerPolicy="no-referrer" loading="lazy" />
+            </div>
+          )}
         </div>
       )}
 

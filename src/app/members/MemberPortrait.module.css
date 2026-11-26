@@ -1,0 +1,29 @@
+.preview {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  place-items: center;
+  pointer-events: none;
+  background: rgb(9 6 16 / 68%);
+}
+
+.preview img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  border-radius: 0.5rem;
+  box-shadow: 0 12px 50px rgb(0 0 0 / 55%);
+}
+
+.sheet:has(.trigger:focus-visible) .preview {
+  display: grid;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sheet:has(.trigger:hover) .preview {
+    display: grid;
+  }
+}
