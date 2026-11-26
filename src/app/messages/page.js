@@ -637,13 +637,14 @@ const createConversation = async () => {
       {label}
     </button>
   )
-  if (loading) return <main className="min-h-svh bg-slate-950 p-6 text-white">Chargement…</main>
-  if (error) return <main className="min-h-svh bg-slate-950 p-6 text-rose-300">Erreur : {error}</main>
-
   const bubbleSides = useMemo(
     () => messageSides(messages, currentSpeakerId ? String(currentSpeakerId) : null),
     [messages, currentSpeakerId],
   )
+
+  if (loading) return <main className="min-h-svh bg-slate-950 p-6 text-white">Chargement…</main>
+  if (error) return <main className="min-h-svh bg-slate-950 p-6 text-rose-300">Erreur : {error}</main>
+
   const activeInfo = activeConv ? infoForConv(activeConv) : null
   const activeCharacter = myChars.find(c => String(c.id) === String(currentSpeakerId)) || myChars[0] || null
   const otherParticipants = screen === 'chat' && activeConv
