@@ -436,21 +436,24 @@ export default function NotificationsWidget({ menu = false, onOpen, returnFocusR
         }}
         className={menu
           ? 'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-amber-50 hover:bg-white/10'
-          : `relative rounded-xl border px-3 py-2 text-white ${
-              hasNew
-                ? 'border-amber-300/50 bg-amber-400/20 ring-2 ring-amber-300/50'
-                : 'border-white/20 bg-white/10 hover:bg-white/15'
-            }`}
+          : 'relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-amber-200/25 bg-white/10 text-amber-100 transition hover:bg-white/15'}
+        title={menu ? undefined : 'Notifications'}
         aria-label={
           `Ouvrir les notifications${
             hasNew ? ` (${displayCount})` : ''
           }`
         }
       >
-        {menu ? 'Notifications' : '🔔 Notifications'}
+        {menu ? 'Notifications' : (
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21a2 2 0 0 0 4 0" />
+          </svg>
+        )}
 
         {hasNew && (
-          <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+          <span aria-hidden="true" className={`inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white ${
+            menu ? 'ml-2' : 'absolute -right-1 -top-1'
+          }`}>
             {displayCount}
           </span>
         )}
