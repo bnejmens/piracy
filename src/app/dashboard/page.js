@@ -235,19 +235,29 @@ export default function DashboardPage() {
           }}>
 
             {/* Avatar central */}
-<div
-  className="group relative rounded-full overflow-hidden ring-2 ring-white/20 border border-white/10 bg-white/5 backdrop-blur-sm shadow-[0_20px_80px_rgba(0,0,0,.45)] mx-auto"
-  style={{ width: 'var(--portrait-size)', height: 'var(--portrait-size)' }}
->
-  {displayAvatar
-    ? <img src={displayAvatar} alt="Avatar" className="w-full h-full object-cover" />
-    : <div className="grid place-items-center w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 text-white/85 text-6xl">
-        {(displayName||'?')[0]?.toUpperCase()||'?'}
-      </div>
-  }
-  <div className="pointer-events-none absolute -inset-3 rounded-full blur-2xl bg-sky-300/20 opacity-0 group-hover:opacity-80 transition duration-300" />
-  <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-amber-300/45" />
-</div>
+            <div className="relative mx-auto"
+              style={{ width: 'var(--portrait-size)', height: 'var(--portrait-size)' }}>
+              {displayAvatar ? (
+                <a
+                  href={displayAvatar}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Ouvrir le portrait de ${displayName} (nouvel onglet)`}
+                  className="group absolute inset-0 z-10 cursor-zoom-in rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={displayAvatar}
+                    alt=""
+                    className="pointer-events-none h-full w-full rounded-full object-cover shadow-xl ring-1 ring-amber-300/45 transition-transform duration-300 group-hover:scale-[1.28] group-focus-visible:scale-[1.28] motion-reduce:transition-none"
+                  />
+                </a>
+              ) : (
+                <div className="grid h-full w-full place-items-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-6xl text-white/85 ring-1 ring-amber-300/45">
+                  {(displayName || '?')[0]?.toUpperCase()}
+                </div>
+              )}
+            </div>
 
             {/* Choix personnage */}
 {pickerOpen && (
